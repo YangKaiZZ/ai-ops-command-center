@@ -1,0 +1,71 @@
+# AI Ops Command Center — Backend (Phase 1)
+
+RESTful API + auth + multi-tenant DB schema. This is the foundation the MCP
+tool layer and Claude agent get built on top of in later phases.
+
+## What's here
+- `schema.sql` — multi-tenant MySQL schema (sellers, orders, inventory, messages)
+- `src/config/db.js` — MySQL connection pool
+- `src/controllers/authController.js` — register/login, JWT issuing
+- `src/controllers/ordersController.js` — order queries, scoped per seller
+- `src/middleware/auth.js` — protects routes, attaches `req.sellerId`
+- `src/routes/` — endpoint definitions
+- `src/server.js` — app entrypoint
+
+## Run it locally
+1. Install MySQL if you don't have it (or use XAMPP, which you may already have).
+2. Create the database and tables:
+   ```
+   mysql -u root -p < schema.sql
+   ```
+3. Copy `.env.example` to `.env` and fill in your DB password + a random JWT_SECRET.
+4. Install deps and run:
+   ```
+   npm install
+   npm run dev
+   ```
+5. Test it:
+   ```
+   curl http://localhost:3000/health
+
+   curl -X POST http://localhost:3000/api/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"business_name":"Test Store","email":"test@test.com","password":"password123"}'
+
+   # copy the token from the response, then:
+   curl http://localhost:3000/api/orders \
+     -H "Authorization: Bearer PASTE_TOKEN_HERE"
+   ```
+
+## Next steps (Phase 2)
+- Get Shopee Open Platform API access (partner account + app registration —
+  takes a few days for approval, so start this NOW in parallel with Phase 1).
+- Replace the empty `orders`/`inventory_items` tables with real synced data
+  from Shopee's API.
+- Add a `POST /api/orders/sync` endpoint that pulls fresh data on demand.
+
+## Phase 4: event-triggered agent
+Two triggers run the same agent loop (`src/services/agentService.js`):
+1. **New order** — Shopify calls `POST /api/webhooks/orders-create`. The HMAC
+   signature is verified against `SHOPIFY_WEBHOOK_SECRET`, the order is stored,
+   and the agent decides if it's fulfillable.
+2. **Low stock** — after `POST /api/inventory/sync`, any tracked item that went
+   from above its threshold to at/below it triggers the agent.
+
+The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
+Phase 3 MCP server's read-only tools — the backend spawns that server with a
+10-minute JWT for the seller in question. The decision goes to Slack
+(`SLACK_WEBHOOK_URL`) or, if that's blank, the server console.
+
+Settings in `.env`: `SHOPIFY_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`,
+`SLACK_WEBHOOK_URL`, `MCP_SERVER_PATH` (see `.env.example`).
+
+Test everything up to the LLM call with a signed fake order (backend running):
+```
+npm run test:agent
+```
+
+To receive real webhooks, expose the backend publicly (e.g. `ngrok http 3000`)
+and register `https://<tunnel>/api/webhooks/orders-create` for the
+`orders/create` topic, then set `SHOPIFY_WEBHOOK_SECRET` to the secret Shopify
+signs with (your app's client secret).
