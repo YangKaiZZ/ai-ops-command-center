@@ -1,4 +1,3 @@
-const path = require('path');
 const express = require('express');
 require('dotenv').config();
 
@@ -16,9 +15,6 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-// The dashboard: static files served from the same origin as the API, so no CORS.
-app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', ordersRoutes);

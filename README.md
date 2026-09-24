@@ -85,14 +85,6 @@ Existing database? Create the new table with the `CREATE TABLE decisions`
 block from `schema.sql`.
 
 ### Dashboard UI
-Open `http://localhost:3000/` and sign in with a seller account. It's plain
-HTML/CSS/JS in `public/`, served by the same Express app, so there's no build
-step and no CORS. It shows:
-- summary tiles: orders needing action, orders the agent put on hold, low-stock items
-- the agent's decision feed (verdict, order, reasoning)
-- low-stock items with stock-vs-threshold bars
-- all orders, each with the agent's latest verdict
-
-It refreshes every 30 seconds. "Sync from Shopify" pulls fresh orders and
-inventory - note an inventory sync can trigger the low-stock agent (and a
-Slack post) if an item just crossed its threshold.
+The dashboard is a separate Next.js app, `ai-ops-dashboard`, which runs on
+port 3005 and proxies `/api/*` to this backend. See that project's README.
+This backend only serves the API.
