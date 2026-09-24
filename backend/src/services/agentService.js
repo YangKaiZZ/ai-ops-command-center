@@ -157,7 +157,7 @@ async function runAgent(sellerId, trigger) {
         try {
           args = JSON.parse(call.function.arguments || '{}');
         } catch {
-          // Model sent malformed JSON args; our tools take none anyway.
+          // Model sent malformed JSON args: call with none, so the tool uses its defaults.
         }
         const result = await mcp.callTool(call.function.name, args);
         console.log(`${tag} tool ${call.function.name}${result.isError ? ' ERROR' : ''} (${result.text.length} chars)`);

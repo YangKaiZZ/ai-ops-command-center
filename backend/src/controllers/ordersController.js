@@ -1,40 +1,138 @@
 const pool = require('../config/db');
 
-// GET /api/orders
-// Returns this seller's orders only — scoped by req.sellerId from the auth middleware.
+const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
+const FINANCIAL_STATUSES = ['pending', 'authorized', 'partially_paid', 'paid', 'partially_refunded', 'refunded', 'voided', 'expired'];
+const MAX_LIMIT = 200;
+const COLUMNS = 'id, shopify_order_id, order_number, status, financial_status, buyer_name, total_amount, order_placed_at, synced_at';
+
+// "Needs action": not yet (fully) shipped, or not yet paid; refunded/voided orders are dead.
+const PENDING_WHERE = `(status IN ('unfulfilled', 'partial')
+    OR financial_status IN ('pending', 'authorized', 'partially_paid'))
+  AND COALESCE(financial_status, '') NOT IN ('refunded', 'voided')`;
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A date (YYYY-MM-DD, a whole UTC day) or an ISO date-time, as epoch seconds.
+// For `to`, a bare date means the end of that day.
+function parseInstant(value, name, endOfDay) {
+  if (typeof value !== 'string' || value.length > 40) return { error: `${name} must be a date like 2026-09-25` };
+  const isDay = DAY.test(value);
+  const ms = Date.parse(isDay ? `${value}T00:00:00Z` : value);
+  if (Number.isNaN(ms) || (!isDay && !/^\d{4}-\d{2}-\d{2}T/.test(value))) {
+    return { error: `${name} must be a date like 2026-09-25` };
+  }
+  return { seconds: Math.floor(ms / 1000) + (isDay && endOfDay ? 86400 - 1 : 0) };
+}
+
+function parseWhole(value, name, min, max, fallback) {
+  if (value === undefined) return { value: fallback };
+  if (typeof value !== 'string' || !/^\d{1,7}$/.test(value) || Number(value) < min || Number(value) > max) {
+    return { error: `${name} must be a whole number from ${min} to ${max}` };
+  }
+  return { value: Number(value) };
+}
+
+// Turns the query string into SQL conditions. Returns { error } for bad input,
+// so a caller (often a model through the MCP server) is told what to fix.
+function parseOrderQuery(query = {}, { defaultLimit = 50, filters = true } = {}) {
+  const limit = parseWhole(query.limit, 'limit', 1, MAX_LIMIT, defaultLimit);
+  if (limit.error) return limit;
+  const offset = parseWhole(query.offset, 'offset', 0, 1000000, 0);
+  if (offset.error) return offset;
+
+  const where = [];
+  const params = [];
+  if (filters) {
+    if (query.status !== undefined) {
+      if (!FULFILLMENT_STATUSES.includes(query.status)) return { error: `status must be one of: ${FULFILLMENT_STATUSES.join(', ')}` };
+      where.push('status = ?');
+      params.push(query.status);
+    }
+    if (query.financial_status !== undefined) {
+      if (!FINANCIAL_STATUSES.includes(query.financial_status)) {
+        return { error: `financial_status must be one of: ${FINANCIAL_STATUSES.join(', ')}` };
+      }
+      where.push('financial_status = ?');
+      params.push(query.financial_status);
+    }
+    let from;
+    let to;
+    if (query.from !== undefined) {
+      from = parseInstant(query.from, 'from', false);
+      if (from.error) return from;
+      // UNIX_TIMESTAMP reads the stored instant, whatever the connection's time zone.
+      where.push('UNIX_TIMESTAMP(order_placed_at) >= ?');
+      params.push(from.seconds);
+    }
+    if (query.to !== undefined) {
+      to = parseInstant(query.to, 'to', true);
+      if (to.error) return to;
+      where.push('UNIX_TIMESTAMP(order_placed_at) <= ?');
+      params.push(to.seconds);
+    }
+    if (from && to && from.seconds > to.seconds) return { error: 'from must not be after to' };
+    if (query.number !== undefined) {
+      const number = typeof query.number === 'string' ? query.number.trim().replace(/^#/, '') : '';
+      if (!number || number.length > 50) return { error: 'number must be an order number like #1001' };
+      where.push('order_number IN (?, ?)');
+      params.push(`#${number}`, number);
+    }
+  }
+  return { limit: limit.value, offset: offset.value, where, params };
+}
+
+// Each order's most recent agent decision, or null.
+async function attachLatestDecisions(sellerId, orders) {
+  if (!orders.length) return orders;
+  const [rows] = await pool.query(
+    `SELECT order_id, action_taken, reasoning, created_at FROM decisions
+     WHERE seller_id = ? AND order_id IN (?) ORDER BY created_at DESC, id DESC`,
+    [sellerId, orders.map((o) => o.id)]
+  );
+  const latest = new Map();
+  for (const { order_id, ...decision } of rows) if (!latest.has(order_id)) latest.set(order_id, decision);
+  return orders.map((order) => ({ ...order, latest_decision: latest.get(order.id) ?? null }));
+}
+
+async function pageOfOrders(sellerId, parsed, extraWhere, orderBy) {
+  const where = ['seller_id = ?', ...(extraWhere ? [extraWhere] : []), ...parsed.where].join(' AND ');
+  const params = [sellerId, ...parsed.params];
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM orders WHERE ${where}`, params);
+  const [rows] = await pool.query(`SELECT ${COLUMNS} FROM orders WHERE ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`, [
+    ...params,
+    parsed.limit,
+    parsed.offset,
+  ]);
+  return { orders: rows, total: Number(total) };
+}
+
+// GET /api/orders?limit=50&offset=0&status=&financial_status=&from=&to=&number=
+// This seller's orders, newest first, a page at a time, each with the agent's
+// latest decision. `total` counts every order matching the filters.
 async function getOrders(req, res) {
+  const parsed = parseOrderQuery(req.query);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM orders WHERE seller_id = ? ORDER BY order_placed_at DESC',
-      [req.sellerId]
-    );
-    res.json({ orders: rows });
+    const { orders, total } = await pageOfOrders(req.sellerId, parsed, null, 'order_placed_at DESC, id DESC');
+    res.json({ orders: await attachLatestDecisions(req.sellerId, orders), total, limit: parsed.limit, offset: parsed.offset });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch orders' });
   }
 }
 
-// GET /api/orders/pending
-// Orders that need action: not yet (fully) shipped, or not yet paid.
-// Refunded/voided orders are dead, so they're skipped. Oldest first = most urgent.
-// This is the exact query the "get_pending_orders" MCP tool will call in Phase 3.
+// GET /api/orders/pending?limit=50&offset=0
+// Orders that need action, oldest (most urgent) first. `total` counts all of them.
 async function getPendingOrders(req, res) {
+  const parsed = parseOrderQuery(req.query, { filters: false });
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
   try {
-    const [rows] = await pool.query(
-      `SELECT * FROM orders
-       WHERE seller_id = ?
-       AND (status IN ('unfulfilled', 'partial')
-            OR financial_status IN ('pending', 'authorized', 'partially_paid'))
-       AND COALESCE(financial_status, '') NOT IN ('refunded', 'voided')
-       ORDER BY order_placed_at ASC`,
-      [req.sellerId]
-    );
-    res.json({ pending_orders: rows });
+    const { orders, total } = await pageOfOrders(req.sellerId, parsed, PENDING_WHERE, 'order_placed_at ASC, id ASC');
+    res.json({ pending_orders: orders, total, limit: parsed.limit, offset: parsed.offset });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch pending orders' });
   }
 }
 
-module.exports = { getOrders, getPendingOrders };
+module.exports = { getOrders, getPendingOrders, parseOrderQuery, FULFILLMENT_STATUSES, FINANCIAL_STATUSES };

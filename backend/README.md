@@ -12,7 +12,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -342,7 +342,13 @@ sent, so an outage can't lose one). `action_taken` is the agent's
 verdict line couldn't be parsed. Nothing is changed in Shopify yet.
 
 Read endpoints for the dashboard (all need the seller's JWT):
-- `GET /api/orders` - synced orders, newest first (`status` = fulfillment, plus `financial_status`)
+- `GET /api/orders` - synced orders, newest first, a page at a time: `{ orders, total, limit, offset }`.
+  Each order has `status` (fulfillment), `financial_status` and `latest_decision` (the agent's most
+  recent verdict and reasoning, or null). Query: `limit` (1-200, default 50), `offset`, `status`
+  (unfulfilled, partial, fulfilled, restocked), `financial_status` (paid, pending, refunded, ...),
+  `from` / `to` (a UTC day `YYYY-MM-DD`, whole day included, or an ISO date-time) and `number`
+  (`#1001` or `1001`). Bad values get a 400 saying what's allowed; `total` counts every match.
+- `GET /api/orders/pending` - orders that need action, oldest first: `{ pending_orders, total, limit, offset }`
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
 - `GET /api/inventory` - every tracked item with its threshold, low ones first

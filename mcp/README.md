@@ -5,14 +5,20 @@ REST API as tools, so an AI model can look at a seller's store and act on it:
 
 | Tool | What it does |
 | --- | --- |
-| `get_pending_orders` | Orders that are unpaid or waiting to ship |
+| `get_pending_orders` | Orders that are unpaid or waiting to ship, oldest first (`limit`, `offset`) |
 | `check_low_stock` | Items at or below their low-stock level |
-| `get_all_orders` | Every synced order, newest first |
+| `get_all_orders` | Orders newest first, with the agent's verdict; filter by `status`, `financial_status`, `from`/`to` (UTC days); `limit`, `offset` |
+| `get_order` | One order by number (`#1001`), with the agent's latest reasoning |
 | `sync_latest_data` | Pulls the latest orders and stock from Shopify |
+
+Order lists come back one page at a time (20 by default, at most 100) as
+`{ total, returned, offset, next_offset, orders }`, so a big store doesn't
+flood the model's context: `total` answers "how many" without reading every
+order, and `next_offset` is where the next page starts (null on the last).
 
 It's used in two places:
 - **The backend's agent** starts it as a subprocess for each run, with a
-  10-minute token for that one seller, and gets the three read-only tools.
+  10-minute token for that one seller, and gets the four read-only tools.
   (`sync_latest_data` is left out on purpose: a sync can trigger the agent,
   so an agent that could sync could trigger itself.)
 - **Claude Desktop**, so a seller can ask about their store in a chat.
@@ -21,7 +27,7 @@ It never touches the database. It only calls the REST API with the seller's
 credentials, so every tool call is limited to that seller's data.
 
 ## Files
-- `server.js` — the four tools
+- `server.js` — the five tools
 - `apiClient.js` — the HTTP client for the backend. Errors come back as
   messages the model can pass on ("the API key was revoked", "the backend
   isn't reachable").

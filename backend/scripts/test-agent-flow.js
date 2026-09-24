@@ -157,7 +157,7 @@ async function main() {
       check(openAITools.every((t) => t.function.parameters.type === 'object'), 'converted to OpenAI function schema');
 
       const pending = await mcp.callTool('get_pending_orders');
-      const pendingOrders = pending.isError ? [] : JSON.parse(pending.text);
+      const pendingOrders = pending.isError ? [] : JSON.parse(pending.text).orders;
       check(!pending.isError, 'get_pending_orders', `${pendingOrders.length} pending`);
       check(pendingOrders.some((o) => o.order_number === order.name), `pending list includes ${order.name}`);
 

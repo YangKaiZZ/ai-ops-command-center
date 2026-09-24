@@ -5,25 +5,63 @@ const api = require('./apiClient');
 
 const server = new McpServer({
   name: 'ai-ops-command-center',
-  version: '1.0.0',
+  version: '1.1.0',
 });
 
+const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
+const FINANCIAL_STATUSES = ['pending', 'authorized', 'partially_paid', 'paid', 'partially_refunded', 'refunded', 'voided', 'expired'];
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const limitInput = z.number().int().min(1).max(100).optional().describe('How many orders to return (default 20, at most 100)');
+const offsetInput = z
+  .number()
+  .int()
+  .min(0)
+  .optional()
+  .describe('How many to skip, for the next page: pass next_offset from the previous result');
+
+// One order, without what a model doesn't need. A list keeps only the verdict
+// of the agent's latest decision; a single order keeps its reasoning too.
+function slim(order, withReasoning) {
+  const { synced_at, latest_decision, ...rest } = order;
+  if (latest_decision === undefined) return rest;
+  const decision = latest_decision && {
+    verdict: latest_decision.action_taken,
+    decided_at: latest_decision.created_at,
+    ...(withReasoning ? { reasoning: latest_decision.reasoning } : {}),
+  };
+  return { ...rest, latest_decision: decision };
+}
+
+// A page as compact JSON, with the count and where the next page starts.
+function pageText(orders, total, offset) {
+  const end = offset + orders.length;
+  return JSON.stringify({
+    total,
+    returned: orders.length,
+    offset,
+    next_offset: end < total ? end : null,
+    orders: orders.map((o) => slim(o, false)),
+  });
+}
+
+const query = (params) =>
+  Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]));
+
 // --- Tool 1: get pending orders ---
-// Claude calls this when the seller asks something like
-// "what orders need my attention" or "what's still unshipped".
+// "What orders need my attention", "what's still unshipped".
 server.registerTool(
   'get_pending_orders',
   {
     title: 'Get Pending Orders',
     description:
-      'Returns orders that are unpaid or awaiting shipment. Use this to answer questions about orders that need action.',
-    inputSchema: {},
+      'Returns orders that need action (unshipped, partly shipped or unpaid; not refunded or voided), oldest first, one page at a time. ' +
+      '`total` is how many need action in all; when next_offset is not null there are more.',
+    inputSchema: { limit: limitInput, offset: offsetInput },
   },
-  async () => {
-    const { data } = await api.get('/api/orders/pending');
-    return {
-      content: [{ type: 'text', text: JSON.stringify(data.pending_orders, null, 2) }],
-    };
+  async ({ limit = 20, offset = 0 }) => {
+    const { data } = await api.get('/api/orders/pending', { params: query({ limit, offset }) });
+    return { content: [{ type: 'text', text: pageText(data.pending_orders, data.total, offset) }] };
   }
 );
 
@@ -44,26 +82,60 @@ server.registerTool(
   }
 );
 
-// --- Tool 3: get all orders ---
-// Slightly broader than get_pending_orders — useful for "how many orders
-// today" or "show me recent sales" type questions.
+// --- Tool 3: search orders ---
+// "How many orders this week", "show me unpaid orders from September".
 server.registerTool(
   'get_all_orders',
   {
-    title: 'Get All Orders',
+    title: 'Get Orders',
     description:
-      'Returns all synced orders for this seller, most recent first. Use this for general order history or sales summary questions.',
-    inputSchema: {},
+      'Returns synced orders, newest first, one page at a time, each with the verdict of the agent\'s latest decision. ' +
+      'Filter by fulfillment status, payment status and date range (UTC days). `total` counts every order that matches, ' +
+      'so to answer "how many" use total with limit 1 instead of reading every order. When next_offset is not null there are more.',
+    inputSchema: {
+      limit: limitInput,
+      offset: offsetInput,
+      status: z.enum(FULFILLMENT_STATUSES).optional().describe('Only orders with this fulfillment status'),
+      financial_status: z.enum(FINANCIAL_STATUSES).optional().describe('Only orders with this payment status'),
+      from: z.string().regex(DATE, 'use YYYY-MM-DD').optional().describe('Only orders placed on or after this day, YYYY-MM-DD (UTC)'),
+      to: z.string().regex(DATE, 'use YYYY-MM-DD').optional().describe('Only orders placed on or before this day, YYYY-MM-DD (UTC)'),
+    },
   },
-  async () => {
-    const { data } = await api.get('/api/orders');
-    return {
-      content: [{ type: 'text', text: JSON.stringify(data.orders, null, 2) }],
-    };
+  async ({ limit = 20, offset = 0, status, financial_status, from, to }) => {
+    const { data } = await api.get('/api/orders', { params: query({ limit, offset, status, financial_status, from, to }) });
+    return { content: [{ type: 'text', text: pageText(data.orders, data.total, offset) }] };
   }
 );
 
-// --- Tool 4: trigger a fresh sync ---
+// --- Tool 4: one order ---
+// "What happened with order 1001?"
+server.registerTool(
+  'get_order',
+  {
+    title: 'Get Order',
+    description: 'Looks up one order by its number (e.g. "#1001"), with the agent\'s latest decision about it and the reasoning.',
+    inputSchema: {
+      order_number: z.string().min(1).max(50).describe('The order number, e.g. "#1001" or "1001"'),
+    },
+  },
+  async ({ order_number }) => {
+    const { data } = await api.get('/api/orders', { params: { number: order_number, limit: '5' } });
+    if (!data.orders.length) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `No order ${order_number} is synced for this store. If it's new, sync_latest_data pulls the latest from Shopify.`,
+          },
+        ],
+      };
+    }
+    const orders = data.orders.map((o) => slim(o, true));
+    return { content: [{ type: 'text', text: JSON.stringify(orders.length === 1 ? orders[0] : orders) }] };
+  }
+);
+
+// --- Tool 5: trigger a fresh sync ---
 // Lets the seller say "refresh my data" or "pull the latest orders"
 // and have Claude actually trigger the sync before answering.
 server.registerTool(
