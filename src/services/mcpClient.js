@@ -1,8 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport, getDefaultEnvironment } = require('@modelcontextprotocol/sdk/client/stdio.js');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-this';
+const { JWT_SECRET } = require('../config/secrets');
 
 // The agent only gets read-only tools. sync_latest_data is left out on
 // purpose: an inventory sync can itself trigger the agent, so letting the

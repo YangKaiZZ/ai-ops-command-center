@@ -1,8 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-this';
+const { JWT_SECRET } = require('../config/secrets');
 
 // POST /api/auth/register
 // Creates a new seller (tenant). Password is hashed, never stored plain.

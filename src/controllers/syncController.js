@@ -1,21 +1,8 @@
 const pool = require('../config/db');
 const { fetchOrders, fetchProducts } = require('../services/shopifyService');
 const { upsertOrder } = require('../models/orderModel');
+const { getStoreCredentials } = require('../models/sellerModel');
 const { triggerAgent } = require('../services/agentService');
-
-// Small helper: every sync route needs this seller's stored Shopify
-// credentials before it can call the API.
-async function getStoreCredentials(sellerId) {
-  const [rows] = await pool.query(
-    'SELECT shopify_shop_domain, shopify_access_token FROM sellers WHERE id = ?',
-    [sellerId]
-  );
-  const seller = rows[0];
-  if (!seller || !seller.shopify_shop_domain || !seller.shopify_access_token) {
-    return null;
-  }
-  return seller;
-}
 
 // POST /api/orders/sync
 // Pulls live orders from Shopify and upserts them into our orders table.
@@ -26,7 +13,7 @@ async function syncOrders(req, res) {
       return res.status(400).json({ error: 'Connect your Shopify store first via /api/store/connect' });
     }
 
-    const orders = await fetchOrders(creds.shopify_shop_domain, creds.shopify_access_token);
+    const orders = await fetchOrders(creds.shopDomain, creds.accessToken);
 
     for (const order of orders) {
       await upsertOrder(req.sellerId, order);
@@ -48,7 +35,7 @@ async function syncInventory(req, res) {
       return res.status(400).json({ error: 'Connect your Shopify store first via /api/store/connect' });
     }
 
-    const products = await fetchProducts(creds.shopify_shop_domain, creds.shopify_access_token);
+    const products = await fetchProducts(creds.shopDomain, creds.accessToken);
     let count = 0;
     const untrackedVariantIds = [];
 

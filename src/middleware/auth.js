@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-this';
+const { JWT_SECRET } = require('../config/secrets');
 
 // This is what makes the whole app multi-tenant: every protected route
 // runs through this first, and req.sellerId is used to scope every DB

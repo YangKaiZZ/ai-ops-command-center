@@ -18,7 +18,18 @@ tool layer and Claude agent get built on top of in later phases.
    ```
    mysql -u root -p < schema.sql
    ```
-3. Copy `.env.example` to `.env` and fill in your DB password + a random JWT_SECRET.
+3. Copy `.env.example` to `.env` and fill in your DB password, plus a random
+   `JWT_SECRET` and `ENCRYPTION_KEY` (the server refuses to start without them).
+   Generate each with:
+   ```
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+   Shopify access tokens are encrypted with `ENCRYPTION_KEY` before they're
+   stored. Keep the key safe: without it, stored tokens can't be read.
+
+   **Upgrading an existing database?** Run `npm run migrate`. It adds any
+   new columns/tables and encrypts tokens that were stored in plain text.
+   It's safe to run more than once.
 4. Install deps and run:
    ```
    npm install

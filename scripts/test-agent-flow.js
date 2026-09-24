@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const pool = require('../src/config/db');
+const { JWT_SECRET } = require('../src/config/secrets');
 const { connectAsSeller } = require('../src/services/mcpClient');
 const { checkOrderStock } = require('../src/services/stockCheck');
 const { describeTrigger, toOpenAITools, createLLMClient } = require('../src/services/agentService');
@@ -197,7 +198,7 @@ async function main() {
     }
 
     console.log('\n5. Dashboard endpoints');
-    const token = jwt.sign({ sellerId: seller.id }, process.env.JWT_SECRET || 'dev-secret-change-this', { expiresIn: '5m' });
+    const token = jwt.sign({ sellerId: seller.id }, JWT_SECRET, { expiresIn: '5m' });
     const auth = { headers: { Authorization: `Bearer ${token}` } };
 
     const { data: ordersData } = await axios.get(`${BASE}/api/orders`, auth);

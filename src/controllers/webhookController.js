@@ -1,5 +1,5 @@
-const pool = require('../config/db');
 const { upsertOrder } = require('../models/orderModel');
+const { findSellerByShopDomain } = require('../models/sellerModel');
 const { triggerAgent } = require('../services/agentService');
 
 // Shopify delivers at-least-once, so the same webhook can arrive twice.
@@ -35,8 +35,7 @@ async function handleOrderCreated(req, res) {
   try {
     // No JWT on webhooks — the shop domain header tells us which seller this is.
     const shopDomain = req.get('X-Shopify-Shop-Domain');
-    const [rows] = await pool.query('SELECT id FROM sellers WHERE shopify_shop_domain = ?', [shopDomain]);
-    const seller = rows[0];
+    const seller = await findSellerByShopDomain(shopDomain);
     if (!seller) {
       // Signed by our app but not a connected store: acknowledge so Shopify stops retrying.
       console.warn(`[webhook] orders/create for unknown shop ${shopDomain} - ignored`);
