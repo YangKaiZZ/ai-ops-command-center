@@ -18,16 +18,15 @@ listed at the end.
   as reasons to hold.
 - **In-dashboard chat** using the same tools. Host the MCP server remotely
   with OAuth, so power users paste a URL instead of editing JSON.
-- **MCP tool inputs** (limit, status, date range, single-order lookup):
-  `get_all_orders` currently puts every order into the model's context.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
 
 ## Dashboard
 
 - **Overview page** with the key numbers.
 - **Order detail view** with line items and an "Open in Shopify" link.
-- **Search, filters and pagination**: `/api/orders` currently returns every
-  order with no limit.
+- **Search and filters on the Orders page.** The API already filters by
+  status, payment status, date range and order number; the page only pages
+  through them so far.
 - **Thumbs up/down on each agent decision**, to get an accuracy figure.
 
 ## Done: before production
@@ -38,3 +37,11 @@ listed at the end.
 - Sign-in and sign-up rate limiting.
 - Password reset by emailed link, signing out older sessions.
 - Invite-only sign-up (`SIGNUP_INVITE_CODE`).
+
+## Done since
+
+- Orders come a page at a time with a total, filterable by status, payment
+  status, date range and order number; the Orders page is paginated.
+- MCP tools take matching inputs (`limit`, `offset`, `status`,
+  `financial_status`, `from`/`to`) and return a page with `total` and
+  `next_offset`; `get_order` looks one order up with the agent's reasoning.

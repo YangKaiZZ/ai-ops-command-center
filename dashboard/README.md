@@ -9,7 +9,7 @@ orders, the agent's decisions, and stock.
 - `/login`: sign-in, with links to sign-up and to password reset
 - `/forgot-password`: asks for a reset link by email (the answer is the same whether or not the address has an account)
 - `/reset-password?token=...`: the page the emailed link opens; sets a new password and signs out older sessions
-- `/orders`: a setup checklist until the store is connected and an alert channel is on, then every synced order with its shipping status, payment status and the agent's latest verdict
+- `/orders`: a setup checklist until the store is connected and an alert channel is on, then the synced orders, newest first and 50 to a page (`/orders?page=2`), with shipping status, payment status and the agent's latest verdict
 - `/decisions`: the agent's decisions, newest first, as cards (order, verdict, headline, reasoning as bullets)
 - `/stock`: one bar per item against its own low-stock level, which can be edited in place; shows low items or all items. Red = out of stock, amber = low. (`/low-stock` redirects here.)
 - `/settings`: connect the store (Connect with Shopify, or a pasted Admin API token) and disconnect it; alerts by Slack, email (confirmed with a code) and Telegram, with a test alert; the default low-stock level; API keys for the MCP server in Claude Desktop; customer data requests

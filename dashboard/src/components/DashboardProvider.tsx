@@ -4,17 +4,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import { apiFetch, UnauthorizedError } from "@/lib/api";
 import { clearSession, loadSession, takeSignOutReason, useSession } from "@/lib/session";
-import type { Decision, InventoryItem, Order, Session, Settings } from "@/lib/types";
+import type { Decision, InventoryItem, Session, Settings } from "@/lib/types";
 
 const REFRESH_MS = 30_000;
 
 type DashboardData = {
-  orders: Order[];
-  pending: Order[];
+  pendingCount: number; // orders that need action; the Orders page loads its own page of orders
   inventory: InventoryItem[]; // every tracked item, low ones first
   lowStock: InventoryItem[];
   decisions: Decision[];
-  latestByOrder: Map<number, Decision>; // each order's most recent agent decision
   settings: Settings; // store connection and alert channels, for setup prompts
 };
 
@@ -60,19 +58,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [{ orders }, { pending_orders }, { items }, { decisions }, settings] = await Promise.all([
-        apiFetch<{ orders: Order[] }>("/api/orders", token),
-        apiFetch<{ pending_orders: Order[] }>("/api/orders/pending", token),
+      const [pending, { items }, { decisions }, settings] = await Promise.all([
+        apiFetch<{ total: number }>("/api/orders/pending?limit=1", token),
         apiFetch<{ items: InventoryItem[] }>("/api/inventory", token),
         apiFetch<{ decisions: Decision[] }>("/api/decisions?limit=200", token),
         apiFetch<Settings>("/api/settings", token),
       ]);
-      // Decisions come newest first, so the first one seen per order is its latest.
-      const latestByOrder = new Map<number, Decision>();
-      for (const d of decisions) if (d.order_id != null && !latestByOrder.has(d.order_id)) latestByOrder.set(d.order_id, d);
-
       const lowStock = items.filter((item) => item.is_low);
-      setData({ orders, pending: pending_orders, inventory: items, lowStock, decisions, latestByOrder, settings });
+      setData({ pendingCount: pending.total, inventory: items, lowStock, decisions, settings });
       setUpdatedAt(new Date());
       setBanner((b) => (b?.isError ? null : b));
     } catch (err) {

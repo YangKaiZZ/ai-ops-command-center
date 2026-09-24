@@ -8,7 +8,11 @@ export type Order = {
   buyer_name: string | null;
   total_amount: string | null; // DECIMAL comes back as a string
   order_placed_at: string | null;
+  latest_decision: { action_taken: Action; created_at: string } | null; // the agent's most recent verdict
 };
+
+// GET /api/orders: one page, and how many orders there are in all.
+export type OrdersPage = { orders: Order[]; total: number; limit: number; offset: number };
 
 // GET /api/inventory: every tracked item; low = at or below its threshold.
 export type InventoryItem = {
