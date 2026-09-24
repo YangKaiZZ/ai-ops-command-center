@@ -33,6 +33,18 @@ Sign in with a seller account. It uses the same sign-in as the backend
 browser only talks to this app and the backend needs no CORS. Set
 `BACKEND_URL` to point somewhere other than `http://localhost:3000`.
 
+## Docker
+The `Dockerfile` builds a standalone server (`output: "standalone"`, turned on
+by `NEXT_OUTPUT=standalone` in the image build only). `BACKEND_URL` is a build
+argument because Next bakes rewrites in at build time:
+
+```bash
+docker build --build-arg BACKEND_URL=http://backend:3000 -t ai-ops-dashboard .
+```
+
+To run the whole app on a server, use the [ai-ops-deploy](../ai-ops-deploy)
+folder's Docker Compose setup and its README.
+
 ## Checks
 ```bash
 npm test         # verdict/stock-color/reasoning/install-link helpers

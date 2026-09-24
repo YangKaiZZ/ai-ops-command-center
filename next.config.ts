@@ -4,6 +4,9 @@ import type { NextConfig } from "next";
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
+  // The Docker build sets NEXT_OUTPUT=standalone: a self-contained server.js
+  // with only the files it needs. Locally, `next start` works as before.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   // Proxy the API through this app, so the browser only ever talks to one
   // origin: no CORS setup on the backend, and the same /api paths as before.
   async rewrites() {
