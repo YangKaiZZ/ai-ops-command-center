@@ -1,0 +1,53 @@
+# AI Ops Dashboard (Phase 5)
+
+Next.js + Tailwind dashboard for the AI Ops Command Center. It reads the
+[ai-ops-backend](../ai-ops-backend/ai-ops-backend) API and shows a seller's
+orders, the agent's decisions, and stock.
+
+## Pages
+- `/signup`: business name, email, password; then on to Settings to connect the store. Shopify's install link sends new stores here as `/signup?shop=<store>.myshopify.com`, and that store is carried through to Settings (also via "Sign in" for an existing account)
+- `/login`: sign-in, with a link to sign-up
+- `/orders`: a setup checklist until the store is connected and an alert channel is on, then every synced order with its shipping status, payment status and the agent's latest verdict
+- `/decisions`: the agent's decisions, newest first, as cards (order, verdict, headline, reasoning as bullets)
+- `/stock`: one bar per item against its own low-stock level, which can be edited in place; shows low items or all items. Red = out of stock, amber = low. (`/low-stock` redirects here.)
+- `/settings`: connect the store (Connect with Shopify, or a pasted Admin API token) and disconnect it; alerts by Slack, email (confirmed with a code) and Telegram, with a test alert; the default low-stock level; API keys for the MCP server in Claude Desktop; customer data requests
+
+The dashboard pages share one data layer (`src/components/DashboardProvider.tsx`).
+It refreshes every 30 seconds, and "Sync from Shopify" calls the backend's
+sync endpoints (disabled until a store is connected). An inventory sync can
+trigger the low-stock agent, which sends an alert.
+
+## Run it
+The backend must be running on port 3000.
+
+```bash
+npm install
+npm run dev      # http://localhost:3005
+```
+
+Sign in with a seller account. It uses the same sign-in as the backend
+(`POST /api/auth/login`). The JWT is stored in localStorage as
+`aiops.session`, and any 401 sends you back to sign-in.
+
+`/api/*` is proxied to the backend by a rewrite in `next.config.ts`, so the
+browser only talks to this app and the backend needs no CORS. Set
+`BACKEND_URL` to point somewhere other than `http://localhost:3000`.
+
+## Docker
+The `Dockerfile` builds a standalone server (`output: "standalone"`, turned on
+by `NEXT_OUTPUT=standalone` in the image build only). `BACKEND_URL` is a build
+argument because Next bakes rewrites in at build time:
+
+```bash
+docker build --build-arg BACKEND_URL=http://backend:3000 -t ai-ops-dashboard .
+```
+
+To run the whole app on a server, use the [ai-ops-deploy](../ai-ops-deploy)
+folder's Docker Compose setup and its README.
+
+## Checks
+```bash
+npm test         # verdict/stock-color/reasoning/install-link helpers
+npm run lint
+npm run build
+```
