@@ -11,7 +11,8 @@ CREATE TABLE sellers (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   shopify_shop_domain VARCHAR(255),     -- e.g. ai-ops.myshopify.com
-  shopify_access_token TEXT,            -- Admin API access token (encrypt in prod)
+  shopify_access_token TEXT,            -- Admin API access token, encrypted (enc:v1:...)
+  slack_webhook_url TEXT,               -- this seller's Slack incoming webhook, encrypted
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

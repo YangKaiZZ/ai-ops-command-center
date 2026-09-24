@@ -65,11 +65,21 @@ Two triggers run the same agent loop (`src/services/agentService.js`):
 
 The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 Phase 3 MCP server's read-only tools — the backend spawns that server with a
-10-minute JWT for the seller in question. The decision goes to Slack
-(`SLACK_WEBHOOK_URL`) or, if that's blank, the server console.
+10-minute JWT for the seller in question. The decision goes to that seller's
+own Slack channel, or to the server console if they haven't set one.
+
+Each seller sets their Slack incoming-webhook URL through the settings API
+(the dashboard's Settings page). It's stored encrypted, and only
+`https://hooks.slack.com/...` URLs are accepted:
+- `GET /api/settings` - account, store and Slack status (never the secrets themselves)
+- `PUT /api/settings/slack` with `{ "webhook_url": "https://hooks.slack.com/services/..." }`
+- `DELETE /api/settings/slack`
+
+The old global `SLACK_WEBHOOK_URL` in `.env` is ignored: it sent every
+seller's orders to one channel.
 
 Settings in `.env`: `SHOPIFY_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`,
-`SLACK_WEBHOOK_URL`, `MCP_SERVER_PATH` (see `.env.example`).
+`MCP_SERVER_PATH` (see `.env.example`).
 
 Test everything up to the LLM call with a signed fake order (backend running):
 ```

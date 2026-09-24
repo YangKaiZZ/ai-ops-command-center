@@ -23,8 +23,23 @@ async function encryptColumn(table, column) {
   return changed ? `encrypted ${changed} value(s)` : null;
 }
 
+async function columnExists(table, column) {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    [table, column]
+  );
+  return rows.length > 0;
+}
+
+async function addColumn(table, column, definition) {
+  if (await columnExists(table, column)) return null;
+  await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return 'added';
+}
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
+  ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
 ];
 
 async function main() {

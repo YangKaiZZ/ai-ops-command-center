@@ -129,7 +129,7 @@ async function runAgent(sellerId, trigger) {
         }
 
         const decision = `*${headline(trigger)}*\n${reasoning}`;
-        await postDecision(decision);
+        await postDecision(sellerId, decision);
         return decision;
       }
 
