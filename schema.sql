@@ -61,6 +61,21 @@ CREATE TABLE customer_messages (
   FOREIGN KEY (seller_id) REFERENCES sellers(id)
 );
 
+-- Long-lived API keys for tools (e.g. the MCP server in Claude Desktop).
+-- Only a SHA-256 hash is stored; the key is shown once when it's created.
+CREATE TABLE api_keys (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  key_prefix VARCHAR(20) NOT NULL,          -- first characters, to tell keys apart in the UI
+  key_hash CHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TIMESTAMP NULL,
+  revoked_at TIMESTAMP NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id),
+  UNIQUE KEY uniq_key_hash (key_hash)
+);
+
 -- Every decision the Phase 4 agent makes, for the dashboard.
 -- action_taken is what the agent *recommended* (it doesn't act on Shopify yet):
 -- fulfill, hold, low_stock_alert, or unknown if its verdict couldn't be parsed.

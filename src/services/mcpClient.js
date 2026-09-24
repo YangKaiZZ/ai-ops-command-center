@@ -23,7 +23,10 @@ async function connectAsSeller(sellerId) {
     env: {
       ...getDefaultEnvironment(),
       BACKEND_URL: `http://localhost:${process.env.PORT || 3000}`,
-      BACKEND_JWT: token, // real env vars win over the MCP server's .env
+      // The MCP server sends BACKEND_API_KEY as its bearer token; the backend
+      // accepts a JWT there too. Real env vars win over the MCP server's .env,
+      // so a key in that file (the Claude Desktop seller's) can't leak in.
+      BACKEND_API_KEY: token,
     },
     stderr: 'ignore',
   });

@@ -79,6 +79,17 @@ Each seller sets their Slack incoming-webhook URL through the settings API
 The old global `SLACK_WEBHOOK_URL` in `.env` is ignored: it sent every
 seller's orders to one channel.
 
+**API keys** let tools like the MCP server in Claude Desktop read a
+seller's data without a sign-in token that expires in 7 days. Keys look
+like `aiops_...`, are sent as `Authorization: Bearer <key>` on the same
+endpoints, and only their SHA-256 hash is stored:
+- `GET /api/settings/api-keys` - active keys (name, first characters, created, last used)
+- `POST /api/settings/api-keys` with `{ "name": "Claude Desktop" }` - the response is the only time the key is shown
+- `DELETE /api/settings/api-keys/:id` - revoke; it stops working immediately
+
+Everything under `/api/settings` needs a signed-in session: an API key can
+read and sync store data, but can't change Slack or create more keys.
+
 Settings in `.env`: `SHOPIFY_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`,
 `MCP_SERVER_PATH` (see `.env.example`).
 

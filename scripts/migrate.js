@@ -47,6 +47,30 @@ async function addIndex(table, index, columns) {
   return 'added';
 }
 
+async function createTable(table, ddl) {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+    [table]
+  );
+  if (rows.length) return null;
+  await pool.query(ddl);
+  return 'created';
+}
+
+// Same definition as schema.sql.
+const API_KEYS_DDL = `CREATE TABLE api_keys (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  key_prefix VARCHAR(20) NOT NULL,
+  key_hash CHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TIMESTAMP NULL,
+  revoked_at TIMESTAMP NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id),
+  UNIQUE KEY uniq_key_hash (key_hash)
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -59,6 +83,7 @@ const STEPS = [
     'index inventory_items(seller_id, shopify_inventory_item_id)',
     () => addIndex('inventory_items', 'idx_seller_inventory_item', 'seller_id, shopify_inventory_item_id'),
   ],
+  ['api_keys table', () => createTable('api_keys', API_KEYS_DDL)],
 ];
 
 async function main() {
