@@ -13,8 +13,15 @@ that just talks, this lets Claude actually pull real data and take action.
 1. Make sure your Phase 1/2 backend is running (`npm run dev` in that project).
 2. `npm install` here.
 3. Copy `.env.example` to `.env`.
-4. Get a fresh JWT: log in via curl to your backend
-   (`POST /api/auth/login`) and paste the token into `BACKEND_JWT` in `.env`.
+4. Create an API key: in the AI Ops dashboard go to **Settings > API keys**,
+   name it (e.g. "Claude Desktop") and copy the key into `BACKEND_API_KEY`
+   in `.env`. It's shown only once. It doesn't expire; if it leaks, revoke it
+   on the same page and create a new one.
+
+   (The old way, a sign-in JWT in `BACKEND_JWT`, still works but stops working
+   after 7 days. If both are set, `BACKEND_API_KEY` wins.)
+
+If a tool fails, Claude shows why: a revoked key, or the backend not running.
 
 ## Connect it to Claude Desktop
 Add this to your Claude Desktop config file
