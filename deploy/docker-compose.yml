@@ -1,0 +1,97 @@
+# AI Ops Command Center on one server. Caddy takes the public traffic (and
+# gets the HTTPS certificate): /api/* goes to the backend, everything else to
+# the dashboard. Settings come from .env next to this file (see .env.example).
+name: ai-ops
+
+# Docker keeps container logs forever by default; cap them so they can't fill the disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ai_ops
+      MYSQL_USER: aiops
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Creates the tables the first time only (while the data volume is empty).
+      # Later changes arrive through the backend's migrate step on every start.
+      - ${BACKEND_DIR:-../ai-ops-backend}/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      # Over TCP on purpose: during first-time setup MySQL runs without
+      # networking, so this only passes once the real server is up.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    logging: *logging
+
+  backend:
+    build:
+      context: ${BACKEND_DIR:-../ai-ops-backend}
+      additional_contexts:
+        mcp: ${MCP_DIR:-../ai-ops-mcp} # the agent runs the MCP server inside this container
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_USER: aiops
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ai_ops
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
+      APP_URL: https://${DOMAIN}
+      DASHBOARD_URL: https://${DOMAIN}
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:-}
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # Not left blank: the backend reads a blank value as 0, which turns the sync off.
+      SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-15}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging: *logging
+
+  dashboard:
+    build:
+      context: ${DASHBOARD_DIR:-../ai-ops-dashboard}
+      args:
+        BACKEND_URL: http://backend:3000
+    restart: unless-stopped
+    depends_on:
+      - backend
+    logging: *logging
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp" # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificates: keep this volume, or Caddy asks for new ones
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - dashboard
+    logging: *logging
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:
