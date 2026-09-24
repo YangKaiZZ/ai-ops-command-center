@@ -13,6 +13,7 @@ CREATE TABLE sellers (
   shopify_shop_domain VARCHAR(255),     -- e.g. ai-ops.myshopify.com
   shopify_access_token TEXT,            -- Admin API access token, encrypted (enc:v1:...)
   slack_webhook_url TEXT,               -- this seller's Slack incoming webhook, encrypted
+  orders_synced_at TIMESTAMP NULL,      -- start of the last order sync; the next asks Shopify for changes since
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -38,12 +39,14 @@ CREATE TABLE inventory_items (
   seller_id INT NOT NULL,
   shopify_product_id VARCHAR(100) NOT NULL,
   shopify_variant_id VARCHAR(100),
+  shopify_inventory_item_id VARCHAR(100),   -- what inventory_levels/update webhooks refer to
   item_name VARCHAR(255),
   stock_quantity INT DEFAULT 0,
   low_stock_threshold INT DEFAULT 5,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (seller_id) REFERENCES sellers(id),
-  UNIQUE KEY uniq_seller_variant (seller_id, shopify_variant_id)
+  UNIQUE KEY uniq_seller_variant (seller_id, shopify_variant_id),
+  INDEX idx_seller_inventory_item (seller_id, shopify_inventory_item_id)
 );
 
 -- Customer messages/complaints, for the "summarize complaints" and "draft reply" tools

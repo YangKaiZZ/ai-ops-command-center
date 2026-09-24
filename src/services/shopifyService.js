@@ -59,9 +59,12 @@ async function fetchAllPages(client, path, params, key) {
   return items;
 }
 
-// Every order in the store (any status), newest first.
-async function fetchOrders(shopDomain, accessToken) {
-  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', { status: 'any' }, 'orders');
+// Every order in the store (any status), newest first. With updatedAtMin,
+// only orders created or changed since then.
+async function fetchOrders(shopDomain, accessToken, { updatedAtMin } = {}) {
+  const params = { status: 'any' };
+  if (updatedAtMin) params.updated_at_min = updatedAtMin.toISOString();
+  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', params, 'orders');
 }
 
 // Every product with its variants (variants hold the actual stock counts).

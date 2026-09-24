@@ -8,6 +8,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const decisionsRoutes = require('./routes/decisionsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const { startScheduledSync } = require('./services/scheduler');
 
 const app = express();
 // Webhooks go before express.json(): HMAC verification needs the raw body,
@@ -29,4 +30,7 @@ if (process.env.SLACK_WEBHOOK_URL) {
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`AI Ops backend running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`AI Ops backend running on port ${PORT}`);
+  startScheduledSync();
+});

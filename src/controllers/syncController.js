@@ -1,113 +1,29 @@
-const pool = require('../config/db');
-const { fetchOrders, fetchProducts } = require('../services/shopifyService');
-const { upsertOrder } = require('../models/orderModel');
-const { getStoreCredentials } = require('../models/sellerModel');
-const { triggerAgent } = require('../services/agentService');
+const syncService = require('../services/syncService');
+
+// Wraps a sync for an HTTP route. The same syncs also run on a schedule
+// (services/scheduler.js), so the logic lives in syncService.
+function syncRoute(run, failureMessage) {
+  return async (req, res) => {
+    try {
+      const { message } = await run(req.sellerId);
+      res.json({ message });
+    } catch (err) {
+      if (err instanceof syncService.StoreNotConnectedError) {
+        return res.status(400).json({ error: err.message });
+      }
+      console.error(err.response?.data || err);
+      res.status(500).json({ error: failureMessage });
+    }
+  };
+}
 
 // POST /api/orders/sync
-// Pulls live orders from Shopify and upserts them into our orders table.
-async function syncOrders(req, res) {
-  try {
-    const creds = await getStoreCredentials(req.sellerId);
-    if (!creds) {
-      return res.status(400).json({ error: 'Connect your Shopify store first via /api/store/connect' });
-    }
-
-    const orders = await fetchOrders(creds.shopDomain, creds.accessToken);
-
-    for (const order of orders) {
-      await upsertOrder(req.sellerId, order);
-    }
-
-    res.json({ message: `Synced ${orders.length} orders` });
-  } catch (err) {
-    console.error(err.response?.data || err);
-    res.status(500).json({ error: 'Could not sync orders from Shopify' });
-  }
-}
+// Pulls new and updated orders from Shopify into our orders table.
+const syncOrders = syncRoute(syncService.syncOrders, 'Could not sync orders from Shopify');
 
 // POST /api/inventory/sync
 // Pulls products + variants from Shopify, flattens variants into inventory rows.
-async function syncInventory(req, res) {
-  try {
-    const creds = await getStoreCredentials(req.sellerId);
-    if (!creds) {
-      return res.status(400).json({ error: 'Connect your Shopify store first via /api/store/connect' });
-    }
-
-    const products = await fetchProducts(creds.shopDomain, creds.accessToken);
-    const trackedVariantIds = [];
-    let untracked = 0;
-
-    // Snapshot stock before the upsert so we can tell which items *crossed*
-    // the threshold on this sync, instead of re-alerting on every sync.
-    const [existing] = await pool.query(
-      'SELECT shopify_variant_id, stock_quantity, low_stock_threshold FROM inventory_items WHERE seller_id = ?',
-      [req.sellerId]
-    );
-    const before = new Map(existing.map((row) => [row.shopify_variant_id, row]));
-    const crossedLowStock = [];
-
-    for (const product of products) {
-      for (const variant of product.variants) {
-        // Shopify reports inventory_quantity 0 for variants it doesn't track
-        // (gift cards, "don't track quantity" products) — they'd show up as
-        // permanently low stock, so leave them out.
-        if (!variant.inventory_management) {
-          untracked++;
-          continue;
-        }
-
-        const itemName = `${product.title}${variant.title !== 'Default Title' ? ' - ' + variant.title : ''}`;
-        const stock = variant.inventory_quantity || 0;
-
-        await pool.query(
-          `INSERT INTO inventory_items
-             (seller_id, shopify_product_id, shopify_variant_id, item_name, stock_quantity)
-           VALUES (?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             stock_quantity = VALUES(stock_quantity),
-             synced_at = CURRENT_TIMESTAMP`,
-          [req.sellerId, product.id, variant.id, itemName, stock]
-        );
-        trackedVariantIds.push(String(variant.id));
-
-        // Only items we already knew about count as crossing — otherwise the
-        // very first sync would fire an alert for everything that starts low.
-        const prev = before.get(String(variant.id));
-        if (prev && prev.stock_quantity > prev.low_stock_threshold && stock <= prev.low_stock_threshold) {
-          crossedLowStock.push({
-            item_name: itemName,
-            shopify_variant_id: String(variant.id),
-            previous_stock: prev.stock_quantity,
-            current_stock: stock,
-            low_stock_threshold: prev.low_stock_threshold,
-          });
-        }
-      }
-    }
-
-    // This was a complete list (every page), so any other row is a variant
-    // that was deleted in Shopify or stopped being tracked.
-    await pool.query(
-      trackedVariantIds.length
-        ? 'DELETE FROM inventory_items WHERE seller_id = ? AND shopify_variant_id NOT IN (?)'
-        : 'DELETE FROM inventory_items WHERE seller_id = ?',
-      [req.sellerId, trackedVariantIds]
-    );
-
-    res.json({
-      message: `Synced ${trackedVariantIds.length} inventory items (skipped ${untracked} untracked)`,
-    });
-
-    // Trigger #2: respond first, then let the agent decide what to do about it.
-    if (crossedLowStock.length) {
-      triggerAgent(req.sellerId, { type: 'low_stock_crossed', items: crossedLowStock });
-    }
-  } catch (err) {
-    console.error(err.response?.data || err);
-    res.status(500).json({ error: 'Could not sync inventory from Shopify' });
-  }
-}
+// Items that just went low trigger the agent (after the response).
+const syncInventory = syncRoute(syncService.syncInventory, 'Could not sync inventory from Shopify');
 
 module.exports = { syncOrders, syncInventory };

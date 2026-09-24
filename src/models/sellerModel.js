@@ -33,6 +33,24 @@ async function findSellerByShopDomain(shopDomain) {
   return rows[0] || null;
 }
 
+// Sellers with a store to sync (for the scheduled sync).
+async function getConnectedSellerIds() {
+  const [rows] = await pool.query(
+    'SELECT id FROM sellers WHERE shopify_shop_domain IS NOT NULL AND shopify_access_token IS NOT NULL ORDER BY id'
+  );
+  return rows.map((row) => row.id);
+}
+
+// When orders were last synced, so the next sync only asks Shopify for what changed since.
+async function getOrdersSyncedAt(sellerId) {
+  const [rows] = await pool.query('SELECT orders_synced_at FROM sellers WHERE id = ?', [sellerId]);
+  return rows[0]?.orders_synced_at || null;
+}
+
+async function setOrdersSyncedAt(sellerId, when) {
+  await pool.query('UPDATE sellers SET orders_synced_at = ? WHERE id = ?', [when, sellerId]);
+}
+
 // What the settings page shows. Secrets stay out: only whether they're set.
 async function getSettings(sellerId) {
   const [rows] = await pool.query(
@@ -64,6 +82,9 @@ module.exports = {
   getStoreCredentials,
   setStoreConnection,
   findSellerByShopDomain,
+  getConnectedSellerIds,
+  getOrdersSyncedAt,
+  setOrdersSyncedAt,
   getSettings,
   getSlackWebhookUrl,
   setSlackWebhookUrl,

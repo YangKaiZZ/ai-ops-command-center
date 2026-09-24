@@ -60,8 +60,9 @@ Two triggers run the same agent loop (`src/services/agentService.js`):
 1. **New order** — Shopify calls `POST /api/webhooks/orders-create`. The HMAC
    signature is verified against `SHOPIFY_WEBHOOK_SECRET`, the order is stored,
    and the agent decides if it's fulfillable.
-2. **Low stock** — after `POST /api/inventory/sync`, any tracked item that went
-   from above its threshold to at/below it triggers the agent.
+2. **Low stock** — any tracked item that goes from above its threshold to
+   at/below it triggers the agent, whether the drop arrives by an
+   `inventory_levels/update` webhook, a scheduled sync or `POST /api/inventory/sync`.
 
 The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 Phase 3 MCP server's read-only tools — the backend spawns that server with a
@@ -99,10 +100,29 @@ Test the full flow with a signed fake order (backend running; with
 npm run test:agent
 ```
 
-To receive real webhooks, expose the backend publicly (e.g. `ngrok http 3000`)
-and register `https://<tunnel>/api/webhooks/orders-create` for the
-`orders/create` topic, then set `SHOPIFY_WEBHOOK_SECRET` to the secret Shopify
-signs with (your app's client secret).
+To receive real webhooks, expose the backend publicly (e.g. `ngrok http 3000`),
+set `SHOPIFY_WEBHOOK_SECRET` to your app's client secret, and register the
+topics with:
+```
+node scripts/register-webhooks.js https://<tunnel>.ngrok-free.app --dry-run   # see what would change
+node scripts/register-webhooks.js https://<tunnel>.ngrok-free.app
+```
+It registers (or moves to the new tunnel) all three topics:
+
+| Topic | Route | What it does |
+| --- | --- | --- |
+| `orders/create` | `/api/webhooks/orders-create` | stores the order, runs the agent |
+| `orders/updated` | `/api/webhooks/orders-updated` | keeps shipping/payment status current |
+| `inventory_levels/update` | `/api/webhooks/inventory-levels-update` | re-reads that variant's stock; an item that just went low triggers the agent |
+
+`inventory_levels/update` needs the app's token to have the `read_inventory` scope.
+Run the script again whenever the tunnel URL changes.
+
+**Scheduled sync.** In case a webhook is missed, every connected store is
+re-synced every `SYNC_INTERVAL_MINUTES` (default 15, `0` = off). Orders
+sync incrementally (only what changed since the last sync), products in full.
+Manual syncs, scheduled syncs and webhooks for one seller run one at a
+time, so an item that goes low is only alerted once.
 
 ## Phase 5: dashboard API
 Every agent decision is saved to the `decisions` table (before the Slack post,

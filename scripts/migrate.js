@@ -37,9 +37,28 @@ async function addColumn(table, column, definition) {
   return 'added';
 }
 
+async function addIndex(table, index, columns) {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+    [table, index]
+  );
+  if (rows.length) return null;
+  await pool.query(`ALTER TABLE ${table} ADD INDEX ${index} (${columns})`);
+  return 'added';
+}
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
+  ['sellers.orders_synced_at', () => addColumn('sellers', 'orders_synced_at', 'TIMESTAMP NULL AFTER slack_webhook_url')],
+  [
+    'inventory_items.shopify_inventory_item_id',
+    () => addColumn('inventory_items', 'shopify_inventory_item_id', 'VARCHAR(100) NULL AFTER shopify_variant_id'),
+  ],
+  [
+    'index inventory_items(seller_id, shopify_inventory_item_id)',
+    () => addIndex('inventory_items', 'idx_seller_inventory_item', 'seller_id, shopify_inventory_item_id'),
+  ],
 ];
 
 async function main() {

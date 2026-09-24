@@ -5,7 +5,11 @@
 //   4. agent decision: with DEEPSEEK_API_KEY set, waits for the backend's run to
 //      save a row in `decisions` (that run also posts to Slack); without a key, skipped
 //   5. dashboard endpoints: /api/orders, /api/inventory/low-stock, /api/decisions
-// The fake order and its decision are deleted at the end.
+//   6. freshness webhooks: orders/updated changes the stored status;
+//      inventory_levels/update re-reads the variant from Shopify, and an item
+//      that drops to its threshold triggers a low-stock decision (a second
+//      LLM call when DEEPSEEK_API_KEY is set)
+// The fake order and the decisions it produced are deleted at the end.
 //
 // Usage (backend must be running):  npm run test:agent
 const path = require('path');
@@ -23,6 +27,7 @@ const { describeTrigger, toOpenAITools, createLLMClient } = require('../src/serv
 
 const BASE = `http://localhost:${process.env.PORT || 3000}`;
 let failures = 0;
+let alertAfterId = null; // low-stock decisions after this id were made by the test
 
 function check(ok, label, detail = '') {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` - ${detail}` : ''}`);
@@ -46,13 +51,13 @@ function sign(body, secret) {
   return crypto.createHmac('sha256', secret).update(body).digest('base64');
 }
 
-async function postWebhook(body, { hmac, shopDomain, webhookId }) {
-  return axios.post(`${BASE}/api/webhooks/orders-create`, body, {
+async function postWebhook(body, { hmac, shopDomain, webhookId, topic = 'orders/create' }) {
+  return axios.post(`${BASE}/api/webhooks/${topic.replace(/[/_]/g, '-')}`, body, {
     headers: {
       'Content-Type': 'application/json',
       'X-Shopify-Hmac-Sha256': hmac,
       'X-Shopify-Shop-Domain': shopDomain,
-      'X-Shopify-Topic': 'orders/create',
+      'X-Shopify-Topic': topic,
       'X-Shopify-Webhook-Id': webhookId,
     },
     validateStatus: () => true, // we assert on status ourselves
@@ -76,7 +81,7 @@ async function buildFakeOrder(sellerId) {
   );
 
   const lineItems = [];
-  if (low[0]) lineItems.push({ ...low[0], quantity: low[0].stock_quantity + 1 });
+  if (low[0]) lineItems.push({ ...low[0], quantity: Math.max(1, low[0].stock_quantity + 1) });
   if (ok[0]) lineItems.push({ ...ok[0], quantity: 1 });
   lineItems.push({ shopify_variant_id: '1', item_name: 'Discontinued Test Item', quantity: 1 });
 
@@ -221,11 +226,66 @@ async function main() {
       'decisions are newest first'
     );
     if (decisionRow) check(feed[0]?.id === decisionRow.id, 'new decision is first in the feed');
+
+    console.log('\n6. Freshness webhooks');
+    const signed = (payload, topic) => {
+      const raw = JSON.stringify(payload);
+      return postWebhook(raw, { hmac: sign(raw, secret), shopDomain: seller.shopify_shop_domain, webhookId: crypto.randomUUID(), topic });
+    };
+
+    const updated = await signed({ ...order, fulfillment_status: 'fulfilled' }, 'orders/updated');
+    const [afterUpdate] = await pool.query('SELECT status FROM orders WHERE seller_id = ? AND shopify_order_id = ?', [seller.id, String(order.id)]);
+    check(updated.status === 200 && afterUpdate[0]?.status === 'fulfilled', 'orders/updated stores the new status', `HTTP ${updated.status}, status ${afterUpdate[0]?.status}`);
+
+    const unknownItem = await signed({ inventory_item_id: 1, location_id: 1, available: 0 }, 'inventory_levels/update');
+    check(unknownItem.status === 200, 'inventory_levels/update for an unknown item is acknowledged', `HTTP ${unknownItem.status}`);
+
+    // An item at or below its threshold in Shopify, recorded as healthy here:
+    // the webhook's re-read should bring the real number back and see it cross.
+    const [lowRows] = await pool.query(
+      `SELECT * FROM inventory_items WHERE seller_id = ? AND shopify_inventory_item_id IS NOT NULL
+       AND stock_quantity <= low_stock_threshold ORDER BY stock_quantity LIMIT 1`,
+      [seller.id]
+    );
+    const low = lowRows[0];
+    if (!low) {
+      console.log('  SKIP  low-stock webhook: no synced item is at its threshold (or inventory_item_id not synced yet)');
+    } else {
+      const [[{ maxId }]] = await pool.query('SELECT COALESCE(MAX(id), 0) AS maxId FROM decisions WHERE seller_id = ?', [seller.id]);
+      alertAfterId = maxId;
+      await pool.query('UPDATE inventory_items SET stock_quantity = ? WHERE id = ?', [low.low_stock_threshold + 10, low.id]);
+      const res = await signed({ inventory_item_id: Number(low.shopify_inventory_item_id), location_id: 1, available: low.stock_quantity }, 'inventory_levels/update');
+      check(res.status === 200, 'inventory_levels/update acknowledged', `${low.item_name}, HTTP ${res.status}`);
+
+      let refreshed = null;
+      for (let i = 0; i < 20 && refreshed?.stock_quantity !== low.stock_quantity; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        [[refreshed]] = await pool.query('SELECT stock_quantity FROM inventory_items WHERE id = ?', [low.id]);
+      }
+      check(refreshed?.stock_quantity === low.stock_quantity, 'stock re-read from Shopify', `${low.low_stock_threshold + 10} -> ${refreshed?.stock_quantity}`);
+
+      if (process.env.DEEPSEEK_API_KEY) {
+        let alert = null;
+        const deadline = Date.now() + 60000;
+        while (!alert && Date.now() < deadline) {
+          [[alert]] = await pool.query(
+            "SELECT * FROM decisions WHERE seller_id = ? AND id > ? AND action_taken = 'low_stock_alert' ORDER BY id LIMIT 1",
+            [seller.id, alertAfterId]
+          );
+          if (!alert) await new Promise((r) => setTimeout(r, 1000));
+        }
+        check(Boolean(alert), 'item crossing its threshold triggered a RESTOCK decision', alert ? `#${alert.id}` : 'none within 60s - check the backend log');
+        if (alert) console.log(alert.reasoning.replace(/^/gm, '      '));
+      }
+    }
   } finally {
     // With no key the backend's run stops before saving anything; give it a
     // moment to finish either way before pulling the order out from under it.
     await new Promise((r) => setTimeout(r, 2000));
     await pool.query('DELETE FROM decisions WHERE seller_id = ? AND order_number = ?', [seller.id, order.name]);
+    if (alertAfterId != null) {
+      await pool.query("DELETE FROM decisions WHERE seller_id = ? AND id > ? AND action_taken = 'low_stock_alert'", [seller.id, alertAfterId]);
+    }
     await pool.query('DELETE FROM orders WHERE seller_id = ? AND shopify_order_id = ?', [seller.id, String(order.id)]);
     console.log(`\nCleaned up fake order ${order.name} and its decision.`);
   }
