@@ -9,10 +9,10 @@ const { isEmail } = require('../utils/isEmail');
 
 const MAX_CODES_PER_HOUR = 5;
 
-// Settings-page status for both channels.
+// Settings-page status for both channels. (email_alerts, because `email` is the account's own address.)
 async function alertStatus(sellerId, { alertEmail, telegramConnected }) {
   return {
-    email: {
+    email_alerts: {
       available: email.isEmailConfigured(),
       address: alertEmail || null,
       pending: await channels.pendingEmail(sellerId),
@@ -59,7 +59,7 @@ async function verifyEmail(req, res) {
       const [status, error] = errors[result.status];
       return res.status(status).json({ error });
     }
-    res.json({ email: { address: result.address } });
+    res.json({ email_alerts: { address: result.address } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not check the code' });
@@ -70,7 +70,7 @@ async function verifyEmail(req, res) {
 async function removeEmail(req, res) {
   try {
     await channels.clearAlertEmail(req.sellerId);
-    res.json({ email: { address: null } });
+    res.json({ email_alerts: { address: null } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not turn off email alerts' });

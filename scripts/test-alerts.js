@@ -138,7 +138,8 @@ async function main() {
   try {
     console.log(`Seller #${sellerId}`);
     const s0 = (await call('GET', '/api/settings', token)).json;
-    check(s0.email.available && s0.telegram.available && s0.email.address === null && !s0.telegram.connected, 'both channels offered, none on');
+    check(s0.email_alerts.available && s0.telegram.available && s0.email_alerts.address === null && !s0.telegram.connected, 'both channels offered, none on');
+    check(s0.email === `alerts-${run}@example.test`, 'the account email is still there');
     check((await call('POST', '/api/settings/test-alert', token)).status === 400, 'test alert with no channels -> asks to turn one on');
 
     console.log('\n1. Email');
@@ -149,14 +150,14 @@ async function main() {
     const code = codeMail?.raw.match(/Enter (\d{6}) in AI Ops/)?.[1];
     check(start.status === 200 && start.json.pending === address && code, 'code emailed to the (lower-cased) address', code ? 'code received' : 'no code');
     check(/Subject: Your AI Ops code: \d{6}/.test(codeMail?.raw || ''), 'code in the subject too');
-    const pending = (await call('GET', '/api/settings', token)).json.email;
+    const pending = (await call('GET', '/api/settings', token)).json.email_alerts;
     check(pending.pending === address && pending.address === null, 'settings: waiting for the code, not on yet');
 
     const wrongCode = code === '000000' ? '111111' : '000000';
     const wrong = await call('POST', '/api/settings/email/verify', token, { code: wrongCode });
     check(wrong.status === 400 && /isn't right/.test(wrong.json.error), 'wrong code refused');
     const right = await call('POST', '/api/settings/email/verify', token, { code: ` ${code} ` });
-    check(right.status === 200 && right.json.email.address === address, 'right code turns email alerts on');
+    check(right.status === 200 && right.json.email_alerts.address === address, 'right code turns email alerts on');
     const again = await call('POST', '/api/settings/email/verify', token, { code });
     check(again.status === 400, 'a used code does not work twice', again.json.error);
 
@@ -216,7 +217,7 @@ async function main() {
     check(Boolean(stopped) && (await call('GET', '/api/settings', token)).json.telegram.connected === false, '/stop in the chat turns Telegram off');
 
     await call('DELETE', '/api/settings/email', token);
-    check((await call('GET', '/api/settings', token)).json.email.address === null, 'email alerts can be turned off');
+    check((await call('GET', '/api/settings', token)).json.email_alerts.address === null, 'email alerts can be turned off');
   } finally {
     telegram.stopTelegramPolling();
     await pool.query('DELETE FROM channel_links WHERE seller_id = ?', [sellerId]);

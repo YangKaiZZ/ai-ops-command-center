@@ -139,6 +139,8 @@ channel doesn't stop the others.
   that chat; `/stop` in the chat or `DELETE /api/settings/telegram` unlinks it.
   The backend long-polls the bot, so it works without a public URL, but only
   one backend process may poll a bot at a time.
+- `GET /api/settings` shows each as `email_alerts: { available, address, pending }` and
+  `telegram: { available, connected }`.
 - `POST /api/settings/test-alert` sends a sample to every channel that's on and
   reports how each went.
 
