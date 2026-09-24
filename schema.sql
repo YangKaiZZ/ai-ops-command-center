@@ -56,3 +56,19 @@ CREATE TABLE customer_messages (
   received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (seller_id) REFERENCES sellers(id)
 );
+
+-- Every decision the Phase 4 agent makes, for the dashboard.
+-- action_taken is what the agent *recommended* (it doesn't act on Shopify yet):
+-- fulfill, hold, low_stock_alert, or unknown if its verdict couldn't be parsed.
+CREATE TABLE decisions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  order_id INT NULL,                        -- our orders.id; NULL for low-stock decisions
+  order_number VARCHAR(50),                 -- kept even if the order row is later deleted
+  reasoning TEXT NOT NULL,                  -- the agent's full output
+  action_taken VARCHAR(32) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id),
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  INDEX idx_seller_created (seller_id, created_at)
+);

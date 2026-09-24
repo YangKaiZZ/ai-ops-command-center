@@ -1,10 +1,11 @@
-// End-to-end check of the Phase 4 flow with a fake order, everything up to
-// the LLM call:
+// End-to-end check of the agent flow with a fake order:
 //   1. signed webhook -> /api/webhooks/orders-create (plus bad-signature + retry cases)
 //   2. order lands in the DB
 //   3. agent's MCP connection: tool list + real tool calls as that seller
-//   4. LLM step (expected to fail until DEEPSEEK_API_KEY is set)
-// The fake order is deleted at the end.
+//   4. agent decision: with DEEPSEEK_API_KEY set, waits for the backend's run to
+//      save a row in `decisions` (that run also posts to Slack); without a key, skipped
+//   5. dashboard endpoints: /api/orders, /api/inventory/low-stock, /api/decisions
+// The fake order and its decision are deleted at the end.
 //
 // Usage (backend must be running):  npm run test:agent
 const path = require('path');
@@ -13,9 +14,10 @@ require('dotenv').config();
 
 const crypto = require('crypto');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const pool = require('../src/config/db');
 const { connectAsSeller } = require('../src/services/mcpClient');
-const { runAgent, describeTrigger, toOpenAITools, createLLMClient } = require('../src/services/agentService');
+const { describeTrigger, toOpenAITools, createLLMClient } = require('../src/services/agentService');
 
 const BASE = `http://localhost:${process.env.PORT || 3000}`;
 let failures = 0;
@@ -23,6 +25,19 @@ let failures = 0;
 function check(ok, label, detail = '') {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` - ${detail}` : ''}`);
   if (!ok) failures++;
+}
+
+async function waitForDecision(sellerId, orderNumber, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const [rows] = await pool.query(
+      'SELECT * FROM decisions WHERE seller_id = ? AND order_number = ? ORDER BY id DESC LIMIT 1',
+      [sellerId, orderNumber]
+    );
+    if (rows[0]) return rows[0];
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return null;
 }
 
 function sign(body, secret) {
@@ -115,10 +130,11 @@ async function main() {
 
     console.log('\n2. Order stored');
     const [stored] = await pool.query(
-      'SELECT order_number, status, financial_status, buyer_name FROM orders WHERE seller_id = ? AND shopify_order_id = ?',
+      'SELECT id, order_number, status, financial_status, buyer_name FROM orders WHERE seller_id = ? AND shopify_order_id = ?',
       [seller.id, String(order.id)]
     );
     check(stored.length === 1, 'webhook order upserted', stored[0] && JSON.stringify(stored[0]));
+    const storedOrderId = stored[0]?.id;
 
     console.log('\n3. MCP tools (same connection the agent uses)');
     const mcp = await connectAsSeller(seller.id);
@@ -143,9 +159,10 @@ async function main() {
       await mcp.close();
     }
 
-    console.log('\n4. LLM step');
+    console.log('\n4. Agent decision');
     const trigger = { type: 'order_created', order };
     console.log('    prompt the model will get:\n' + describeTrigger(trigger).replace(/^/gm, '      '));
+    let decisionRow = null;
     if (!process.env.DEEPSEEK_API_KEY) {
       try {
         createLLMClient();
@@ -154,18 +171,47 @@ async function main() {
         console.log(`  SKIP  LLM call (expected): ${err.message}`);
       }
     } else {
-      // Key is set: run the real agent. The backend is running the same flow
-      // for the webhook above, so expect its decision in Slack/console too.
-      const decision = await runAgent(seller.id, trigger);
-      check(Boolean(decision), 'agent produced a decision');
-      console.log(decision.replace(/^/gm, '      '));
+      // The webhook above already started the backend's own agent run (which
+      // also posts to Slack). Wait for it to save its decision instead of
+      // running a second copy here.
+      decisionRow = await waitForDecision(seller.id, order.name, 60000);
+      check(
+        Boolean(decisionRow),
+        'decision saved to decisions table',
+        decisionRow ? `#${decisionRow.id} ${decisionRow.action_taken}` : 'none within 60s - check the backend log'
+      );
+      if (decisionRow) {
+        check(decisionRow.order_id === storedOrderId, 'decision linked to the order row', `order_id ${decisionRow.order_id}`);
+        console.log(decisionRow.reasoning.replace(/^/gm, '      '));
+      }
     }
+
+    console.log('\n5. Dashboard endpoints');
+    const token = jwt.sign({ sellerId: seller.id }, process.env.JWT_SECRET || 'dev-secret-change-this', { expiresIn: '5m' });
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
+
+    const { data: ordersData } = await axios.get(`${BASE}/api/orders`, auth);
+    const listed = ordersData.orders.find((o) => o.order_number === order.name);
+    check(Boolean(listed?.status), 'GET /api/orders includes status', listed && `${order.name}: ${listed.status} / ${listed.financial_status}`);
+
+    const { data: lowData } = await axios.get(`${BASE}/api/inventory/low-stock`, auth);
+    check(Array.isArray(lowData.low_stock_items), 'GET /api/inventory/low-stock', `${lowData.low_stock_items.length} items`);
+
+    const { data: decData } = await axios.get(`${BASE}/api/decisions?limit=5`, auth);
+    const feed = decData.decisions;
+    check(Array.isArray(feed), 'GET /api/decisions', `${feed.length} returned`);
+    check(
+      feed.every((d, i) => i === 0 || new Date(feed[i - 1].created_at) >= new Date(d.created_at)),
+      'decisions are newest first'
+    );
+    if (decisionRow) check(feed[0]?.id === decisionRow.id, 'new decision is first in the feed');
   } finally {
-    // Give the backend's own background agent run a moment to finish before
-    // we pull the order out from under it.
+    // With no key the backend's run stops before saving anything; give it a
+    // moment to finish either way before pulling the order out from under it.
     await new Promise((r) => setTimeout(r, 2000));
+    await pool.query('DELETE FROM decisions WHERE seller_id = ? AND order_number = ?', [seller.id, order.name]);
     await pool.query('DELETE FROM orders WHERE seller_id = ? AND shopify_order_id = ?', [seller.id, String(order.id)]);
-    console.log(`\nCleaned up fake order ${order.name}.`);
+    console.log(`\nCleaned up fake order ${order.name} and its decision.`);
   }
 }
 

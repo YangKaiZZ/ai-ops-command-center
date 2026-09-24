@@ -69,3 +69,17 @@ To receive real webhooks, expose the backend publicly (e.g. `ngrok http 3000`)
 and register `https://<tunnel>/api/webhooks/orders-create` for the
 `orders/create` topic, then set `SHOPIFY_WEBHOOK_SECRET` to the secret Shopify
 signs with (your app's client secret).
+
+## Phase 5: dashboard API
+Every agent decision is saved to the `decisions` table (before the Slack post,
+so a Slack outage can't lose one). `action_taken` is the agent's
+*recommendation* - `fulfill`, `hold`, `low_stock_alert`, or `unknown` if the
+verdict line couldn't be parsed. Nothing is changed in Shopify yet.
+
+Read endpoints for the dashboard (all need the seller's JWT):
+- `GET /api/orders` - synced orders, newest first (`status` = fulfillment, plus `financial_status`)
+- `GET /api/inventory/low-stock` - items at or below their threshold
+- `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
+
+Existing database? Create the new table with the `CREATE TABLE decisions`
+block from `schema.sql`.

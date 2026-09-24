@@ -1,6 +1,7 @@
 const { OpenAI } = require('openai');
 const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
+const { saveDecision } = require('../models/decisionModel');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint.
@@ -14,12 +15,16 @@ Always check the data with your tools before deciding - never guess stock levels
 
 How to read the data:
 - check_low_stock returns items at or below their low-stock threshold, keyed by shopify_variant_id.
+  Everything it returns IS stock-tracked in this store and its stock_quantity is authoritative -
+  never assume an item (gift cards, digital goods) is exempt from stock.
 - An ordered variant that is NOT in the low-stock list either has stock above its threshold or
   isn't stock-tracked in Shopify; treat it as available.
 - An order is not fulfillable if any line item's quantity is more than that variant's stock_quantity.
 
 Reply in plain text for a Slack message, under 80 words:
-Line 1: one verdict - FULFILL, HOLD, or RESTOCK - followed by a short headline.
+Line 1: one verdict followed by a short headline. The verdict is saved to the dashboard, so use exactly:
+- for a new order: FULFILL if every item can ship now, otherwise HOLD (mention any restock need in the bullets)
+- for a low-stock event: RESTOCK
 Then 2-4 bullets with the specific reasons (item names, quantities, stock numbers).`;
 
 // Turns the raw trigger into the user message the model sees.
@@ -98,6 +103,15 @@ async function runAgent(sellerId, trigger) {
       messages.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
 
       if (!msg.tool_calls?.length) {
+        // Save before posting, so a Slack outage can't lose the decision. A DB
+        // failure shouldn't silence the alert either, so it's only logged.
+        try {
+          const saved = await saveDecision(sellerId, trigger, msg.content);
+          console.log(`${tag} decision #${saved.id} saved (${saved.actionTaken})`);
+        } catch (err) {
+          console.error(`${tag} could not save decision: ${err.message}`);
+        }
+
         const decision = `*${headline(trigger)}*\n${msg.content}`;
         await postDecision(decision);
         return decision;
