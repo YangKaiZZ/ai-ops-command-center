@@ -31,7 +31,14 @@ test('reasoning: verdict dropped from headline, bullets grouped', () => {
 test('verdict badges', () => {
   assert.equal(actionInfo('fulfill').label, 'Fulfill');
   assert.equal(actionInfo('hold').tone, 'warning');
+  assert.equal(actionInfo('skipped').label, 'Skipped');
   assert.equal(actionInfo('something-new').label, 'Unclear');
+});
+
+test('reasoning: a skipped run reads as its reason, not "SKIPPED"', () => {
+  const r = parseReasoning('SKIPPED - daily limit reached\nThis account has used its 50 agent checks.');
+  assert.equal(r.headline, 'daily limit reached');
+  assert.deepEqual(r.blocks, [{ type: 'text', text: 'This account has used its 50 agent checks.' }]);
 });
 
 test('install link shop: only exact *.myshopify.com addresses are passed on', () => {

@@ -134,6 +134,16 @@ The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 every alert channel the seller turned on (Slack, email, Telegram), or to the
 server console if none is.
 
+**Daily limits.** So no account (or crowd of new accounts) can run up the
+LLM bill, runs are capped over any 24 hours: `AGENT_DAILY_LIMIT_PER_ACCOUNT`
+(default 50) per seller and `AGENT_DAILY_LIMIT_TOTAL` (default 200) for all
+sellers together; `0` turns the agent off. Each run makes at most 6 model
+calls, so the worst case is known up front. Runs that went ahead are counted
+in `agent_runs` (`src/services/agentBudget.js`). An event over a limit is
+still saved, as a `skipped` decision that says which limit it hit, but the
+model isn't called and no alert is sent. `npm run test:agent-limit` checks
+this against a fake DeepSeek.
+
 Each seller sets their Slack incoming-webhook URL through the settings API
 (the dashboard's Settings page). It's stored encrypted, and only
 `https://hooks.slack.com/...` URLs are accepted:

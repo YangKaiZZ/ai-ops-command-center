@@ -8,6 +8,7 @@ export const ACTIONS: Record<Action, { label: string; tone: Tone; icon: IconName
   hold: { label: "Hold", tone: "warning", icon: "pause" },
   low_stock_alert: { label: "Restock", tone: "serious", icon: "alert" },
   unknown: { label: "Unclear", tone: "neutral", icon: "help" },
+  skipped: { label: "Skipped", tone: "neutral", icon: "empty" },
 };
 
 export function actionInfo(action: string) {
@@ -35,7 +36,7 @@ export function parseReasoning(reasoning: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
-  const headline = (lines.shift() ?? "").replace(/^\**(FULFILL|HOLD|RESTOCK)\**\s*[-–—:]*\s*/, "");
+  const headline = (lines.shift() ?? "").replace(/^\**(FULFILL|HOLD|RESTOCK|SKIPPED)\**\s*[-–—:]*\s*/, "");
   const blocks: ({ type: "bullets"; items: string[] } | { type: "text"; text: string })[] = [];
   for (const line of lines) {
     const bullet = line.match(/^[-*•]\s*(.*)$/);

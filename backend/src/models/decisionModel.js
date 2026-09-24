@@ -2,15 +2,17 @@ const pool = require('../config/db');
 
 // The agent's reply starts with a verdict (see SYSTEM_PROMPT in agentService).
 // It only *recommends* today, so these name the recommendation, not an action.
+// SKIPPED isn't the model's: it's saved when a daily limit stopped the run (agentBudget).
 const VERDICT_TO_ACTION = {
   FULFILL: 'fulfill',
   HOLD: 'hold',
   RESTOCK: 'low_stock_alert',
+  SKIPPED: 'skipped',
 };
 
 function actionFromReasoning(reasoning) {
   const firstLine = (reasoning || '').trim().split('\n')[0];
-  const match = firstLine.match(/\b(FULFILL|HOLD|RESTOCK)\b/);
+  const match = firstLine.match(/\b(FULFILL|HOLD|RESTOCK|SKIPPED)\b/);
   return match ? VERDICT_TO_ACTION[match[1]] : 'unknown';
 }
 

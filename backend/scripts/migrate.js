@@ -118,6 +118,15 @@ const CHANNEL_LINKS_DDL = `CREATE TABLE channel_links (
   INDEX idx_code (code_hash)
 );`;
 
+const AGENT_RUNS_DDL = `CREATE TABLE agent_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  INDEX idx_seller_started (seller_id, started_at),
+  INDEX idx_started (started_at)
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -147,6 +156,7 @@ const STEPS = [
   ['sellers.alert_email', () => addColumn('sellers', 'alert_email', 'VARCHAR(255) NULL AFTER slack_webhook_url')],
   ['sellers.telegram_chat_id', () => addColumn('sellers', 'telegram_chat_id', 'VARCHAR(64) NULL AFTER alert_email')],
   ['channel_links table', () => createTable('channel_links', CHANNEL_LINKS_DDL)],
+  ['agent_runs table', () => createTable('agent_runs', AGENT_RUNS_DDL)],
 ];
 
 async function main() {

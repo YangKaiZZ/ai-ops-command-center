@@ -124,7 +124,8 @@ CREATE TABLE api_keys (
 
 -- Every decision the Phase 4 agent makes, for the dashboard.
 -- action_taken is what the agent *recommended* (it doesn't act on Shopify yet):
--- fulfill, hold, low_stock_alert, or unknown if its verdict couldn't be parsed.
+-- fulfill, hold, low_stock_alert, unknown if its verdict couldn't be parsed,
+-- or skipped when a daily limit stopped the run (see agent_runs).
 CREATE TABLE decisions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   seller_id INT NOT NULL,
@@ -136,4 +137,15 @@ CREATE TABLE decisions (
   FOREIGN KEY (seller_id) REFERENCES sellers(id),
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
   INDEX idx_seller_created (seller_id, created_at)
+);
+
+-- One row per agent run that went ahead (called the LLM). The daily limits
+-- per account and in total count these over the last 24 hours.
+CREATE TABLE agent_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  INDEX idx_seller_started (seller_id, started_at),
+  INDEX idx_started (started_at)
 );

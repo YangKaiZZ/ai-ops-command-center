@@ -3,9 +3,10 @@ const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
 const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
 const { checkOrderStock, describeShortfall } = require('./stockCheck');
+const { claimRun, skippedReasoning } = require('./agentBudget');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
-// as-is once it's pointed at their endpoint.
+// as-is once it's pointed at their endpoint. (DEEPSEEK_BASE_URL is for tests.)
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 const MAX_STEPS = 6; // hard stop so a confused model can't loop on tool calls forever
@@ -93,18 +94,28 @@ function createLLMClient() {
   if (!process.env.DEEPSEEK_API_KEY) {
     throw new Error('DEEPSEEK_API_KEY is not set in .env - skipping the LLM call');
   }
-  return new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: DEEPSEEK_BASE_URL });
+  return new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL });
 }
 
 // The agent loop: give the model the event + the MCP tools, execute whatever
 // tools it asks for, feed results back, repeat until it answers in text.
 async function runAgent(sellerId, trigger) {
   const tag = `[agent seller=${sellerId} ${trigger.type}]`;
-  const mcp = await connectAsSeller(sellerId);
+  const llm = createLLMClient(); // no key: stop here, before a run is counted
 
+  // Over a daily cap: no model call. The decision is still saved, so the
+  // dashboard says why this event wasn't checked, but no alert goes out: a
+  // busy day shouldn't become a flood of "skipped" messages.
+  const limitHit = await claimRun(sellerId);
+  if (limitHit) {
+    const saved = await saveDecision(sellerId, trigger, skippedReasoning(limitHit, trigger));
+    console.warn(`${tag} skipped: ${limitHit === 'account' ? "this account's" : 'the total'} daily agent limit is reached (decision #${saved.id})`);
+    return null;
+  }
+
+  const mcp = await connectAsSeller(sellerId);
   try {
     console.log(`${tag} MCP tools: ${mcp.tools.map((t) => t.name).join(', ')}`);
-    const llm = createLLMClient();
     const tools = toOpenAITools(mcp.tools);
     const stockCheck = trigger.type === 'order_created' ? await checkOrderStock(sellerId, trigger.order) : null;
     const messages = [

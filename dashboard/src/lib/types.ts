@@ -20,7 +20,8 @@ export type InventoryItem = {
   is_low: boolean;
 };
 
-export type Action = "fulfill" | "hold" | "low_stock_alert" | "unknown";
+// "skipped": a daily limit stopped the agent before it ran.
+export type Action = "fulfill" | "hold" | "low_stock_alert" | "unknown" | "skipped";
 
 export type Decision = {
   id: number;

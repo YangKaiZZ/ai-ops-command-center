@@ -69,6 +69,9 @@ from their own dashboard.
 - **Shopify requests are verified**: webhooks by HMAC over the raw body;
   OAuth redirects by HMAC, a one-time `state` and a timestamp.
 - **Privacy requests** are logged with ids and outcomes only, never the personal data.
+- **LLM cost is capped**: agent runs are limited per account and for all
+  accounts together over any 24 hours, and each run makes at most 6 model
+  calls. Events over a limit are saved as "Skipped" instead of checked.
 
 ## Tech stack
 
@@ -96,10 +99,11 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 40 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts |
+| backend | `npm test` | 45 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
+| backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 
 ## How it was built
