@@ -81,7 +81,20 @@ seller's orders to one channel.
 Settings in `.env`: `SHOPIFY_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`,
 `MCP_SERVER_PATH` (see `.env.example`).
 
-Test everything up to the LLM call with a signed fake order (backend running):
+**Stock check.** Whether each line item can ship is decided in code
+(`src/services/stockCheck.js`) from Shopify's *live* stock, not our last
+sync. Shopify takes an order's units off "available" as soon as the order is
+created, so the live number is what's left after this order; below zero means
+the store oversold. A variant that no longer exists holds the order. If Shopify
+can't be reached, the last sync is used, read strictly.
+
+**Syncing.** Order and product syncs follow Shopify's pagination to the last
+page (250 per request, retrying on rate limits), so big stores are complete.
+A product sync also removes rows for variants that were deleted or stopped
+being tracked.
+
+Test the full flow with a signed fake order (backend running; with
+`DEEPSEEK_API_KEY` set, this makes one real LLM call):
 ```
 npm run test:agent
 ```

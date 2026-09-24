@@ -2,7 +2,7 @@ const { OpenAI } = require('openai');
 const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
 const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
-const { checkOrderStock } = require('./stockCheck');
+const { checkOrderStock, describeShortfall } = require('./stockCheck');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint.
@@ -15,10 +15,12 @@ You are triggered by store events and must decide what the seller should do.
 Use your tools for context (other pending orders, low stock) - never guess stock levels.
 
 How to read the data:
-- A new order comes with a stock check for each line item (stock_on_hand, can_ship), computed
-  from this store's inventory. It is final: if any line item has can_ship: false, the verdict is HOLD.
+- A new order comes with a stock check for each line item (stock_left_after_order, can_ship), computed
+  from Shopify's live inventory. It is final: if any line item has can_ship: false, the verdict is HOLD.
   Don't second-guess it - never assume an item (gift cards, digital goods) needs no stock.
-  stock_on_hand "not tracked" means the store doesn't limit that item's stock.
+  stock_left_after_order is what remains once this order is counted: below zero means the store sold
+  more than it has. "not tracked" means the store doesn't limit that item's stock; "unknown" means the
+  stock couldn't be confirmed, so a person has to check it.
 - check_low_stock returns items at or below their low-stock threshold, keyed by shopify_variant_id.
   Its stock_quantity values are authoritative.
 
@@ -60,7 +62,7 @@ function enforceStockCheck(reasoning, stockCheck) {
   if (!stockCheck || stockCheck.canShip || actionFromReasoning(reasoning) === 'hold') {
     return { reasoning, overridden: false };
   }
-  const short = stockCheck.short.map((l) => `${l.title} (${l.quantity} ordered, ${l.stock_on_hand} on hand)`).join('; ');
+  const short = stockCheck.short.map(describeShortfall).join('; ');
   return {
     reasoning: `HOLD - stock check: ${short}\n(The agent's reply below disagreed; stock data wins.)\n\n${reasoning || ''}`,
     overridden: true,

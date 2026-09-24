@@ -36,8 +36,8 @@ async function syncInventory(req, res) {
     }
 
     const products = await fetchProducts(creds.shopDomain, creds.accessToken);
-    let count = 0;
-    const untrackedVariantIds = [];
+    const trackedVariantIds = [];
+    let untracked = 0;
 
     // Snapshot stock before the upsert so we can tell which items *crossed*
     // the threshold on this sync, instead of re-alerting on every sync.
@@ -54,7 +54,7 @@ async function syncInventory(req, res) {
         // (gift cards, "don't track quantity" products) — they'd show up as
         // permanently low stock, so leave them out.
         if (!variant.inventory_management) {
-          untrackedVariantIds.push(variant.id);
+          untracked++;
           continue;
         }
 
@@ -70,7 +70,7 @@ async function syncInventory(req, res) {
              synced_at = CURRENT_TIMESTAMP`,
           [req.sellerId, product.id, variant.id, itemName, stock]
         );
-        count++;
+        trackedVariantIds.push(String(variant.id));
 
         // Only items we already knew about count as crossing — otherwise the
         // very first sync would fire an alert for everything that starts low.
@@ -87,16 +87,17 @@ async function syncInventory(req, res) {
       }
     }
 
-    // Clear rows from earlier syncs, or from variants that stopped being tracked.
-    if (untrackedVariantIds.length) {
-      await pool.query(
-        'DELETE FROM inventory_items WHERE seller_id = ? AND shopify_variant_id IN (?)',
-        [req.sellerId, untrackedVariantIds.map(String)]
-      );
-    }
+    // This was a complete list (every page), so any other row is a variant
+    // that was deleted in Shopify or stopped being tracked.
+    await pool.query(
+      trackedVariantIds.length
+        ? 'DELETE FROM inventory_items WHERE seller_id = ? AND shopify_variant_id NOT IN (?)'
+        : 'DELETE FROM inventory_items WHERE seller_id = ?',
+      [req.sellerId, trackedVariantIds]
+    );
 
     res.json({
-      message: `Synced ${count} inventory items (skipped ${untrackedVariantIds.length} untracked)`,
+      message: `Synced ${trackedVariantIds.length} inventory items (skipped ${untracked} untracked)`,
     });
 
     // Trigger #2: respond first, then let the agent decide what to do about it.

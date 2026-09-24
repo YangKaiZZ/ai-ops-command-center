@@ -59,8 +59,10 @@ async function postWebhook(body, { hmac, shopDomain, webhookId }) {
   });
 }
 
-// Orders one item that's low on stock (more than we have) and one healthy
-// item, so the agent has something real to decide about.
+// Orders a low-stock item and a healthy item (checked against live Shopify
+// stock), plus a variant that doesn't exist in the store. Shopify never saw
+// this fake order, so live stock doesn't count it; the missing variant is
+// what makes it unshippable, so the HOLD path is exercised every run.
 async function buildFakeOrder(sellerId) {
   const [low] = await pool.query(
     `SELECT shopify_variant_id, item_name, stock_quantity FROM inventory_items
@@ -76,7 +78,7 @@ async function buildFakeOrder(sellerId) {
   const lineItems = [];
   if (low[0]) lineItems.push({ ...low[0], quantity: low[0].stock_quantity + 1 });
   if (ok[0]) lineItems.push({ ...ok[0], quantity: 1 });
-  if (!lineItems.length) lineItems.push({ shopify_variant_id: '1', item_name: 'Fake Item', quantity: 1 });
+  lineItems.push({ shopify_variant_id: '1', item_name: 'Discontinued Test Item', quantity: 1 });
 
   const stamp = Date.now();
   return {
@@ -165,9 +167,12 @@ async function main() {
     const trigger = { type: 'order_created', order };
     const stockCheck = await checkOrderStock(seller.id, order);
     for (const line of stockCheck.lines) {
-      console.log(`    stock check: ${line.quantity} x ${line.title} - ${line.stock_on_hand} on hand -> ${line.can_ship ? 'can ship' : 'CANNOT ship'}`);
+      console.log(`    stock check: ${line.quantity} x ${line.title} - ${line.stock_left_after_order} left after order (${line.source}) -> ${line.can_ship ? 'can ship' : 'CANNOT ship'}`);
     }
-    // buildFakeOrder orders one more than we have of a low-stock item, when one exists.
+    const tracked = stockCheck.lines.filter((l) => l.variant_id !== '1');
+    check(tracked.every((l) => l.source === 'shopify'), 'stock check read live Shopify stock', tracked.map((l) => l.source).join(', '));
+    const missing = stockCheck.lines.find((l) => l.variant_id === '1');
+    check(missing && !missing.can_ship && missing.stock_left_after_order === 'unknown', 'variant missing from Shopify -> cannot ship', missing?.source);
     const expectedAction = stockCheck.canShip ? null : 'hold';
     console.log('    prompt the model will get:\n' + describeTrigger(trigger, stockCheck).replace(/^/gm, '      '));
     let decisionRow = null;
