@@ -1,0 +1,22 @@
+# One site for everything. Caddy gets and renews the HTTPS certificate for
+# {$DOMAIN} by itself, and redirects http:// to https://.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	# The API, Shopify's install link and OAuth callback, and its webhooks all
+	# live under /api. Sent straight to the backend, so webhook bodies arrive
+	# byte-for-byte as Shopify signed them.
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		reverse_proxy dashboard:3000
+	}
+}
