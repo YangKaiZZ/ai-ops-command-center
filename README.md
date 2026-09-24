@@ -127,6 +127,27 @@ Each seller sets their Slack incoming-webhook URL through the settings API
 The old global `SLACK_WEBHOOK_URL` in `.env` is ignored: it sent every
 seller's orders to one channel.
 
+**Email and Telegram alerts** work the same way, per seller, next to Slack.
+Each decision goes to every channel the seller turned on; one failing
+channel doesn't stop the others.
+- Email (needs `SMTP_URL` + `EMAIL_FROM`): `PUT /api/settings/email` `{ "email" }`
+  sends a 6-digit code; `POST /api/settings/email/verify` `{ "code" }` turns it on;
+  `DELETE /api/settings/email`. Alerts only go to a confirmed address. At most 5
+  codes an hour and 5 tries per code.
+- Telegram (needs `TELEGRAM_BOT_TOKEN`): `POST /api/settings/telegram` returns a
+  one-time `https://t.me/<bot>?start=<code>` link (15 min). Pressing Start links
+  that chat; `/stop` in the chat or `DELETE /api/settings/telegram` unlinks it.
+  The backend long-polls the bot, so it works without a public URL, but only
+  one backend process may poll a bot at a time.
+- `POST /api/settings/test-alert` sends a sample to every channel that's on and
+  reports how each went.
+
+WhatsApp isn't offered: sending business messages needs a verified Meta
+business account and approved message templates.
+
+`npm run test:alerts` checks email and Telegram against a fake mail server
+and a fake Telegram on localhost.
+
 **API keys** let tools like the MCP server in Claude Desktop read a
 seller's data without a sign-in token that expires in 7 days. Keys look
 like `aiops_...`, are sent as `Authorization: Bearer <key>` on the same

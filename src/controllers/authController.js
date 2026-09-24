@@ -2,8 +2,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { JWT_SECRET } = require('../config/secrets');
+const { isEmail } = require('../utils/isEmail');
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
 // Checks the sign-up form; returns the cleaned values or an error message.
@@ -12,7 +12,7 @@ function validateRegistration(body) {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
   if (!businessName || businessName.length > 255) return { error: 'Enter your business name' };
-  if (!EMAIL_RE.test(email) || email.length > 255) return { error: 'Enter a valid email address' };
+  if (!isEmail(email)) return { error: 'Enter a valid email address' };
   if (password.length < MIN_PASSWORD) return { error: `Use a password of at least ${MIN_PASSWORD} characters` };
   if (password.length > 200) return { error: 'That password is too long' };
   return { businessName, email, password };

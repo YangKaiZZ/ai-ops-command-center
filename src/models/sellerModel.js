@@ -136,7 +136,8 @@ async function setOrdersSyncedAt(sellerId, when) {
 async function getSettings(sellerId) {
   const [rows] = await pool.query(
     `SELECT business_name, email, shopify_shop_domain, shopify_scopes, default_low_stock_threshold,
-       shopify_access_token IS NOT NULL AS store_connected, slack_webhook_url IS NOT NULL AS slack_connected
+       shopify_access_token IS NOT NULL AS store_connected, slack_webhook_url IS NOT NULL AS slack_connected,
+       alert_email, telegram_chat_id IS NOT NULL AS telegram_connected
      FROM sellers WHERE id = ?`,
     [sellerId]
   );
@@ -154,6 +155,8 @@ async function getSettings(sellerId) {
     shopify: { oauth_available: oauth.isConfigured() },
     inventory: { default_low_stock_threshold: seller.default_low_stock_threshold },
     slack: { connected: Boolean(seller.slack_connected) },
+    alertEmail: seller.alert_email,
+    telegramConnected: Boolean(seller.telegram_connected),
   };
 }
 

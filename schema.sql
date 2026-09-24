@@ -16,6 +16,8 @@ CREATE TABLE sellers (
   shopify_token_expires_at TIMESTAMP NULL,  -- NULL for tokens that don't expire (pasted custom-app tokens)
   shopify_scopes VARCHAR(500),          -- what the token was granted, e.g. read_orders,read_products
   slack_webhook_url TEXT,               -- this seller's Slack incoming webhook, encrypted
+  alert_email VARCHAR(255),             -- confirmed address for email alerts
+  telegram_chat_id VARCHAR(64),         -- linked Telegram chat for alerts
   orders_synced_at TIMESTAMP NULL,      -- start of the last order sync; the next asks Shopify for changes since
   default_low_stock_threshold INT NOT NULL DEFAULT 5,  -- what new items start with
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -33,6 +35,22 @@ CREATE TABLE privacy_requests (
   received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE SET NULL,
   INDEX idx_seller_topic (seller_id, topic)
+);
+
+-- Linking an alert channel: a 6-digit code emailed to the address, or the
+-- one-time code in a Telegram bot link. Only the code's hash is stored.
+CREATE TABLE channel_links (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  channel VARCHAR(20) NOT NULL,             -- email | telegram
+  target VARCHAR(255),                      -- the address being confirmed (email only)
+  code_hash CHAR(64) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  INDEX idx_seller_channel (seller_id, channel),
+  INDEX idx_code (code_hash)
 );
 
 -- "Connect with Shopify" in progress: the state sent to Shopify's approval

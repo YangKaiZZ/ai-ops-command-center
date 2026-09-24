@@ -104,6 +104,20 @@ const PRIVACY_REQUESTS_DDL = `CREATE TABLE privacy_requests (
   INDEX idx_seller_topic (seller_id, topic)
 );`;
 
+const CHANNEL_LINKS_DDL = `CREATE TABLE channel_links (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NOT NULL,
+  channel VARCHAR(20) NOT NULL,
+  target VARCHAR(255),
+  code_hash CHAR(64) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  INDEX idx_seller_channel (seller_id, channel),
+  INDEX idx_code (code_hash)
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -130,6 +144,9 @@ const STEPS = [
     'sellers.default_low_stock_threshold',
     () => addColumn('sellers', 'default_low_stock_threshold', 'INT NOT NULL DEFAULT 5 AFTER orders_synced_at'),
   ],
+  ['sellers.alert_email', () => addColumn('sellers', 'alert_email', 'VARCHAR(255) NULL AFTER slack_webhook_url')],
+  ['sellers.telegram_chat_id', () => addColumn('sellers', 'telegram_chat_id', 'VARCHAR(64) NULL AFTER alert_email')],
+  ['channel_links table', () => createTable('channel_links', CHANNEL_LINKS_DDL)],
 ];
 
 async function main() {
