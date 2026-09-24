@@ -7,7 +7,8 @@ Telegram. Sellers sign up, connect their store through Shopify's OAuth flow
 and run everything from a web dashboard. The same tools are available in
 Claude Desktop through an MCP server.
 
-Tested end to end against a Shopify development store.
+Tested end to end against a Shopify development store. Live at
+https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
 
 ## What it does
 
@@ -117,7 +118,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 59 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits |
+| backend | `npm test` | 61 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
