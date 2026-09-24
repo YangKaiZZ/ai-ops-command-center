@@ -1,6 +1,6 @@
 const { fetchOrders, fetchProducts, fetchVariant } = require('./shopifyService');
 const { upsertOrder } = require('../models/orderModel');
-const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt } = require('../models/sellerModel');
+const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt, getDefaultThreshold } = require('../models/sellerModel');
 const inventory = require('../models/inventoryModel');
 const { triggerAgent } = require('./agentService');
 const { withLock } = require('../utils/lock');
@@ -59,6 +59,7 @@ function syncInventory(sellerId) {
     const creds = await requireCredentials(sellerId);
     const products = await fetchProducts(creds.shopDomain, creds.accessToken);
     const before = await inventory.getStockSnapshot(sellerId);
+    const defaultThreshold = await getDefaultThreshold(sellerId);
     const trackedVariantIds = [];
     const crossed = [];
     let untracked = 0;
@@ -80,7 +81,7 @@ function syncInventory(sellerId) {
           itemName: `${product.title}${variant.title !== 'Default Title' ? ' - ' + variant.title : ''}`,
           stock: variant.inventory_quantity || 0,
         };
-        await inventory.upsertInventoryItem(sellerId, item);
+        await inventory.upsertInventoryItem(sellerId, item, defaultThreshold);
         trackedVariantIds.push(item.variantId);
 
         const prev = before.get(item.variantId);

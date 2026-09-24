@@ -10,6 +10,7 @@ const {
   createKey,
   revokeKey,
   privacyRequests,
+  setInventoryDefaults,
 } = require('../controllers/settingsController');
 
 router.use(requireAuth, requireSession);
@@ -20,5 +21,6 @@ router.get('/api-keys', listKeys);
 router.post('/api-keys', createKey);
 router.delete('/api-keys/:id', revokeKey);
 router.get('/privacy-requests', privacyRequests);
+router.put('/inventory', setInventoryDefaults);
 
 module.exports = router;

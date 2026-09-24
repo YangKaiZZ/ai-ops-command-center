@@ -126,6 +126,10 @@ const STEPS = [
   ['unique sellers.shopify_shop_domain', uniqueShopDomains],
   ['oauth_states table', () => createTable('oauth_states', OAUTH_STATES_DDL)],
   ['privacy_requests table', () => createTable('privacy_requests', PRIVACY_REQUESTS_DDL)],
+  [
+    'sellers.default_low_stock_threshold',
+    () => addColumn('sellers', 'default_low_stock_threshold', 'INT NOT NULL DEFAULT 5 AFTER orders_synced_at'),
+  ],
 ];
 
 async function main() {

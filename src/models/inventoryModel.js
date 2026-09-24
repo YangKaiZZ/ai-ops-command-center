@@ -10,19 +10,55 @@ async function getStockSnapshot(sellerId) {
   return new Map(rows.map((row) => [row.shopify_variant_id, row]));
 }
 
-async function upsertInventoryItem(sellerId, item) {
+// A new item starts at the seller's default threshold; an existing item keeps
+// whatever threshold the seller set for it.
+async function upsertInventoryItem(sellerId, item, defaultThreshold) {
   await pool.query(
     `INSERT INTO inventory_items
-       (seller_id, shopify_product_id, shopify_variant_id, shopify_inventory_item_id, item_name, stock_quantity)
-     VALUES (?, ?, ?, ?, ?, ?)
+       (seller_id, shopify_product_id, shopify_variant_id, shopify_inventory_item_id, item_name, stock_quantity, low_stock_threshold)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        shopify_product_id = VALUES(shopify_product_id),
        shopify_inventory_item_id = VALUES(shopify_inventory_item_id),
        item_name = VALUES(item_name),
        stock_quantity = VALUES(stock_quantity),
        synced_at = CURRENT_TIMESTAMP`,
-    [sellerId, item.productId, item.variantId, item.inventoryItemId, item.itemName, item.stock]
+    [sellerId, item.productId, item.variantId, item.inventoryItemId, item.itemName, item.stock, defaultThreshold]
   );
+}
+
+// Every tracked item, lowest stock relative to its threshold first.
+async function listInventory(sellerId) {
+  const [rows] = await pool.query(
+    `SELECT id, item_name, shopify_variant_id, stock_quantity, low_stock_threshold,
+       stock_quantity <= low_stock_threshold AS is_low, synced_at
+     FROM inventory_items WHERE seller_id = ?
+     ORDER BY is_low DESC, stock_quantity - low_stock_threshold ASC, item_name ASC`,
+    [sellerId]
+  );
+  return rows.map((row) => ({ ...row, is_low: Boolean(row.is_low) }));
+}
+
+// Returns the updated item, or null if it isn't this seller's.
+async function setThreshold(sellerId, id, threshold) {
+  const [result] = await pool.query('UPDATE inventory_items SET low_stock_threshold = ? WHERE id = ? AND seller_id = ?', [
+    threshold,
+    id,
+    sellerId,
+  ]);
+  if (!result.affectedRows) return null;
+  const [[row]] = await pool.query(
+    `SELECT id, item_name, shopify_variant_id, stock_quantity, low_stock_threshold,
+       stock_quantity <= low_stock_threshold AS is_low, synced_at
+     FROM inventory_items WHERE id = ?`,
+    [id]
+  );
+  return { ...row, is_low: Boolean(row.is_low) };
+}
+
+async function setAllThresholds(sellerId, threshold) {
+  const [result] = await pool.query('UPDATE inventory_items SET low_stock_threshold = ? WHERE seller_id = ?', [threshold, sellerId]);
+  return result.affectedRows;
 }
 
 // After a complete product sync: any other row is a variant that was deleted
@@ -56,6 +92,9 @@ async function deleteInventoryItem(id) {
 module.exports = {
   getStockSnapshot,
   upsertInventoryItem,
+  listInventory,
+  setThreshold,
+  setAllThresholds,
   deleteInventoryExcept,
   findByInventoryItemId,
   updateStock,

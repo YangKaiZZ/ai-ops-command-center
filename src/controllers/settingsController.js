@@ -1,4 +1,6 @@
-const { getSettings: loadSettings, setSlackWebhookUrl } = require('../models/sellerModel');
+const { getSettings: loadSettings, setSlackWebhookUrl, setDefaultThreshold } = require('../models/sellerModel');
+const { setAllThresholds } = require('../models/inventoryModel');
+const { parseThreshold } = require('./inventoryController');
 const { isSlackWebhookUrl } = require('../services/notifier');
 const { createApiKey, listApiKeys, revokeApiKey } = require('../models/apiKeyModel');
 const { listDataRequests } = require('../models/privacyModel');
@@ -86,6 +88,21 @@ async function revokeKey(req, res) {
   }
 }
 
+// PUT /api/settings/inventory   Body: { default_low_stock_threshold, apply_to_all? }
+// The threshold new items start with; apply_to_all also resets every existing item to it.
+async function setInventoryDefaults(req, res) {
+  const threshold = parseThreshold(req.body?.default_low_stock_threshold);
+  if (threshold === null) return res.status(400).json({ error: 'The default threshold must be a whole number from 0 up' });
+  try {
+    await setDefaultThreshold(req.sellerId, threshold);
+    const updated = req.body?.apply_to_all === true ? await setAllThresholds(req.sellerId, threshold) : 0;
+    res.json({ inventory: { default_low_stock_threshold: threshold }, items_updated: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not save the default threshold' });
+  }
+}
+
 // GET /api/settings/privacy-requests
 // Customer data requests Shopify forwarded, each with the data we hold for
 // it now, for the seller to pass on to the customer.
@@ -98,4 +115,4 @@ async function privacyRequests(req, res) {
   }
 }
 
-module.exports = { getSettings, setSlack, clearSlack, listKeys, createKey, revokeKey, privacyRequests };
+module.exports = { getSettings, setSlack, clearSlack, listKeys, createKey, revokeKey, privacyRequests, setInventoryDefaults };

@@ -17,6 +17,7 @@ CREATE TABLE sellers (
   shopify_scopes VARCHAR(500),          -- what the token was granted, e.g. read_orders,read_products
   slack_webhook_url TEXT,               -- this seller's Slack incoming webhook, encrypted
   orders_synced_at TIMESTAMP NULL,      -- start of the last order sync; the next asks Shopify for changes since
+  default_low_stock_threshold INT NOT NULL DEFAULT 5,  -- what new items start with
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_shop_domain (shopify_shop_domain)  -- one account per store
 );
@@ -69,7 +70,7 @@ CREATE TABLE inventory_items (
   shopify_inventory_item_id VARCHAR(100),   -- what inventory_levels/update webhooks refer to
   item_name VARCHAR(255),
   stock_quantity INT DEFAULT 0,
-  low_stock_threshold INT DEFAULT 5,
+  low_stock_threshold INT DEFAULT 5,        -- set per item by the seller; new items get the seller's default
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (seller_id) REFERENCES sellers(id),
   UNIQUE KEY uniq_seller_variant (seller_id, shopify_variant_id),

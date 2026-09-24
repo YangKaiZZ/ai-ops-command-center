@@ -195,6 +195,13 @@ Read endpoints for the dashboard (all need the seller's JWT):
 - `GET /api/orders` - synced orders, newest first (`status` = fulfillment, plus `financial_status`)
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
+- `GET /api/inventory` - every tracked item with its threshold, low ones first
+- `PATCH /api/inventory/:id` with `{ "low_stock_threshold": 3 }` - an item counts as low at or below this
+- `PUT /api/settings/inventory` with `{ "default_low_stock_threshold": 5, "apply_to_all": false }` -
+  what new items start with (`apply_to_all` also resets every existing item)
+
+Syncs never overwrite a threshold the seller set. Changing a threshold doesn't
+send an alert by itself; alerts come when stock drops past it.
 
 Existing database? Create the new table with the `CREATE TABLE decisions`
 block from `schema.sql`.

@@ -135,7 +135,7 @@ async function setOrdersSyncedAt(sellerId, when) {
 // What the settings page shows. Secrets stay out: only whether they're set.
 async function getSettings(sellerId) {
   const [rows] = await pool.query(
-    `SELECT business_name, email, shopify_shop_domain, shopify_scopes,
+    `SELECT business_name, email, shopify_shop_domain, shopify_scopes, default_low_stock_threshold,
        shopify_access_token IS NOT NULL AS store_connected, slack_webhook_url IS NOT NULL AS slack_connected
      FROM sellers WHERE id = ?`,
     [sellerId]
@@ -152,8 +152,19 @@ async function getSettings(sellerId) {
       missing_scopes: connected && seller.shopify_scopes ? oauth.missingScopes(seller.shopify_scopes) : [],
     },
     shopify: { oauth_available: oauth.isConfigured() },
+    inventory: { default_low_stock_threshold: seller.default_low_stock_threshold },
     slack: { connected: Boolean(seller.slack_connected) },
   };
+}
+
+// The low-stock threshold new items start with.
+async function getDefaultThreshold(sellerId) {
+  const [rows] = await pool.query('SELECT default_low_stock_threshold FROM sellers WHERE id = ?', [sellerId]);
+  return rows[0]?.default_low_stock_threshold ?? 5;
+}
+
+async function setDefaultThreshold(sellerId, threshold) {
+  await pool.query('UPDATE sellers SET default_low_stock_threshold = ? WHERE id = ?', [threshold, sellerId]);
 }
 
 // Each seller's own Slack incoming webhook (encrypted: anyone holding the URL can post to that channel).
@@ -177,6 +188,8 @@ module.exports = {
   getOrdersSyncedAt,
   setOrdersSyncedAt,
   getSettings,
+  getDefaultThreshold,
+  setDefaultThreshold,
   getSlackWebhookUrl,
   setSlackWebhookUrl,
 };

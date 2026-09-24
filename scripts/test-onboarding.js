@@ -8,6 +8,8 @@
 //   5. app/uninstalled webhook disconnects but keeps the shop for later webhooks
 //   6. Shopify-side install link: new shop -> sign-up, known shop -> approval
 //   7. Disconnect button, and switching stores clears the old store's data
+//   8. Privacy (GDPR) webhooks
+//   9. Low-stock thresholds: seller default for new items, per-item overrides
 //
 // Usage:  npm run test:onboarding
 const path = require('path');
@@ -331,6 +333,36 @@ async function main() {
     check(wipe.status === 200 && left === 0 && acct.shopify_shop_domain === null && acct.email, 'shop/redact after uninstall deletes the store\'s data, keeps the login');
     const unknownTopic = await privacyHook('customers/whatever', { shop_domain: SHOP_2 });
     check(unknownTopic.status === 400, 'unknown compliance topic -> 400');
+
+    console.log('\n9. Low-stock thresholds');
+    const inventoryModel = require('../src/models/inventoryModel');
+    const defaults = await http('PUT', '/api/settings/inventory', { token: a.token, body: { default_low_stock_threshold: 12 } });
+    check(defaults.status === 200 && defaults.json.inventory.default_low_stock_threshold === 12, 'seller default saved');
+    await inventoryModel.upsertInventoryItem(a.id, { productId: 'p1', variantId: 'v1', inventoryItemId: 'i1', itemName: 'Mug', stock: 10 }, 12);
+    await inventoryModel.upsertInventoryItem(a.id, { productId: 'p2', variantId: 'v2', inventoryItemId: 'i2', itemName: 'Tote', stock: 40 }, 12);
+    const list = await http('GET', '/api/inventory', { token: a.token });
+    const [mug, tote] = list.json.items;
+    check(mug?.item_name === 'Mug' && mug.low_stock_threshold === 12 && mug.is_low === true && tote.is_low === false, 'new items start at the default; low ones listed first');
+
+    const patched = await http('PATCH', `/api/inventory/${mug.id}`, { token: a.token, body: { low_stock_threshold: 3 } });
+    check(patched.status === 200 && patched.json.item.low_stock_threshold === 3 && patched.json.item.is_low === false, 'per-item threshold saved (Mug no longer low)');
+    await inventoryModel.upsertInventoryItem(a.id, { productId: 'p1', variantId: 'v1', inventoryItemId: 'i1', itemName: 'Mug', stock: 9 }, 12);
+    const [[mugRow]] = await pool.query('SELECT low_stock_threshold FROM inventory_items WHERE id = ?', [mug.id]);
+    check(mugRow.low_stock_threshold === 3, 'a later sync keeps the seller\'s own threshold');
+
+    for (const bad of [-1, 1.5, 'abc', null]) {
+      const r = await http('PATCH', `/api/inventory/${mug.id}`, { token: a.token, body: { low_stock_threshold: bad } });
+      if (r.status !== 400) check(false, `threshold ${JSON.stringify(bad)} rejected`, `HTTP ${r.status}`);
+    }
+    check(true, 'negative, fractional and non-numeric thresholds rejected');
+    const otherSeller = await http('PATCH', `/api/inventory/${mug.id}`, { token: b.token, body: { low_stock_threshold: 1 } });
+    check(otherSeller.status === 404, "another seller can't change it", `HTTP ${otherSeller.status}`);
+
+    const applyAll = await http('PUT', '/api/settings/inventory', { token: a.token, body: { default_low_stock_threshold: 8, apply_to_all: true } });
+    const [thresholds] = await pool.query('SELECT DISTINCT low_stock_threshold AS t FROM inventory_items WHERE seller_id = ?', [a.id]);
+    check(applyAll.json.items_updated === 2 && thresholds.length === 1 && thresholds[0].t === 8, 'apply to all resets every item');
+    const settingsInv = await http('GET', '/api/settings', { token: a.token });
+    check(settingsInv.json.inventory.default_low_stock_threshold === 8, 'settings shows the default');
   } finally {
     for (const id of created) {
       for (const table of ['api_keys', 'decisions', 'orders', 'inventory_items', 'oauth_states', 'privacy_requests']) {
