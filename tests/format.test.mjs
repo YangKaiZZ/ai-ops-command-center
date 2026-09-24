@@ -1,7 +1,7 @@
 // Run with: npm test  (Node strips the TypeScript types itself)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stockTone, stockPercent, parseReasoning, actionInfo } from '../src/lib/format.ts';
+import { stockTone, stockPercent, parseReasoning, actionInfo, shopParam } from '../src/lib/format.ts';
 
 test('stock bar color: red only when nothing is left, amber when low', () => {
   assert.equal(stockTone(0, 5), 'critical'); // out of stock -> red
@@ -32,4 +32,14 @@ test('verdict badges', () => {
   assert.equal(actionInfo('fulfill').label, 'Fulfill');
   assert.equal(actionInfo('hold').tone, 'warning');
   assert.equal(actionInfo('something-new').label, 'Unclear');
+});
+
+test('install link shop: only exact *.myshopify.com addresses are passed on', () => {
+  assert.equal(shopParam('My-Store.myshopify.com'), 'my-store.myshopify.com');
+  assert.equal(shopParam(' my-store.myshopify.com '), 'my-store.myshopify.com');
+  assert.equal(shopParam(null), '');
+  assert.equal(shopParam('my-store'), ''); // Shopify always sends the full host
+  assert.equal(shopParam('my-store.myshopify.com.attacker.example'), '');
+  assert.equal(shopParam('https://my-store.myshopify.com'), '');
+  assert.equal(shopParam('-bad.myshopify.com'), '');
 });

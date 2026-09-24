@@ -65,3 +65,10 @@ const money = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maxim
 export function formatMoney(amount: string | null): string {
   return amount == null ? "—" : money.format(Number(amount));
 }
+
+// The ?shop= that Shopify's install link brings to sign-up, if it's a real
+// store address (same rule as the backend); "" otherwise.
+export function shopParam(value: string | null): string {
+  const shop = (value ?? "").trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop) ? shop : "";
+}
