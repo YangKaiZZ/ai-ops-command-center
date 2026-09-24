@@ -118,6 +118,10 @@ cd deploy && docker compose up -d --build
 Only the images that changed are rebuilt. Database migrations run when the
 backend starts. Old images pile up over time; `docker image prune` removes them.
 
+Restarting is safe while orders come in: webhooks' work waits in the job
+queue, the backend lets running agent jobs finish for up to 25 seconds before
+it stops, and anything cut off runs again once it's back.
+
 ## Backups
 
 `scripts/backup.sh` saves the database to `backups/ai_ops-<date>.sql.gz` and

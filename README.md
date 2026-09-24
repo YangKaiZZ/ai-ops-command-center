@@ -73,6 +73,16 @@ from their own dashboard.
   accounts together over any 24 hours, and each run makes at most 6 model
   calls. Events over a limit are saved as "Skipped" instead of checked.
 
+## Reliability
+
+- **Nothing lost on a restart**: agent runs go through a job queue in MySQL.
+  A job is saved before Shopify gets its reply, retried with backoff if the
+  model or network fails, and picked up again if the server stops mid-run.
+  On shutdown the backend lets running jobs finish first.
+- **No double work**: one agent run per order, and webhook delivery ids are
+  kept in the database, so Shopify's redeliveries are recognised even after
+  a restart.
+
 ## Tech stack
 
 | Part | Built with |
@@ -99,11 +109,12 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 45 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits |
+| backend | `npm test` | 49 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
 | backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |
+| backend | `npm run test:jobs` | the job queue: retries, restarts, shutdown, and webhooks through the queue to a decision, with duplicates caught |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 
 ## How it was built

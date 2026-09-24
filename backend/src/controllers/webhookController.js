@@ -1,27 +1,18 @@
 const { upsertOrder } = require('../models/orderModel');
 const { findSellerByShopDomain, clearShopifyToken } = require('../models/sellerModel');
-const { triggerAgent } = require('../services/agentService');
-const { refreshInventoryItem } = require('../services/syncService');
+const { queueAgentRun } = require('../services/agentService');
+const { enqueue } = require('../services/jobQueue');
+const webhookDeliveries = require('../models/webhookDeliveryModel');
 const privacy = require('../models/privacyModel');
-
-// Shopify delivers at-least-once, so the same webhook can arrive twice.
-// Remember recent delivery IDs so a retry doesn't post a second decision.
-const seenWebhookIds = new Set();
-const MAX_SEEN = 500;
-
-// Only called once a delivery is fully handled, so a failed attempt (500)
-// can still be retried by Shopify.
-function markSeen(webhookId) {
-  if (!webhookId) return;
-  seenWebhookIds.add(webhookId);
-  if (seenWebhookIds.size > MAX_SEEN) {
-    seenWebhookIds.delete(seenWebhookIds.values().next().value); // Sets iterate oldest-first
-  }
-}
 
 // Shared by every topic (signature already verified): parse the body, drop
 // repeats, find which seller's store sent it, then run `handle`. Anything
-// slow must be started by `handle`, not awaited: Shopify wants a reply within 5s.
+// slow goes on the job queue instead of being awaited: Shopify wants a reply
+// within 5s.
+//
+// Shopify delivers at-least-once, so the same webhook can arrive twice. Its
+// delivery id is recorded (in the database, so it holds across restarts) only
+// once `handle` succeeds, so a failed attempt (500) can still be retried.
 function webhookHandler(topic, handle) {
   return async (req, res) => {
     let payload;
@@ -32,11 +23,11 @@ function webhookHandler(topic, handle) {
     }
 
     const webhookId = req.get('X-Shopify-Webhook-Id');
-    if (webhookId && seenWebhookIds.has(webhookId)) {
-      return res.json({ received: true, duplicate: true });
-    }
-
     try {
+      if (webhookId && (await webhookDeliveries.isHandled(webhookId))) {
+        return res.json({ received: true, duplicate: true });
+      }
+
       // No JWT on webhooks — the shop domain header tells us which seller this is.
       const shopDomain = req.get('X-Shopify-Shop-Domain');
       const seller = await findSellerByShopDomain(shopDomain);
@@ -47,7 +38,7 @@ function webhookHandler(topic, handle) {
       }
 
       await handle(seller.id, payload);
-      markSeen(webhookId);
+      if (webhookId) await webhookDeliveries.markHandled(webhookId, topic);
       res.json({ received: true });
     } catch (err) {
       console.error(`[webhook] ${topic}:`, err);
@@ -60,8 +51,9 @@ function webhookHandler(topic, handle) {
 // Trigger #1: Shopify calls this on every new order.
 const handleOrderCreated = webhookHandler('orders/create', async (sellerId, order) => {
   // Store it first so get_pending_orders already sees it when the agent runs.
+  // If queueing fails, the 500 makes Shopify send the order again.
   await upsertOrder(sellerId, order);
-  triggerAgent(sellerId, { type: 'order_created', order });
+  await queueAgentRun(sellerId, { type: 'order_created', order });
 });
 
 // POST /api/webhooks/orders-updated
@@ -76,10 +68,7 @@ const handleOrderUpdated = webhookHandler('orders/updated', async (sellerId, ord
 const handleInventoryLevelUpdate = webhookHandler('inventory_levels/update', async (sellerId, level) => {
   // Shopify has sent these without an item id for bulk edits; the scheduled sync covers those.
   if (level.inventory_item_id == null) return;
-  const tag = `[webhook] inventory item ${level.inventory_item_id} seller=${sellerId}`;
-  refreshInventoryItem(sellerId, level.inventory_item_id)
-    .then((result) => console.log(`${tag}: ${result.status}${result.stock != null ? `, stock ${result.stock}` : ''}`))
-    .catch((err) => console.error(`${tag}: refresh failed: ${err.response?.status || err.message}`));
+  await enqueue('refresh_inventory_item', sellerId, { inventoryItemId: String(level.inventory_item_id) });
 });
 
 // POST /api/webhooks/app-uninstalled

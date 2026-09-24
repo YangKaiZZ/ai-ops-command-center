@@ -4,6 +4,7 @@ const { postDecision } = require('./notifier');
 const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
 const { checkOrderStock, describeShortfall } = require('./stockCheck');
 const { claimRun, skippedReasoning } = require('./agentBudget');
+const { enqueue } = require('./jobQueue');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint. (DEEPSEEK_BASE_URL is for tests.)
@@ -92,9 +93,14 @@ function toOpenAITools(mcpTools) {
 
 function createLLMClient() {
   if (!process.env.DEEPSEEK_API_KEY) {
-    throw new Error('DEEPSEEK_API_KEY is not set in .env - skipping the LLM call');
+    // Not worth retrying: the job queue gives up on this one straight away.
+    throw Object.assign(new Error('DEEPSEEK_API_KEY is not set in .env - skipping the LLM call'), { retryable: false });
   }
-  return new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL });
+  return new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL,
+    timeout: 60 * 1000, // per model call; the SDK's default of 10 minutes would hold a job slot far too long
+  });
 }
 
 // The agent loop: give the model the event + the MCP tools, execute whatever
@@ -169,12 +175,36 @@ async function runAgent(sellerId, trigger) {
   }
 }
 
-// Fire-and-forget wrapper for request handlers: the HTTP response has already
-// gone out (Shopify wants a reply within 5s), so failures just get logged.
-function triggerAgent(sellerId, trigger) {
-  runAgent(sellerId, trigger).catch((err) => {
-    console.error(`[agent seller=${sellerId} ${trigger.type}] failed: ${err.message}`);
-  });
+// Only what the agent reads from an order, so no customer name, address or
+// email sits in the job queue.
+function slimTrigger(trigger) {
+  if (trigger.type !== 'order_created') return trigger;
+  const o = trigger.order;
+  return {
+    type: 'order_created',
+    order: {
+      id: o.id,
+      name: o.name,
+      financial_status: o.financial_status,
+      total_price: o.total_price,
+      line_items: (o.line_items || []).map((li) => ({
+        variant_id: li.variant_id ?? null,
+        title: li.title,
+        variant_title: li.variant_title ?? null,
+        quantity: li.quantity,
+      })),
+    },
+  };
 }
 
-module.exports = { runAgent, triggerAgent, describeTrigger, enforceStockCheck, toOpenAITools, createLLMClient };
+// Puts an agent run on the job queue (runs in the background worker, see
+// jobHandlers.js). It's saved before the webhook or sync that caused it
+// returns, retried if the model or network fails, and survives a restart.
+// One run per order, however many times Shopify delivers it; resolves to the
+// job id, or null for an order that already has one.
+function queueAgentRun(sellerId, trigger) {
+  const dedupeKey = trigger.type === 'order_created' ? `agent:order:${sellerId}:${trigger.order.id}` : null;
+  return enqueue('agent_run', sellerId, { trigger: slimTrigger(trigger) }, { dedupeKey });
+}
+
+module.exports = { runAgent, queueAgentRun, slimTrigger, describeTrigger, enforceStockCheck, toOpenAITools, createLLMClient };

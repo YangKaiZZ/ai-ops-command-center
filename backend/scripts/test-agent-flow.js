@@ -51,7 +51,10 @@ function sign(body, secret) {
   return crypto.createHmac('sha256', secret).update(body).digest('base64');
 }
 
+const sentWebhookIds = []; // removed from webhook_deliveries at the end
+
 async function postWebhook(body, { hmac, shopDomain, webhookId, topic = 'orders/create' }) {
+  if (webhookId) sentWebhookIds.push(webhookId);
   return axios.post(`${BASE}/api/webhooks/${topic.replace(/[/_]/g, '-')}`, body, {
     headers: {
       'Content-Type': 'application/json',
@@ -287,6 +290,8 @@ async function main() {
       await pool.query("DELETE FROM decisions WHERE seller_id = ? AND id > ? AND action_taken = 'low_stock_alert'", [seller.id, alertAfterId]);
     }
     await pool.query('DELETE FROM orders WHERE seller_id = ? AND shopify_order_id = ?', [seller.id, String(order.id)]);
+    await pool.query('DELETE FROM jobs WHERE dedupe_key = ?', [`agent:order:${seller.id}:${order.id}`]);
+    if (sentWebhookIds.length) await pool.query('DELETE FROM webhook_deliveries WHERE webhook_id IN (?)', [sentWebhookIds]);
     console.log(`\nCleaned up fake order ${order.name} and its decision.`);
   }
 }

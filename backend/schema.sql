@@ -149,3 +149,34 @@ CREATE TABLE agent_runs (
   INDEX idx_seller_started (seller_id, started_at),
   INDEX idx_started (started_at)
 );
+
+-- Background work that has to survive a restart: agent runs and stock
+-- re-reads from webhooks (src/services/jobQueue.js). Payloads never hold
+-- customer details. Finished jobs are pruned after 30 days.
+CREATE TABLE jobs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(50) NOT NULL,                -- agent_run, refresh_inventory_item
+  seller_id INT NOT NULL,
+  payload JSON NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'queued',  -- queued, running, done, failed
+  attempts INT NOT NULL DEFAULT 0,
+  max_attempts INT NOT NULL DEFAULT 3,
+  run_after TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- a retry waits until then
+  locked_at TIMESTAMP NULL,
+  last_error TEXT,
+  dedupe_key VARCHAR(191) NULL,             -- e.g. one agent run per order; NULL = no check
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  finished_at TIMESTAMP NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_dedupe (dedupe_key),
+  INDEX idx_claim (status, run_after)
+);
+
+-- Shopify webhook deliveries already handled (X-Shopify-Webhook-Id), so a
+-- redelivery is recognised even after a restart. Pruned after 7 days.
+CREATE TABLE webhook_deliveries (
+  webhook_id VARCHAR(255) PRIMARY KEY,
+  topic VARCHAR(50) NOT NULL,
+  received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_received (received_at)
+);

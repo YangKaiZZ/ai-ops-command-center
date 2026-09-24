@@ -127,6 +127,32 @@ const AGENT_RUNS_DDL = `CREATE TABLE agent_runs (
   INDEX idx_started (started_at)
 );`;
 
+const JOBS_DDL = `CREATE TABLE jobs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(50) NOT NULL,
+  seller_id INT NOT NULL,
+  payload JSON NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'queued',
+  attempts INT NOT NULL DEFAULT 0,
+  max_attempts INT NOT NULL DEFAULT 3,
+  run_after TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_at TIMESTAMP NULL,
+  last_error TEXT,
+  dedupe_key VARCHAR(191) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  finished_at TIMESTAMP NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_dedupe (dedupe_key),
+  INDEX idx_claim (status, run_after)
+);`;
+
+const WEBHOOK_DELIVERIES_DDL = `CREATE TABLE webhook_deliveries (
+  webhook_id VARCHAR(255) PRIMARY KEY,
+  topic VARCHAR(50) NOT NULL,
+  received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_received (received_at)
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -157,6 +183,8 @@ const STEPS = [
   ['sellers.telegram_chat_id', () => addColumn('sellers', 'telegram_chat_id', 'VARCHAR(64) NULL AFTER alert_email')],
   ['channel_links table', () => createTable('channel_links', CHANNEL_LINKS_DDL)],
   ['agent_runs table', () => createTable('agent_runs', AGENT_RUNS_DDL)],
+  ['jobs table', () => createTable('jobs', JOBS_DDL)],
+  ['webhook_deliveries table', () => createTable('webhook_deliveries', WEBHOOK_DELIVERIES_DDL)],
 ];
 
 async function main() {

@@ -9,7 +9,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/app.js`, `src/server.js` — the Express app, and the entrypoint that starts it with the scheduler and Telegram polling
 - `src/routes/`, `src/controllers/` — endpoints: auth, orders, inventory, store, Shopify OAuth, webhooks, settings, alerts, decisions
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
-- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`) and the scheduled sync
+- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
 - `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`)
 - `tests/` — unit tests (`npm test`)
@@ -234,6 +234,32 @@ re-synced every `SYNC_INTERVAL_MINUTES` (default 15, `0` = off). Orders
 sync incrementally (only what changed since the last sync), products in full.
 Manual syncs, scheduled syncs and webhooks for one seller run one at a
 time, so an item that goes low is only alerted once.
+
+## Background jobs
+Agent runs, and the stock re-reads that `inventory_levels/update` webhooks
+ask for, go through a job queue in MySQL (the `jobs` table,
+`src/services/jobQueue.js`) instead of running inside the request:
+- A job is saved before the webhook or sync that caused it is answered, so a
+  restart can't lose it. If saving fails, the webhook gets a 500 and Shopify
+  sends it again.
+- A worker in the backend process runs `JOB_CONCURRENCY` jobs at a time
+  (default 2), claiming them with `SELECT ... FOR UPDATE SKIP LOCKED`.
+- A failed job is retried after 30 seconds, then 2 minutes (3 tries in all).
+  Errors that waiting won't fix, like a missing DeepSeek key, fail at once.
+  Each model call times out after 60 seconds.
+- On shutdown (SIGTERM, e.g. `docker compose stop`) the backend stops taking
+  jobs and gives running ones up to 25 seconds to finish. Jobs still marked
+  running at the next start are queued again. So a job runs at least once:
+  an agent run cut off after saving its decision could save a second one.
+- One agent run per order (`dedupe_key`), however many times Shopify delivers it.
+- Webhook delivery ids (`X-Shopify-Webhook-Id`) are kept in
+  `webhook_deliveries`, so a redelivery is recognised after a restart too.
+- An order's job holds only what the agent reads (id, number, total, line
+  items), never customer details.
+- Finished jobs are kept for 30 days, delivery ids for 7.
+
+This assumes one backend process, as the per-seller locks already do.
+`npm run test:jobs` checks all of it against a fake DeepSeek.
 
 ## Dashboard API
 Every agent decision is saved to the `decisions` table (before any alert is

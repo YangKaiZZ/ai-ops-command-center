@@ -123,6 +123,14 @@ async function row(sellerId) {
   return r;
 }
 
+// Delivery ids the test sent, removed from webhook_deliveries at the end.
+const sentWebhookIds = [];
+function newWebhookId() {
+  const id = crypto.randomUUID();
+  sentWebhookIds.push(id);
+  return id;
+}
+
 async function signedWebhook(topic, route, payload, shop) {
   const raw = JSON.stringify(payload);
   return http('POST', `/api/webhooks/${route}`, {
@@ -131,7 +139,7 @@ async function signedWebhook(topic, route, payload, shop) {
       'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', SECRET).update(raw).digest('base64'),
       'X-Shopify-Shop-Domain': shop,
       'X-Shopify-Topic': topic,
-      'X-Shopify-Webhook-Id': crypto.randomUUID(),
+      'X-Shopify-Webhook-Id': newWebhookId(),
     },
   });
 }
@@ -292,7 +300,7 @@ async function main() {
           'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', SECRET).update(raw).digest('base64'),
           'X-Shopify-Shop-Domain': payload.shop_domain,
           'X-Shopify-Topic': topic,
-          'X-Shopify-Webhook-Id': crypto.randomUUID(),
+          'X-Shopify-Webhook-Id': newWebhookId(),
         },
       });
     };
@@ -370,6 +378,7 @@ async function main() {
       }
       await pool.query('DELETE FROM sellers WHERE id = ?', [id]);
     }
+    if (sentWebhookIds.length) await pool.query('DELETE FROM webhook_deliveries WHERE webhook_id IN (?)', [sentWebhookIds]);
     console.log('\nRemoved the test sellers.');
   }
 }

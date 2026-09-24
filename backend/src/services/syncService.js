@@ -2,7 +2,7 @@ const { fetchOrders, fetchProducts, fetchVariant } = require('./shopifyService')
 const { upsertOrder } = require('../models/orderModel');
 const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt, getDefaultThreshold } = require('../models/sellerModel');
 const inventory = require('../models/inventoryModel');
-const { triggerAgent } = require('./agentService');
+const { queueAgentRun } = require('./agentService');
 const { withLock } = require('../utils/lock');
 
 // Re-ask for orders changed a little before the last sync, in case our clock
@@ -100,7 +100,7 @@ function syncInventory(sellerId) {
     // The product list was complete (every page), so anything else is gone.
     await inventory.deleteInventoryExcept(sellerId, trackedVariantIds);
 
-    if (crossed.length) triggerAgent(sellerId, { type: 'low_stock_crossed', items: crossed });
+    if (crossed.length) await queueAgentRun(sellerId, { type: 'low_stock_crossed', items: crossed });
 
     return {
       count: trackedVariantIds.length,
@@ -128,7 +128,7 @@ function refreshInventoryItem(sellerId, inventoryItemId) {
     const stock = variant.inventory_quantity || 0;
     await inventory.updateStock(row.id, stock);
     if (crossedLowStock(row, stock)) {
-      triggerAgent(sellerId, {
+      await queueAgentRun(sellerId, {
         type: 'low_stock_crossed',
         items: [
           {

@@ -40,6 +40,9 @@ services:
       additional_contexts:
         mcp: ../mcp # the agent runs the MCP server inside this container
     restart: unless-stopped
+    # On a restart the backend lets running jobs (agent runs) finish for up to
+    # 25s; anything cut off is queued again when it starts.
+    stop_grace_period: 30s
     environment:
       DB_HOST: mysql
       DB_USER: aiops
