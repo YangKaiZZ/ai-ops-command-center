@@ -37,14 +37,28 @@ async function addColumn(table, column, definition) {
   return 'added';
 }
 
-async function addIndex(table, index, columns) {
+async function addIndex(table, index, columns, { unique = false } = {}) {
   const [rows] = await pool.query(
     'SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
     [table, index]
   );
   if (rows.length) return null;
-  await pool.query(`ALTER TABLE ${table} ADD INDEX ${index} (${columns})`);
+  await pool.query(`ALTER TABLE ${table} ADD ${unique ? 'UNIQUE ' : ''}INDEX ${index} (${columns})`);
   return 'added';
+}
+
+// A store can belong to one account. Checked before adding the unique index,
+// so the migration explains the problem instead of failing on a duplicate.
+async function uniqueShopDomains() {
+  const [dupes] = await pool.query(
+    `SELECT shopify_shop_domain, GROUP_CONCAT(id) AS ids FROM sellers
+     WHERE shopify_shop_domain IS NOT NULL GROUP BY shopify_shop_domain HAVING COUNT(*) > 1`
+  );
+  if (dupes.length) {
+    const list = dupes.map((d) => `${d.shopify_shop_domain} (sellers ${d.ids})`).join(', ');
+    throw new Error(`Several accounts share a store: ${list}. Clear shopify_shop_domain on all but one, then run again.`);
+  }
+  return addIndex('sellers', 'uniq_shop_domain', 'shopify_shop_domain', { unique: true });
 }
 
 async function createTable(table, ddl) {
@@ -71,6 +85,14 @@ const API_KEYS_DDL = `CREATE TABLE api_keys (
   UNIQUE KEY uniq_key_hash (key_hash)
 );`;
 
+const OAUTH_STATES_DDL = `CREATE TABLE oauth_states (
+  state CHAR(48) PRIMARY KEY,
+  seller_id INT NOT NULL,
+  shop VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -84,6 +106,14 @@ const STEPS = [
     () => addIndex('inventory_items', 'idx_seller_inventory_item', 'seller_id, shopify_inventory_item_id'),
   ],
   ['api_keys table', () => createTable('api_keys', API_KEYS_DDL)],
+  ['sellers.shopify_refresh_token', () => addColumn('sellers', 'shopify_refresh_token', 'TEXT NULL AFTER shopify_access_token')],
+  [
+    'sellers.shopify_token_expires_at',
+    () => addColumn('sellers', 'shopify_token_expires_at', 'TIMESTAMP NULL AFTER shopify_refresh_token'),
+  ],
+  ['sellers.shopify_scopes', () => addColumn('sellers', 'shopify_scopes', 'VARCHAR(500) NULL AFTER shopify_token_expires_at')],
+  ['unique sellers.shopify_shop_domain', uniqueShopDomains],
+  ['oauth_states table', () => createTable('oauth_states', OAUTH_STATES_DDL)],
 ];
 
 async function main() {

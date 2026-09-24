@@ -1,5 +1,5 @@
 const { upsertOrder } = require('../models/orderModel');
-const { findSellerByShopDomain } = require('../models/sellerModel');
+const { findSellerByShopDomain, clearShopifyToken } = require('../models/sellerModel');
 const { triggerAgent } = require('../services/agentService');
 const { refreshInventoryItem } = require('../services/syncService');
 
@@ -81,4 +81,12 @@ const handleInventoryLevelUpdate = webhookHandler('inventory_levels/update', asy
     .catch((err) => console.error(`${tag}: refresh failed: ${err.response?.status || err.message}`));
 });
 
-module.exports = { handleOrderCreated, handleOrderUpdated, handleInventoryLevelUpdate };
+// POST /api/webhooks/app-uninstalled
+// The merchant removed the app (or we revoked it): the token no longer works.
+// The shop domain is kept so the privacy webhooks that follow still find this seller.
+const handleAppUninstalled = webhookHandler('app/uninstalled', async (sellerId) => {
+  await clearShopifyToken(sellerId);
+  console.log(`[webhook] app uninstalled: seller ${sellerId}'s store is now disconnected`);
+});
+
+module.exports = { handleOrderCreated, handleOrderUpdated, handleInventoryLevelUpdate, handleAppUninstalled };

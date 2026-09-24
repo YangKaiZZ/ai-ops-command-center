@@ -1,13 +1,14 @@
 const crypto = require('crypto');
+const { config } = require('../services/shopifyOAuth');
 
 // Shopify signs every webhook: X-Shopify-Hmac-Sha256 is the base64
-// HMAC-SHA256 of the raw request body, keyed with the app's webhook secret.
+// HMAC-SHA256 of the raw request body, keyed with the app's client secret.
 // Needs the *raw* bytes — re-serialized JSON won't match — so the route must
 // use express.raw(), not express.json().
 function verifyShopifyWebhook(req, res, next) {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const secret = config().apiSecret;
   if (!secret) {
-    console.error('[webhook] SHOPIFY_WEBHOOK_SECRET is not set - rejecting webhook');
+    console.error('[webhook] SHOPIFY_API_SECRET is not set - rejecting webhook');
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
   if (!Buffer.isBuffer(req.body)) {

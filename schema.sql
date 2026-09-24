@@ -10,11 +10,25 @@ CREATE TABLE sellers (
   business_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  shopify_shop_domain VARCHAR(255),     -- e.g. ai-ops.myshopify.com
-  shopify_access_token TEXT,            -- Admin API access token, encrypted (enc:v1:...)
+  shopify_shop_domain VARCHAR(255),     -- e.g. ai-ops.myshopify.com; kept after disconnecting
+  shopify_access_token TEXT,            -- Admin API access token, encrypted (enc:v1:...); NULL = not connected
+  shopify_refresh_token TEXT,           -- encrypted; only for expiring tokens from "Connect with Shopify"
+  shopify_token_expires_at TIMESTAMP NULL,  -- NULL for tokens that don't expire (pasted custom-app tokens)
+  shopify_scopes VARCHAR(500),          -- what the token was granted, e.g. read_orders,read_products
   slack_webhook_url TEXT,               -- this seller's Slack incoming webhook, encrypted
   orders_synced_at TIMESTAMP NULL,      -- start of the last order sync; the next asks Shopify for changes since
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_shop_domain (shopify_shop_domain)  -- one account per store
+);
+
+-- "Connect with Shopify" in progress: the state sent to Shopify's approval
+-- page, checked (once) when Shopify redirects back.
+CREATE TABLE oauth_states (
+  state CHAR(48) PRIMARY KEY,
+  seller_id INT NOT NULL,
+  shop VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE
 );
 
 -- Orders pulled in from Shopify, normalized to our own shape

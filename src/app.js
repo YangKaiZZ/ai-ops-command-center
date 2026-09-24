@@ -10,6 +10,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const decisionsRoutes = require('./routes/decisionsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const shopifyRoutes = require('./routes/shopifyRoutes');
 
 const app = express();
 // Webhooks go before express.json(): HMAC verification needs the raw body,
@@ -25,5 +26,6 @@ app.use('/api/store', storeRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/decisions', decisionsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/shopify', shopifyRoutes);
 
 module.exports = app;

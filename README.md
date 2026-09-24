@@ -48,12 +48,46 @@ tool layer and Claude agent get built on top of in later phases.
      -H "Authorization: Bearer PASTE_TOKEN_HERE"
    ```
 
-## Next steps (Phase 2)
-- Get Shopee Open Platform API access (partner account + app registration —
-  takes a few days for approval, so start this NOW in parallel with Phase 1).
-- Replace the empty `orders`/`inventory_items` tables with real synced data
-  from Shopee's API.
-- Add a `POST /api/orders/sync` endpoint that pulls fresh data on demand.
+## Connecting a store
+Sellers connect from the dashboard's Settings page, one of two ways.
+
+**Connect with Shopify** (OAuth). The seller types their store address,
+approves the app on Shopify and lands back on Settings. The backend then
+registers the webhooks and imports orders and products in the background.
+It needs these in `.env`:
+- `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`: client ID and secret of your app in the Shopify Dev Dashboard
+- `APP_URL`: this backend's public https URL (an ngrok tunnel while developing)
+- `DASHBOARD_URL`: where the dashboard runs (default `http://localhost:3005`)
+- `SHOPIFY_SCOPES` (optional): default `read_orders,read_products,read_inventory`
+
+and, in the app's configuration on Shopify:
+- **App URL**: `<APP_URL>/api/shopify/install`. A merchant who installs from Shopify's side lands
+  here: a store we know goes straight to approval, a new one is sent to sign up first.
+- **Allowed redirection URL**: `<APP_URL>/api/shopify/callback`
+- **Compliance webhooks**: see "Privacy webhooks" below.
+
+Connections use Shopify's expiring offline tokens (1 hour, with a refresh
+token). They're refreshed automatically, one refresh at a time per seller
+(each refresh invalidates the previous refresh token). If Shopify rejects a
+refresh, the store shows as disconnected and needs reconnecting.
+
+**Paste a token**, for a custom app made in the store's own admin
+(Settings > Apps > Develop apps): `POST /api/store/connect` with
+`{ "shop_domain": "...", "access_token": "shpat_..." }`. The token is
+checked with Shopify before it's saved. These tokens don't expire.
+
+Either way:
+- One account per store. Connecting an account to a *different* store clears the old store's
+  orders and stock (decisions stay as history).
+- `DELETE /api/store` disconnects: it uninstalls the app from the store and forgets the token.
+  Uninstalling from Shopify's side (`app/uninstalled`) does the same.
+- Changing the store connection needs a signed-in session; API keys can't.
+
+Endpoints: `POST /api/shopify/connect` `{ "shop": "my-store" }` returns `{ authorize_url }`;
+`GET /api/shopify/install` and `GET /api/shopify/callback` are Shopify's redirects,
+checked with Shopify's HMAC signature, the one-time `state` and a timestamp.
+
+`npm run test:onboarding` runs all of this in-process against a fake Shopify.
 
 ## Phase 4: event-triggered agent
 Two triggers run the same agent loop (`src/services/agentService.js`):
@@ -111,20 +145,22 @@ Test the full flow with a signed fake order (backend running; with
 npm run test:agent
 ```
 
-To receive real webhooks, expose the backend publicly (e.g. `ngrok http 3000`),
-set `SHOPIFY_WEBHOOK_SECRET` to your app's client secret, and register the
-topics with:
+Stores connected with "Connect with Shopify" or a pasted token get their
+webhooks registered automatically at `APP_URL`. To move them to a new
+tunnel URL (or set them up for a store connected before this existed),
+expose the backend publicly (e.g. `ngrok http 3000`) and run:
 ```
 node scripts/register-webhooks.js https://<tunnel>.ngrok-free.app --dry-run   # see what would change
 node scripts/register-webhooks.js https://<tunnel>.ngrok-free.app
 ```
-It registers (or moves to the new tunnel) all three topics:
+It registers (or moves to the new tunnel) all four topics:
 
 | Topic | Route | What it does |
 | --- | --- | --- |
 | `orders/create` | `/api/webhooks/orders-create` | stores the order, runs the agent |
 | `orders/updated` | `/api/webhooks/orders-updated` | keeps shipping/payment status current |
 | `inventory_levels/update` | `/api/webhooks/inventory-levels-update` | re-reads that variant's stock; an item that just went low triggers the agent |
+| `app/uninstalled` | `/api/webhooks/app-uninstalled` | disconnects the store (the shop domain is kept for the privacy webhooks) |
 
 `inventory_levels/update` needs the app's token to have the `read_inventory` scope.
 Run the script again whenever the tunnel URL changes.

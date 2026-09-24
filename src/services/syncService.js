@@ -11,7 +11,7 @@ const ORDER_SYNC_OVERLAP_MS = 10 * 60 * 1000;
 
 class StoreNotConnectedError extends Error {
   constructor() {
-    super('Connect your Shopify store first via /api/store/connect');
+    super('Connect your Shopify store first (Settings > Store)');
   }
 }
 
