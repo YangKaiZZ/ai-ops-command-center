@@ -11,6 +11,7 @@ async function postDecision(text) {
 
   try {
     await axios.post(url, { text });
+    console.log(`[notifier] posted to Slack: ${text.split('\n')[0]}`);
   } catch (err) {
     // Don't lose the decision just because Slack is down or the URL is wrong.
     console.error('[notifier] Slack post failed:', err.response?.status || err.message);
