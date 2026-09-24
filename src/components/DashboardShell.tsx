@@ -13,6 +13,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: "/orders", label: "Orders", count: data?.pending.length, countLabel: "need action" },
     { href: "/decisions", label: "Decisions", count: data?.decisions.length, countLabel: "total" },
     { href: "/low-stock", label: "Low stock", count: data?.lowStock.length, countLabel: "items" },
+    { href: "/settings", label: "Settings", count: undefined, countLabel: "" },
   ];
 
   return (

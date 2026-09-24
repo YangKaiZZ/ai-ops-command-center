@@ -30,3 +30,19 @@ export type Decision = {
 };
 
 export type Session = { token: string; business_name?: string };
+
+// GET /api/settings: whether things are set up, never the secrets themselves.
+export type Settings = {
+  business_name: string;
+  email: string;
+  store: { connected: boolean; shop_domain: string | null };
+  slack: { connected: boolean };
+};
+
+export type ApiKey = {
+  id: number;
+  name: string;
+  key_prefix: string; // first characters, e.g. "aiops_Ab12Cd"
+  created_at: string;
+  last_used_at: string | null;
+};
