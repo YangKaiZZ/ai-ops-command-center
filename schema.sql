@@ -21,6 +21,19 @@ CREATE TABLE sellers (
   UNIQUE KEY uniq_shop_domain (shopify_shop_domain)  -- one account per store
 );
 
+-- Shopify's privacy (GDPR) webhooks as they arrive: ids and outcomes only,
+-- never the personal data itself.
+CREATE TABLE privacy_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NULL,
+  topic VARCHAR(50) NOT NULL,               -- customers/data_request, customers/redact, shop/redact
+  shop_domain VARCHAR(255),
+  details JSON,                             -- order ids involved, what was redacted/deleted
+  received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE SET NULL,
+  INDEX idx_seller_topic (seller_id, topic)
+);
+
 -- "Connect with Shopify" in progress: the state sent to Shopify's approval
 -- page, checked (once) when Shopify redirects back.
 CREATE TABLE oauth_states (

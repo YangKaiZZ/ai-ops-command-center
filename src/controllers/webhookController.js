@@ -2,6 +2,7 @@ const { upsertOrder } = require('../models/orderModel');
 const { findSellerByShopDomain, clearShopifyToken } = require('../models/sellerModel');
 const { triggerAgent } = require('../services/agentService');
 const { refreshInventoryItem } = require('../services/syncService');
+const privacy = require('../models/privacyModel');
 
 // Shopify delivers at-least-once, so the same webhook can arrive twice.
 // Remember recent delivery IDs so a retry doesn't post a second decision.
@@ -89,4 +90,63 @@ const handleAppUninstalled = webhookHandler('app/uninstalled', async (sellerId) 
   console.log(`[webhook] app uninstalled: seller ${sellerId}'s store is now disconnected`);
 });
 
-module.exports = { handleOrderCreated, handleOrderUpdated, handleInventoryLevelUpdate, handleAppUninstalled };
+// --- Privacy (GDPR) webhooks, mandatory for apps on the Shopify App Store ---
+// Every request is logged in privacy_requests (ids only, no personal data).
+
+const handleCustomerDataRequest = webhookHandler('customers/data_request', async (sellerId, body) => {
+  const orderIds = (body.orders_requested || []).map(String);
+  await privacy.recordPrivacyRequest(sellerId, 'customers/data_request', body.shop_domain, {
+    data_request_id: body.data_request?.id ?? null,
+    customer_id: body.customer?.id ?? null,
+    order_ids: orderIds,
+  });
+  console.log(`[privacy] seller ${sellerId}: customer data request for ${orderIds.length} order(s) (see GET /api/settings/privacy-requests)`);
+});
+
+const handleCustomerRedact = webhookHandler('customers/redact', async (sellerId, body) => {
+  const orderIds = (body.orders_to_redact || []).map(String);
+  const redacted = await privacy.redactCustomer(sellerId, orderIds);
+  await privacy.recordPrivacyRequest(sellerId, 'customers/redact', body.shop_domain, {
+    customer_id: body.customer?.id ?? null,
+    order_ids: orderIds,
+    orders_redacted: redacted,
+  });
+  console.log(`[privacy] seller ${sellerId}: redacted the buyer on ${redacted} order(s)`);
+});
+
+const handleShopRedact = webhookHandler('shop/redact', async (sellerId, body) => {
+  // Sent 48 hours after an uninstall. If the store was connected again since,
+  // it's a current customer again: keep its data.
+  const seller = await findSellerByShopDomain(body.shop_domain);
+  if (seller?.connected) {
+    await privacy.recordPrivacyRequest(sellerId, 'shop/redact', body.shop_domain, { skipped: 'store was reconnected' });
+    console.log(`[privacy] seller ${sellerId}: shop/redact skipped, ${body.shop_domain} is connected again`);
+    return;
+  }
+  const deleted = await privacy.redactShop(sellerId);
+  await privacy.recordPrivacyRequest(sellerId, 'shop/redact', body.shop_domain, { deleted });
+  console.log(`[privacy] seller ${sellerId}: deleted ${body.shop_domain}'s data ${JSON.stringify(deleted)}`);
+});
+
+const privacyHandlers = {
+  'customers/data_request': handleCustomerDataRequest,
+  'customers/redact': handleCustomerRedact,
+  'shop/redact': handleShopRedact,
+};
+
+// POST /api/webhooks/compliance
+// The single "compliance webhooks" URL in the app's configuration: all three
+// topics arrive here, told apart by the X-Shopify-Topic header.
+function handlePrivacyWebhook(req, res) {
+  const handler = privacyHandlers[req.get('X-Shopify-Topic')];
+  if (!handler) return res.status(400).json({ error: 'Unknown compliance topic' });
+  return handler(req, res);
+}
+
+module.exports = {
+  handleOrderCreated,
+  handleOrderUpdated,
+  handleInventoryLevelUpdate,
+  handleAppUninstalled,
+  handlePrivacyWebhook,
+};

@@ -1,6 +1,7 @@
 const { getSettings: loadSettings, setSlackWebhookUrl } = require('../models/sellerModel');
 const { isSlackWebhookUrl } = require('../services/notifier');
 const { createApiKey, listApiKeys, revokeApiKey } = require('../models/apiKeyModel');
+const { listDataRequests } = require('../models/privacyModel');
 
 // GET /api/settings
 // Account, store and notification status for the settings page. Never returns secrets.
@@ -85,4 +86,16 @@ async function revokeKey(req, res) {
   }
 }
 
-module.exports = { getSettings, setSlack, clearSlack, listKeys, createKey, revokeKey };
+// GET /api/settings/privacy-requests
+// Customer data requests Shopify forwarded, each with the data we hold for
+// it now, for the seller to pass on to the customer.
+async function privacyRequests(req, res) {
+  try {
+    res.json({ requests: await listDataRequests(req.sellerId) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load privacy requests' });
+  }
+}
+
+module.exports = { getSettings, setSlack, clearSlack, listKeys, createKey, revokeKey, privacyRequests };

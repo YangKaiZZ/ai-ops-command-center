@@ -93,6 +93,17 @@ const OAUTH_STATES_DDL = `CREATE TABLE oauth_states (
   FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE
 );`;
 
+const PRIVACY_REQUESTS_DDL = `CREATE TABLE privacy_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  seller_id INT NULL,
+  topic VARCHAR(50) NOT NULL,
+  shop_domain VARCHAR(255),
+  details JSON,
+  received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE SET NULL,
+  INDEX idx_seller_topic (seller_id, topic)
+);`;
+
 const STEPS = [
   ['encrypt sellers.shopify_access_token', () => encryptColumn('sellers', 'shopify_access_token')],
   ['sellers.slack_webhook_url', () => addColumn('sellers', 'slack_webhook_url', 'TEXT NULL AFTER shopify_access_token')],
@@ -114,6 +125,7 @@ const STEPS = [
   ['sellers.shopify_scopes', () => addColumn('sellers', 'shopify_scopes', 'VARCHAR(500) NULL AFTER shopify_token_expires_at')],
   ['unique sellers.shopify_shop_domain', uniqueShopDomains],
   ['oauth_states table', () => createTable('oauth_states', OAUTH_STATES_DDL)],
+  ['privacy_requests table', () => createTable('privacy_requests', PRIVACY_REQUESTS_DDL)],
 ];
 
 async function main() {

@@ -268,9 +268,72 @@ async function main() {
     const [[{ items }]] = await pool.query('SELECT COUNT(*) AS items FROM inventory_items WHERE seller_id = ?', [b.id]);
     check(switched.cb.location?.endsWith('shopify=connected') && orders === 0 && items === 0, 'switching to another store clears the old store\'s orders and stock');
     check((await row(b.id)).shopify_shop_domain === SHOP_2, 'now on the new store');
+
+    console.log('\n8. Privacy (GDPR) webhooks');
+    const [o1] = await pool.query(
+      "INSERT INTO orders (seller_id, shopify_order_id, order_number, status, buyer_name, total_amount) VALUES (?, '9001', '#P1', 'unfulfilled', 'Maria Santos', 20)",
+      [b.id]
+    );
+    await pool.query(
+      "INSERT INTO orders (seller_id, shopify_order_id, order_number, status, buyer_name) VALUES (?, '9002', '#P2', 'unfulfilled', 'Other Buyer')",
+      [b.id]
+    );
+    await pool.query(
+      "INSERT INTO decisions (seller_id, order_id, order_number, reasoning, action_taken) VALUES (?, ?, '#P1', 'FULFILL - Maria Santos ordered 1 item', 'fulfill')",
+      [b.id, o1.insertId]
+    );
+    const privacyHook = (topic, payload) => {
+      const raw = JSON.stringify(payload);
+      return http('POST', '/api/webhooks/compliance', {
+        body: raw,
+        headers: {
+          'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', SECRET).update(raw).digest('base64'),
+          'X-Shopify-Shop-Domain': payload.shop_domain,
+          'X-Shopify-Topic': topic,
+          'X-Shopify-Webhook-Id': crypto.randomUUID(),
+        },
+      });
+    };
+
+    const unsigned = await http('POST', '/api/webhooks/compliance', { body: '{}', headers: { 'X-Shopify-Hmac-Sha256': 'x', 'X-Shopify-Topic': 'shop/redact' } });
+    check(unsigned.status === 401, 'unsigned privacy webhook -> 401 (what Shopify\'s review checks for)', `HTTP ${unsigned.status}`);
+
+    const dataReq = await privacyHook('customers/data_request', {
+      shop_domain: SHOP_2,
+      customer: { id: 555, email: 'maria@example.test' },
+      orders_requested: [9001],
+      data_request: { id: 77 },
+    });
+    const requests = await http('GET', '/api/settings/privacy-requests', { token: b.token });
+    const req0 = requests.json?.requests?.[0];
+    check(dataReq.status === 200 && req0?.data_request_id === 77 && req0.data.orders[0]?.buyer_name === 'Maria Santos' && req0.data.decisions.length === 1, 'data request logged; Settings can show what we hold for it');
+    const [[logged]] = await pool.query("SELECT details FROM privacy_requests WHERE seller_id = ? AND topic = 'customers/data_request'", [b.id]);
+    check(!JSON.stringify(logged.details).includes('maria@'), 'the log holds ids, not the customer\'s email');
+
+    const redact = await privacyHook('customers/redact', { shop_domain: SHOP_2, customer: { id: 555 }, orders_to_redact: [9001] });
+    const [[p1]] = await pool.query("SELECT buyer_name FROM orders WHERE seller_id = ? AND shopify_order_id = '9001'", [b.id]);
+    const [[p2]] = await pool.query("SELECT buyer_name FROM orders WHERE seller_id = ? AND shopify_order_id = '9002'", [b.id]);
+    const [[d1]] = await pool.query("SELECT reasoning FROM decisions WHERE seller_id = ? AND order_number = '#P1'", [b.id]);
+    check(redact.status === 200 && p1.buyer_name === 'Redacted' && p2.buyer_name === 'Other Buyer', 'customers/redact removes that buyer only');
+    check(d1.reasoning === 'FULFILL - [redacted] ordered 1 item', 'and scrubs their name from decisions', d1.reasoning);
+
+    const keep = await privacyHook('shop/redact', { shop_domain: SHOP_2, shop_id: 1 });
+    const [[{ stillThere }]] = await pool.query('SELECT COUNT(*) AS stillThere FROM orders WHERE seller_id = ?', [b.id]);
+    check(keep.status === 200 && stillThere === 2, 'shop/redact for a store that is connected again keeps its data');
+
+    await http('DELETE', '/api/store', { token: b.token });
+    const wipe = await privacyHook('shop/redact', { shop_domain: SHOP_2, shop_id: 1 });
+    const [[{ left }]] = await pool.query(
+      'SELECT (SELECT COUNT(*) FROM orders WHERE seller_id = ?) + (SELECT COUNT(*) FROM decisions WHERE seller_id = ?) AS `left`',
+      [b.id, b.id]
+    );
+    const [[acct]] = await pool.query('SELECT email, shopify_shop_domain FROM sellers WHERE id = ?', [b.id]);
+    check(wipe.status === 200 && left === 0 && acct.shopify_shop_domain === null && acct.email, 'shop/redact after uninstall deletes the store\'s data, keeps the login');
+    const unknownTopic = await privacyHook('customers/whatever', { shop_domain: SHOP_2 });
+    check(unknownTopic.status === 400, 'unknown compliance topic -> 400');
   } finally {
     for (const id of created) {
-      for (const table of ['api_keys', 'decisions', 'orders', 'inventory_items', 'oauth_states']) {
+      for (const table of ['api_keys', 'decisions', 'orders', 'inventory_items', 'oauth_states', 'privacy_requests']) {
         await pool.query(`DELETE FROM ${table} WHERE seller_id = ?`, [id]);
       }
       await pool.query('DELETE FROM sellers WHERE id = ?', [id]);

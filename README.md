@@ -89,6 +89,20 @@ checked with Shopify's HMAC signature, the one-time `state` and a timestamp.
 
 `npm run test:onboarding` runs all of this in-process against a fake Shopify.
 
+### Privacy webhooks
+Apps on the Shopify App Store must handle three privacy (GDPR) webhooks. In
+the app's configuration, set the **compliance webhooks** URL to
+`<APP_URL>/api/webhooks/compliance`; all three arrive there:
+
+| Topic | What happens |
+| --- | --- |
+| `customers/data_request` | logged; `GET /api/settings/privacy-requests` lists each request with the data we hold for those orders, for the seller to pass on |
+| `customers/redact` | the buyer's name on those orders becomes "Redacted", and is scrubbed from decision text |
+| `shop/redact` | (48 h after uninstall) deletes the store's orders, stock, decisions and messages; skipped if the store was connected again. The seller's login stays |
+
+Each request is logged in `privacy_requests` with ids and outcomes only,
+never the personal data. Unsigned requests get 401, as Shopify's review expects.
+
 ## Phase 4: event-triggered agent
 Two triggers run the same agent loop (`src/services/agentService.js`):
 1. **New order** — Shopify calls `POST /api/webhooks/orders-create`. The HMAC
