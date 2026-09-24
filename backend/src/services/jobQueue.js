@@ -133,6 +133,7 @@ async function pruneOldRows() {
   await pool.query('DELETE FROM webhook_deliveries WHERE received_at < NOW() - INTERVAL 7 DAY');
   await pool.query('DELETE FROM agent_runs WHERE started_at < NOW() - INTERVAL 7 DAY');
   await pool.query('DELETE FROM rate_limit_events WHERE created_at < NOW() - INTERVAL 1 DAY');
+  await pool.query('DELETE FROM password_resets WHERE expires_at < NOW() - INTERVAL 1 DAY');
 }
 
 // --- the worker ---

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config/secrets');
+const pool = require('../config/db');
 const { isApiKey, findSellerIdByApiKey } = require('../models/apiKeyModel');
 
 // This is what makes the whole app multi-tenant: every protected route
@@ -29,13 +30,25 @@ async function requireAuth(req, res, next) {
     }
   }
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    // A password reset signs out every token issued before it.
+    const [rows] = await pool.query('SELECT UNIX_TIMESTAMP(password_changed_at) AS changed_at FROM sellers WHERE id = ?', [decoded.sellerId]);
+    if (!rows[0] || (rows[0].changed_at && decoded.iat < Number(rows[0].changed_at))) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
     req.sellerId = decoded.sellerId;
     req.authMethod = 'session';
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error(err);
+    return res.status(500).json({ error: 'Could not check the session' });
   }
 }
 

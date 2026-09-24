@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { JWT_SECRET } = require('../config/secrets');
 const { isEmail } = require('../utils/isEmail');
 const rateLimit = require('../services/rateLimit');
+const passwordReset = require('../services/passwordReset');
 
 const { LIMITS } = rateLimit;
 const MIN_PASSWORD = 8;
@@ -89,4 +90,63 @@ async function login(req, res) {
   }
 }
 
-module.exports = { register, login, validateRegistration };
+// POST /api/auth/forgot-password { email }
+// Always answers the same (202) whether or not the email has an account, and
+// counts every request against the limits, so it can't be used to find out
+// who has one. The email is sent after answering, so timing doesn't tell either.
+async function forgotPassword(req, res) {
+  try {
+    if (!passwordReset.isEmailConfigured()) {
+      return res.status(503).json({ error: "Password reset by email isn't set up on this server. Ask its administrator." });
+    }
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!isEmail(email)) return res.status(400).json({ error: 'Enter a valid email address' });
+    const limitedByIp = !rateLimit.isLoopback(req.ip);
+
+    const wait = Math.max(
+      await rateLimit.secondsUntilAllowed(LIMITS.resetRequestsPerAccount, email),
+      limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.resetRequestsPerIp, req.ip) : 0
+    );
+    if (wait) return rateLimit.tooManyRequests(res, wait, 'Too many password reset requests');
+    await rateLimit.record(LIMITS.resetRequestsPerAccount, email);
+    if (limitedByIp) await rateLimit.record(LIMITS.resetRequestsPerIp, req.ip);
+
+    const [rows] = await pool.query('SELECT id, email, business_name FROM sellers WHERE email = ?', [email]);
+    if (rows[0]) {
+      passwordReset.sendResetEmail(rows[0]).catch((err) => console.error(`[auth] reset email for seller ${rows[0].id} failed: ${err.message}`));
+    }
+    res.status(202).json({ message: 'If that email has an account, a reset link is on its way. It works once and expires in an hour.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong sending the reset link' });
+  }
+}
+
+// POST /api/auth/reset-password { token, password }
+// Sets the new password, spends the token, and signs out everywhere else
+// (older sign-in tokens stop working). Doesn't sign the caller in.
+async function resetPassword(req, res) {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (password.length < MIN_PASSWORD) return res.status(400).json({ error: `Use a password of at least ${MIN_PASSWORD} characters` });
+    if (password.length > 200) return res.status(400).json({ error: 'That password is too long' });
+
+    const limitedByIp = !rateLimit.isLoopback(req.ip);
+    const wait = limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.resetFailuresPerIp, req.ip) : 0;
+    if (wait) return rateLimit.tooManyRequests(res, wait, 'Too many attempts with a bad reset link');
+
+    const email = token.length >= 20 && token.length <= 100 ? await passwordReset.resetPassword(token, password) : null;
+    if (!email) {
+      if (limitedByIp) await rateLimit.record(LIMITS.resetFailuresPerIp, req.ip);
+      return res.status(400).json({ error: 'This reset link is invalid or has expired. Ask for a new one.' });
+    }
+    await rateLimit.clear(LIMITS.loginFailuresPerAccount, email); // they've proved they own it: lift a lockout
+    res.json({ message: 'Password changed. Sign in with the new one.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong resetting the password' });
+  }
+}
+
+module.exports = { register, login, forgotPassword, resetPassword, validateRegistration };

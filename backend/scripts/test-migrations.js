@@ -39,9 +39,10 @@ async function main() {
   try {
     console.log('\n1. A fresh database');
     let applied = await migrate({ settings: settings(names.fresh), log: quiet });
-    check(applied.length === 1 && applied[0] === '001_initial_schema', 'creates the database and applies 001', applied.join(', '));
+    const shipped = listMigrations(MIGRATIONS_DIR).map((m) => m.version);
+    check(applied.join() === shipped.join() && applied[0] === '001_initial_schema', 'creates the database and applies every shipped migration', applied.join(', '));
     const tables = await tablesIn(names.fresh);
-    const expected = ['agent_runs', 'api_keys', 'channel_links', 'customer_messages', 'decisions', 'inventory_items', 'jobs', 'oauth_states', 'orders', 'privacy_requests', 'schema_migrations', 'sellers', 'webhook_deliveries'];
+    const expected = ['agent_runs', 'api_keys', 'channel_links', 'customer_messages', 'decisions', 'inventory_items', 'jobs', 'oauth_states', 'orders', 'password_resets', 'privacy_requests', 'rate_limit_events', 'schema_migrations', 'sellers', 'webhook_deliveries'];
     check(expected.every((t) => tables.includes(t)), 'every table exists', tables.join(', '));
     applied = await migrate({ settings: settings(names.fresh), log: quiet });
     check(applied.length === 0, 'running again does nothing');
@@ -82,7 +83,7 @@ async function main() {
     check(before.legacy === true, 'status recognises it');
     const lines = [];
     applied = await migrate({ settings: settings(names.legacy), log: (line) => lines.push(line) });
-    check(applied.length === 0 && lines.some((l) => /recorded 001_initial_schema\.sql as applied/.test(l)), 'the first run adopts it and records 001', lines.filter((l) => /DONE/.test(l)).length + ' step(s) done');
+    check(applied.join() === shipped.slice(1).join() && lines.some((l) => /recorded 001_initial_schema\.sql as applied/.test(l)), 'the first run adopts it and records 001', lines.filter((l) => /DONE/.test(l)).length + ' step(s) done');
     check((await tablesIn(names.legacy)).includes('jobs') && (await columnIn(names.legacy, 'sellers', 'telegram_chat_id')), 'the missing table and column are back');
     const [[seller]] = await admin.query('SELECT shopify_access_token AS t FROM sellers');
     const { decryptSecret, isEncrypted } = require('../src/config/secrets');

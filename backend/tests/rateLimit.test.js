@@ -28,6 +28,13 @@ test('waits read as minutes, rounded up', () => {
 test('the limits are the documented ones', () => {
   assert.deepEqual(
     Object.fromEntries(Object.entries(LIMITS).map(([name, l]) => [name, [l.max, l.windowSeconds]])),
-    { loginFailuresPerAccount: [10, 900], loginFailuresPerIp: [30, 900], signupsPerIp: [10, 3600] }
+    {
+      loginFailuresPerAccount: [10, 900],
+      loginFailuresPerIp: [30, 900],
+      signupsPerIp: [10, 3600],
+      resetRequestsPerAccount: [3, 3600],
+      resetRequestsPerIp: [10, 3600],
+      resetFailuresPerIp: [20, 900],
+    }
   );
 });

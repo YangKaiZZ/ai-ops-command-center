@@ -12,7 +12,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -300,6 +300,26 @@ Failed attempts are recorded in `rate_limit_events` (`src/services/rateLimit.js`
 - Old events are pruned by the job worker.
 
 `npm run test:rate-limits` checks it through the real routes.
+
+## Password reset
+
+`POST /api/auth/forgot-password` with `{ "email" }` emails a reset link
+(`DASHBOARD_URL/reset-password?token=...`); `POST /api/auth/reset-password`
+with `{ "token", "password" }` sets the new password. It needs `SMTP_URL` and
+`EMAIL_FROM`; without them forgot-password answers 503.
+- Links are random 256-bit tokens stored only as SHA-256 hashes
+  (`password_resets`), work once, and expire after an hour. Asking again
+  replaces the older link.
+- forgot-password answers the same 202 for every valid-looking email and sends
+  the mail after answering, so it can't be used to find out who has an account.
+- Limits (`rateLimit.js`): 3 emails per address per hour (with or without an
+  account), 10 requests per IP per hour, and 20 bad links per IP per 15 minutes.
+- A reset sets `sellers.password_changed_at`; sign-in tokens issued before it
+  are refused (the auth middleware checks it), so a stolen 7-day token dies
+  with the old password. API keys are unaffected, they can be revoked in Settings.
+- A reset also lifts that account's sign-in lockout. It doesn't sign anyone in.
+
+`npm run test:password-reset` checks it against a fake SMTP server.
 
 ## Dashboard API
 Every agent decision is saved to the `decisions` table (before any alert is

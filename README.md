@@ -71,6 +71,8 @@ from their own dashboard.
 - **Sign-in is rate-limited**: 10 failed sign-ins per email and 30 per IP
   per 15 minutes, 10 sign-ups per IP per hour. Emails and IPs are stored only
   as keyed hashes, and unknown emails take as long to reject as wrong passwords.
+- **Password reset** by emailed link: single-use, one-hour, stored only as a
+  hash, rate-limited, and it signs out every older session.
 - **Privacy requests** are logged with ids and outcomes only, never the personal data.
 - **LLM cost is capped**: agent runs are limited per account and for all
   accounts together over any 24 hours, and each run makes at most 6 model
@@ -119,6 +121,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |
 | backend | `npm run test:jobs` | the job queue: retries, restarts, shutdown, and webhooks through the queue to a decision, with duplicates caught |
 | backend | `npm run test:rate-limits` | sign-in and sign-up limits through the real routes: per email, per IP, reset on success, no hint about which accounts exist |
+| backend | `npm run test:password-reset` | reset links against a fake mail server: one use, expiry, hashed storage, sign-out of old sessions, limits |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 
