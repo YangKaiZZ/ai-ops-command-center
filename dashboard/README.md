@@ -1,7 +1,7 @@
-# AI Ops Dashboard (Phase 5)
+# AI Ops Command Center — Dashboard
 
 Next.js + Tailwind dashboard for the AI Ops Command Center. It reads the
-[ai-ops-backend](../ai-ops-backend/ai-ops-backend) API and shows a seller's
+[backend](../backend) API and shows a seller's
 orders, the agent's decisions, and stock.
 
 ## Pages
@@ -42,7 +42,7 @@ argument because Next bakes rewrites in at build time:
 docker build --build-arg BACKEND_URL=http://backend:3000 -t ai-ops-dashboard .
 ```
 
-To run the whole app on a server, use the [ai-ops-deploy](../ai-ops-deploy)
+To run the whole app on a server, use the [deploy](../deploy)
 folder's Docker Compose setup and its README.
 
 ## Checks

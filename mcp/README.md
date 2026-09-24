@@ -1,49 +1,48 @@
-# AI Ops MCP Server (Phase 3)
+# AI Ops MCP server
 
-This is the piece that makes the project unique. It exposes your Phase 1/2
-REST API as **tools** Claude can call directly — so instead of a chatbot
-that just talks, this lets Claude actually pull real data and take action.
+An [MCP](https://modelcontextprotocol.io) server that exposes the backend's
+REST API as tools, so an AI model can look at a seller's store and act on it:
 
-## What's here
-- `server.js` — defines 4 tools: get_pending_orders, check_low_stock,
-  get_all_orders, sync_latest_data
-- `apiClient.js` — calls your existing backend (the one from Phase 1/2)
+| Tool | What it does |
+| --- | --- |
+| `get_pending_orders` | Orders that are unpaid or waiting to ship |
+| `check_low_stock` | Items at or below their low-stock level |
+| `get_all_orders` | Every synced order, newest first |
+| `sync_latest_data` | Pulls the latest orders and stock from Shopify |
 
-## Setup
-1. Make sure your Phase 1/2 backend is running (`npm run dev` in that project).
-2. `npm install` here.
-3. Copy `.env.example` to `.env`.
-4. Create an API key: in the AI Ops dashboard go to **Settings > API keys**,
-   name it (e.g. "Claude Desktop") and copy the key into `BACKEND_API_KEY`
-   in `.env`. It's shown only once. It doesn't expire; if it leaks, revoke it
-   on the same page and create a new one.
+It's used in two places:
+- **The backend's agent** starts it as a subprocess for each run, with a
+  10-minute token for that one seller, and gets the three read-only tools.
+  (`sync_latest_data` is left out on purpose: a sync can trigger the agent,
+  so an agent that could sync could trigger itself.)
+- **Claude Desktop**, so a seller can ask about their store in a chat.
 
-   (The old way, a sign-in JWT in `BACKEND_JWT`, still works but stops working
-   after 7 days. If both are set, `BACKEND_API_KEY` wins.)
+It never touches the database. It only calls the REST API with the seller's
+credentials, so every tool call is limited to that seller's data.
 
-If a tool fails, Claude shows why: a revoked key, or the backend not running.
+## Files
+- `server.js` — the four tools
+- `apiClient.js` — the HTTP client for the backend. Errors come back as
+  messages the model can pass on ("the API key was revoked", "the backend
+  isn't reachable").
 
-## Connect it to Claude Desktop
-Add this to your Claude Desktop config file
-(`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "ai-ops": {
-      "command": "node",
-      "args": ["C:\\full\\path\\to\\ai-ops-mcp\\server.js"]
-    }
-  }
-}
-```
-
-Restart Claude Desktop completely. You should see a small tools/plug icon
-in the chat — that means it found your MCP server. Then just ask Claude
-things like "what orders need my attention" or "check my low stock items"
-and it'll call your tools and answer with real data from your Shopify store.
-
-## This is your demo
-Once this works, record a short screen capture: ask Claude a question,
-show it calling the tool, show the real answer coming back. That video +
-the GitHub repo IS your portfolio piece.
+## Use it from Claude Desktop
+1. `npm install`
+2. Copy `.env.example` to `.env`. Set `BACKEND_URL` to the backend, and
+   create an API key in the dashboard (**Settings > API keys**) for
+   `BACKEND_API_KEY`. The key is shown once and doesn't expire; revoke it on
+   the same page. (A sign-in JWT in `BACKEND_JWT` also works, for 7 days.)
+3. Add the server to Claude Desktop's config
+   (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+   ```json
+   {
+     "mcpServers": {
+       "ai-ops": {
+         "command": "node",
+         "args": ["C:\\path\\to\\ai-ops-command-center\\mcp\\server.js"]
+       }
+     }
+   }
+   ```
+4. Restart Claude Desktop and ask something like "which orders need my
+   attention?" or "what's running low?".

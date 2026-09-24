@@ -5,8 +5,8 @@ Runs the whole app on one Linux server with Docker Compose:
 | Service | What it does |
 |---|---|
 | `caddy` | The only thing open to the internet (ports 80 and 443). Gets and renews the HTTPS certificate. Sends `/api/*` to the backend and everything else to the dashboard. |
-| `dashboard` | The Next.js dashboard ([ai-ops-dashboard](../ai-ops-dashboard)). |
-| `backend` | The Express API ([ai-ops-backend](../ai-ops-backend)), with the MCP server ([ai-ops-mcp](../ai-ops-mcp)) built into the same image: the agent starts it as a subprocess for each run. Runs the database migrations each time it starts. |
+| `dashboard` | The Next.js dashboard ([dashboard](../dashboard)). |
+| `backend` | The Express API ([backend](../backend)), with the MCP server ([mcp](../mcp)) built into the same image: the agent starts it as a subprocess for each run. Runs the database migrations each time it starts. |
 | `mysql` | MySQL 8.4. Data lives in the `mysql-data` volume. |
 
 Everything is served from one domain: `https://<DOMAIN>/` is the dashboard,
@@ -37,44 +37,24 @@ resolves, so do it first. Check with `ping ops.example.com`.
 
 ## 3. The code
 
-The four repos sit side by side (the paths are set in `.env`):
-
-```
-/opt/ai-ops/
-  ai-ops-deploy/      this folder: docker-compose.yml, Caddyfile, .env
-  ai-ops-backend/
-  ai-ops-dashboard/
-  ai-ops-mcp/
-```
-
-**Option A, GitHub (recommended, makes updates a `git pull`).** Push each repo
-to a private GitHub repository, then on the server:
+Clone the repo on the server:
 
 ```bash
-sudo mkdir -p /opt/ai-ops && sudo chown $USER /opt/ai-ops && cd /opt/ai-ops
-for repo in ai-ops-deploy ai-ops-backend ai-ops-dashboard ai-ops-mcp; do
-  git clone git@github.com:<you>/$repo.git
-done
+sudo mkdir -p /opt/ai-ops && sudo chown $USER /opt/ai-ops
+git clone https://github.com/YangKaiZZ/ai-ops-command-center.git /opt/ai-ops
 ```
 
-The server needs read access to the private repos: add its SSH key
-(`ssh-keygen -t ed25519`, then `cat ~/.ssh/id_ed25519.pub`) to your GitHub
-account, or as a read-only deploy key on each repo.
+(For a private fork, the server needs read access: add its SSH key,
+`ssh-keygen -t ed25519` then `cat ~/.ssh/id_ed25519.pub`, as a read-only
+deploy key on the repo, and clone with the `git@github.com:...` address.)
 
-**Option B, copy from your computer.** In each repo on your computer, make an
-archive of the committed code (this leaves out `node_modules` and `.env`),
-then copy and unpack it on the server:
-
-```bash
-git archive --format=tar.gz -o ai-ops-backend.tar.gz HEAD
-scp ai-ops-backend.tar.gz you@server:/opt/ai-ops/
-ssh you@server "mkdir -p /opt/ai-ops/ai-ops-backend && tar -xzf /opt/ai-ops/ai-ops-backend.tar.gz -C /opt/ai-ops/ai-ops-backend"
-```
+The compose file builds the `backend`, `dashboard` and `mcp` folders next
+to this one, so always run `docker compose` from `/opt/ai-ops/deploy`.
 
 ## 4. Settings
 
 ```bash
-cd /opt/ai-ops/ai-ops-deploy
+cd /opt/ai-ops/deploy
 cp .env.example .env
 # Fill in the four secrets with random values:
 for v in JWT_SECRET ENCRYPTION_KEY DB_PASSWORD MYSQL_ROOT_PASSWORD; do
@@ -121,7 +101,7 @@ them on each store when it connects.
 ## 7. Claude Desktop (optional)
 
 To use the MCP tools against the live server, create an API key in the live
-dashboard (Settings, API keys) and put these in your local `ai-ops-mcp/.env`:
+dashboard (Settings, API keys) and put these in your local `mcp/.env`:
 
 ```
 BACKEND_URL=https://ops.example.com
@@ -131,9 +111,8 @@ BACKEND_API_KEY=aiops_...
 ## Updating
 
 ```bash
-cd /opt/ai-ops
-for repo in ai-ops-deploy ai-ops-backend ai-ops-dashboard ai-ops-mcp; do git -C $repo pull; done
-cd ai-ops-deploy && docker compose up -d --build
+cd /opt/ai-ops && git pull
+cd deploy && docker compose up -d --build
 ```
 
 Only the images that changed are rebuilt. Database migrations run when the
@@ -145,7 +124,7 @@ backend starts. Old images pile up over time; `docker image prune` removes them.
 keeps the newest 14. Run it daily from cron (`crontab -e`):
 
 ```
-30 3 * * * /opt/ai-ops/ai-ops-deploy/scripts/backup.sh >> /opt/ai-ops/ai-ops-deploy/backups/backup.log 2>&1
+30 3 * * * /opt/ai-ops/deploy/scripts/backup.sh >> /opt/ai-ops/deploy/backups/backup.log 2>&1
 ```
 
 Copy the backups off the server now and then (e.g. `scp`), because a backup
@@ -195,9 +174,8 @@ orders and decisions along instead:
 ## Try it locally
 
 With Docker Desktop, you can run the same stack on your own computer. Make an
-`.env` with `DOMAIN=localhost`, `HTTP_PORT=8080`, `HTTPS_PORT=8443`, the four
-secrets, and on the Windows layout `BACKEND_DIR=../ai-ops-backend/ai-ops-backend`.
-Start it with `docker compose -p ai-ops-local up -d --build` and open
+`.env` in this folder with `DOMAIN=localhost`, `HTTP_PORT=8080`,
+`HTTPS_PORT=8443` and the four secrets. Start it with `docker compose -p ai-ops-local up -d --build` and open
 `https://localhost:8443` directly (Caddy uses its own certificate for
 `localhost`, so the browser warns once; `http://localhost:8080` redirects to
 port 443, which only works on a real server). The `-p` name keeps it apart

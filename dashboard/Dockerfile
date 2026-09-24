@@ -4,7 +4,7 @@
 #   docker build --build-arg BACKEND_URL=http://backend:3000 -t ai-ops-dashboard .
 #
 # BACKEND_URL is where /api/* is proxied to. Next bakes it in at build time,
-# so changing it means rebuilding. (Behind ai-ops-deploy's Caddy, /api/* goes
+# so changing it means rebuilding. (Behind the deploy setup's Caddy, /api/* goes
 # straight to the backend and this proxy is only a fallback.)
 FROM node:24-slim AS build
 WORKDIR /app

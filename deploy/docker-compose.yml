@@ -23,7 +23,7 @@ services:
       - mysql-data:/var/lib/mysql
       # Creates the tables the first time only (while the data volume is empty).
       # Later changes arrive through the backend's migrate step on every start.
-      - ${BACKEND_DIR:-../ai-ops-backend}/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - ../backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
       # Over TCP on purpose: during first-time setup MySQL runs without
       # networking, so this only passes once the real server is up.
@@ -36,9 +36,9 @@ services:
 
   backend:
     build:
-      context: ${BACKEND_DIR:-../ai-ops-backend}
+      context: ../backend
       additional_contexts:
-        mcp: ${MCP_DIR:-../ai-ops-mcp} # the agent runs the MCP server inside this container
+        mcp: ../mcp # the agent runs the MCP server inside this container
     restart: unless-stopped
     environment:
       DB_HOST: mysql
@@ -65,7 +65,7 @@ services:
 
   dashboard:
     build:
-      context: ${DASHBOARD_DIR:-../ai-ops-dashboard}
+      context: ../dashboard
       args:
         BACKEND_URL: http://backend:3000
     restart: unless-stopped

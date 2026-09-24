@@ -1,19 +1,21 @@
-# AI Ops Command Center — Backend (Phase 1)
+# AI Ops Command Center — Backend
 
-RESTful API + auth + multi-tenant DB schema. This is the foundation the MCP
-tool layer and Claude agent get built on top of in later phases.
+Express + MySQL REST API for the AI Ops Command Center: multi-tenant
+accounts, Shopify connection and webhooks, the order/stock agent, alerts,
+and the endpoints the dashboard and the MCP server use.
 
 ## What's here
-- `schema.sql` — multi-tenant MySQL schema (sellers, orders, inventory, messages)
-- `src/config/db.js` — MySQL connection pool
-- `src/controllers/authController.js` — register/login, JWT issuing
-- `src/controllers/ordersController.js` — order queries, scoped per seller
-- `src/middleware/auth.js` — protects routes, attaches `req.sellerId`
-- `src/routes/` — endpoint definitions
-- `src/server.js` — app entrypoint
+- `schema.sql` — multi-tenant MySQL schema (every table is scoped by `seller_id`)
+- `src/app.js`, `src/server.js` — the Express app, and the entrypoint that starts it with the scheduler and Telegram polling
+- `src/routes/`, `src/controllers/` — endpoints: auth, orders, inventory, store, Shopify OAuth, webhooks, settings, alerts, decisions
+- `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
+- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`) and the scheduled sync
+- `src/models/` — database access
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`)
+- `tests/` — unit tests (`npm test`)
 
 ## Run it locally
-1. Install MySQL if you don't have it (or use XAMPP, which you may already have).
+1. MySQL 8 (or run the whole stack with Docker instead: see [deploy](../deploy)).
 2. Create the database and tables:
    ```
    mysql -u root -p < schema.sql
@@ -50,16 +52,16 @@ tool layer and Claude agent get built on top of in later phases.
 
 ## Docker
 The `Dockerfile` builds this API with the MCP server inside (the agent starts
-it as a subprocess), so it takes the [ai-ops-mcp](../../ai-ops-mcp) folder as a
+it as a subprocess), so it takes the [mcp](../mcp) folder as a
 second build context:
 
 ```
-docker build --build-context mcp=../../ai-ops-mcp -t ai-ops-backend .
+docker build --build-context mcp=../mcp -t ai-ops-backend .
 ```
 
 The container runs `npm run migrate` before starting, and takes its settings
 from environment variables (no `.env` inside the image). To run the whole app
-on a server, use the [ai-ops-deploy](../../ai-ops-deploy) folder's Docker
+on a server, use the [deploy](../deploy) folder's Docker
 Compose setup and its README.
 
 ## Connecting a store
@@ -117,19 +119,20 @@ the app's configuration, set the **compliance webhooks** URL to
 Each request is logged in `privacy_requests` with ids and outcomes only,
 never the personal data. Unsigned requests get 401, as Shopify's review expects.
 
-## Phase 4: event-triggered agent
+## The agent
 Two triggers run the same agent loop (`src/services/agentService.js`):
 1. **New order** — Shopify calls `POST /api/webhooks/orders-create`. The HMAC
-   signature is verified against `SHOPIFY_WEBHOOK_SECRET`, the order is stored,
+   signature is verified against `SHOPIFY_API_SECRET`, the order is stored,
    and the agent decides if it's fulfillable.
 2. **Low stock** — any tracked item that goes from above its threshold to
    at/below it triggers the agent, whether the drop arrives by an
    `inventory_levels/update` webhook, a scheduled sync or `POST /api/inventory/sync`.
 
 The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
-Phase 3 MCP server's read-only tools — the backend spawns that server with a
-10-minute JWT for the seller in question. The decision goes to that seller's
-own Slack channel, or to the server console if they haven't set one.
+[MCP server](../mcp)'s read-only tools — the backend spawns that server with a
+10-minute JWT for the seller in question. The decision is saved, then sent to
+every alert channel the seller turned on (Slack, email, Telegram), or to the
+server console if none is.
 
 Each seller sets their Slack incoming-webhook URL through the settings API
 (the dashboard's Settings page). It's stored encrypted, and only
@@ -175,7 +178,7 @@ endpoints, and only their SHA-256 hash is stored:
 Everything under `/api/settings` needs a signed-in session: an API key can
 read and sync store data, but can't change Slack or create more keys.
 
-Settings in `.env`: `SHOPIFY_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`,
+Settings in `.env`: `SHOPIFY_API_SECRET`, `DEEPSEEK_API_KEY`,
 `MCP_SERVER_PATH` (see `.env.example`).
 
 **Stock check.** Whether each line item can ship is decided in code
@@ -222,9 +225,9 @@ sync incrementally (only what changed since the last sync), products in full.
 Manual syncs, scheduled syncs and webhooks for one seller run one at a
 time, so an item that goes low is only alerted once.
 
-## Phase 5: dashboard API
-Every agent decision is saved to the `decisions` table (before the Slack post,
-so a Slack outage can't lose one). `action_taken` is the agent's
+## Dashboard API
+Every agent decision is saved to the `decisions` table (before any alert is
+sent, so an outage can't lose one). `action_taken` is the agent's
 *recommendation* - `fulfill`, `hold`, `low_stock_alert`, or `unknown` if the
 verdict line couldn't be parsed. Nothing is changed in Shopify yet.
 
@@ -244,6 +247,6 @@ Existing database? Create the new table with the `CREATE TABLE decisions`
 block from `schema.sql`.
 
 ### Dashboard UI
-The dashboard is a separate Next.js app, `ai-ops-dashboard`, which runs on
-port 3005 and proxies `/api/*` to this backend. See that project's README.
+The dashboard is a separate Next.js app in [dashboard](../dashboard), which
+runs on port 3005 and proxies `/api/*` to this backend. See its README.
 This backend only serves the API.

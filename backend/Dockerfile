@@ -3,9 +3,9 @@
 # as a subprocess (MCP_SERVER_PATH), so both have to be in this image. The MCP
 # code comes from its own repo as a second build context named "mcp":
 #
-#   docker build --build-context mcp=../ai-ops-mcp -t ai-ops-backend .
+#   docker build --build-context mcp=../mcp -t ai-ops-backend .
 #
-# (ai-ops-deploy's docker-compose.yml passes it for you.)
+# (deploy/docker-compose.yml passes it for you.)
 FROM node:24-slim
 
 # MCP server: only its code and lockfile. Its .env (a seller's API key for
