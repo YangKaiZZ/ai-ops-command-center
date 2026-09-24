@@ -4,16 +4,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import { apiFetch, UnauthorizedError } from "@/lib/api";
 import { clearSession, loadSession, takeSignOutReason, useSession } from "@/lib/session";
-import type { Decision, LowStockItem, Order, Session } from "@/lib/types";
+import type { Decision, InventoryItem, Order, Session, Settings } from "@/lib/types";
 
 const REFRESH_MS = 30_000;
 
 type DashboardData = {
   orders: Order[];
   pending: Order[];
-  lowStock: LowStockItem[];
+  inventory: InventoryItem[]; // every tracked item, low ones first
+  lowStock: InventoryItem[];
   decisions: Decision[];
   latestByOrder: Map<number, Decision>; // each order's most recent agent decision
+  settings: Settings; // store connection and alert channels, for setup prompts
 };
 
 type Banner = { text: string; isError: boolean } | null;
@@ -25,6 +27,7 @@ type DashboardContextValue = {
   banner: Banner;
   syncing: boolean;
   sync: () => Promise<void>;
+  refresh: () => Promise<void>; // reload everything now, e.g. after changing a setting
   logout: () => void;
 };
 
@@ -36,7 +39,7 @@ export function useDashboard() {
   return value;
 }
 
-// Owns the session check, the data for all three pages, the 30s poll, and sync.
+// Owns the session check, the data for every page, the 30s poll, and sync.
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const session = useSession();
@@ -57,17 +60,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [{ orders }, { pending_orders }, { low_stock_items }, { decisions }] = await Promise.all([
+      const [{ orders }, { pending_orders }, { items }, { decisions }, settings] = await Promise.all([
         apiFetch<{ orders: Order[] }>("/api/orders", token),
         apiFetch<{ pending_orders: Order[] }>("/api/orders/pending", token),
-        apiFetch<{ low_stock_items: LowStockItem[] }>("/api/inventory/low-stock", token),
+        apiFetch<{ items: InventoryItem[] }>("/api/inventory", token),
         apiFetch<{ decisions: Decision[] }>("/api/decisions?limit=200", token),
+        apiFetch<Settings>("/api/settings", token),
       ]);
       // Decisions come newest first, so the first one seen per order is its latest.
       const latestByOrder = new Map<number, Decision>();
       for (const d of decisions) if (d.order_id != null && !latestByOrder.has(d.order_id)) latestByOrder.set(d.order_id, d);
 
-      setData({ orders, pending: pending_orders, lowStock: low_stock_items, decisions, latestByOrder });
+      const lowStock = items.filter((item) => item.is_low);
+      setData({ orders, pending: pending_orders, inventory: items, lowStock, decisions, latestByOrder, settings });
       setUpdatedAt(new Date());
       setBanner((b) => (b?.isError ? null : b));
     } catch (err) {
@@ -109,8 +114,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => clearSession(), []);
 
   const value = useMemo(
-    () => (session ? { session, data, updatedAt, banner, syncing, sync, logout } : null),
-    [session, data, updatedAt, banner, syncing, sync, logout]
+    () => (session ? { session, data, updatedAt, banner, syncing, sync, refresh, logout } : null),
+    [session, data, updatedAt, banner, syncing, sync, refresh, logout]
   );
 
   if (!value) return null; // hydrating, or on the way to /login

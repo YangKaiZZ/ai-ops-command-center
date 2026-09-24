@@ -8,11 +8,13 @@ import { useDashboard } from "./DashboardProvider";
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, data, updatedAt, banner, syncing, sync, logout } = useDashboard();
+  // Nothing to sync from until a store is connected (unknown while loading).
+  const noStore = data != null && !data.settings.store.connected;
 
   const tabs = [
     { href: "/orders", label: "Orders", count: data?.pending.length, countLabel: "need action" },
     { href: "/decisions", label: "Decisions", count: data?.decisions.length, countLabel: "total" },
-    { href: "/low-stock", label: "Low stock", count: data?.lowStock.length, countLabel: "items" },
+    { href: "/stock", label: "Stock", count: data?.lowStock.length, countLabel: "running low" },
     { href: "/settings", label: "Settings", count: undefined, countLabel: "" },
   ];
 
@@ -32,8 +34,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={sync}
-            disabled={syncing}
-            className="rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-medium hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-progress disabled:opacity-60"
+            disabled={syncing || noStore}
+            title={noStore ? "Connect your store in Settings first" : undefined}
+            className={`rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-medium hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60 ${
+              syncing ? "disabled:cursor-progress" : "disabled:cursor-not-allowed"
+            }`}
           >
             {syncing ? "Syncing…" : "Sync from Shopify"}
           </button>

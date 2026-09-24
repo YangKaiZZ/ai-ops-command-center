@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
   },
+  // The Stock page used to be "Low stock"; keep old bookmarks working.
+  async redirects() {
+    return [{ source: "/low-stock", destination: "/stock", permanent: false }];
+  },
 };
 
 export default nextConfig;
