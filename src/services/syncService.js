@@ -3,6 +3,7 @@ const { upsertOrder } = require('../models/orderModel');
 const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt } = require('../models/sellerModel');
 const inventory = require('../models/inventoryModel');
 const { triggerAgent } = require('./agentService');
+const { withLock } = require('../utils/lock');
 
 // Re-ask for orders changed a little before the last sync, in case our clock
 // and Shopify's disagree or an update landed while that sync was running.
@@ -12,21 +13,6 @@ class StoreNotConnectedError extends Error {
   constructor() {
     super('Connect your Shopify store first via /api/store/connect');
   }
-}
-
-// Manual sync, the scheduled sync and webhooks can all touch the same
-// seller's data at once. Running them one at a time per seller keeps the
-// "did this cross the threshold?" check from alerting twice.
-// (In-process only: assumes a single backend instance.)
-const queues = new Map();
-function withLock(key, fn) {
-  const run = (queues.get(key) || Promise.resolve()).then(fn);
-  const tail = run.catch(() => {});
-  queues.set(key, tail);
-  tail.then(() => {
-    if (queues.get(key) === tail) queues.delete(key);
-  });
-  return run;
 }
 
 // An item crosses when it goes from above its threshold to at/below it.
@@ -41,6 +27,10 @@ async function requireCredentials(sellerId) {
   if (!creds) throw new StoreNotConnectedError();
   return creds;
 }
+
+// Manual sync, the scheduled sync and webhooks can all touch the same
+// seller's data at once, so each runs under a per-seller lock: that keeps the
+// "did this cross the threshold?" check from alerting twice.
 
 // Pulls orders into our table. The first sync takes everything; after that
 // only orders created or updated since the last one.
@@ -160,6 +150,5 @@ module.exports = {
   syncInventory,
   refreshInventoryItem,
   crossedLowStock,
-  withLock,
   StoreNotConnectedError,
 };

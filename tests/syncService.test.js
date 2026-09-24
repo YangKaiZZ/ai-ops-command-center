@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 
 process.env.JWT_SECRET = 'test-jwt-secret-0123456789abcdef';
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
-const { crossedLowStock, withLock } = require('../src/services/syncService');
+const { crossedLowStock } = require('../src/services/syncService');
+const { withLock } = require('../src/utils/lock');
 
 test('an item crosses only when it goes from above its threshold to at/below it', () => {
   const prev = { stock_quantity: 8, low_stock_threshold: 5 };
