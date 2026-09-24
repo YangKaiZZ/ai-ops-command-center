@@ -1,7 +1,8 @@
 const { OpenAI } = require('openai');
 const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
-const { saveDecision } = require('../models/decisionModel');
+const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
+const { checkOrderStock } = require('./stockCheck');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint.
@@ -11,15 +12,15 @@ const MAX_STEPS = 6; // hard stop so a confused model can't loop on tool calls f
 
 const SYSTEM_PROMPT = `You are the operations assistant for a Shopify seller.
 You are triggered by store events and must decide what the seller should do.
-Always check the data with your tools before deciding - never guess stock levels.
+Use your tools for context (other pending orders, low stock) - never guess stock levels.
 
 How to read the data:
+- A new order comes with a stock check for each line item (stock_on_hand, can_ship), computed
+  from this store's inventory. It is final: if any line item has can_ship: false, the verdict is HOLD.
+  Don't second-guess it - never assume an item (gift cards, digital goods) needs no stock.
+  stock_on_hand "not tracked" means the store doesn't limit that item's stock.
 - check_low_stock returns items at or below their low-stock threshold, keyed by shopify_variant_id.
-  Everything it returns IS stock-tracked in this store and its stock_quantity is authoritative -
-  never assume an item (gift cards, digital goods) is exempt from stock.
-- An ordered variant that is NOT in the low-stock list either has stock above its threshold or
-  isn't stock-tracked in Shopify; treat it as available.
-- An order is not fulfillable if any line item's quantity is more than that variant's stock_quantity.
+  Its stock_quantity values are authoritative.
 
 Reply in plain text for a Slack message, under 80 words:
 Line 1: one verdict followed by a short headline. The verdict is saved to the dashboard, so use exactly:
@@ -27,18 +28,16 @@ Line 1: one verdict followed by a short headline. The verdict is saved to the da
 - for a low-stock event: RESTOCK
 Then 2-4 bullets with the specific reasons (item names, quantities, stock numbers).`;
 
-// Turns the raw trigger into the user message the model sees.
-function describeTrigger(trigger) {
+// Turns the raw trigger into the user message the model sees. Orders need
+// the stock check from checkOrderStock().
+function describeTrigger(trigger, stockCheck) {
   if (trigger.type === 'order_created') {
     const o = trigger.order;
-    const items = (o.line_items || []).map((li) => ({
-      title: li.title,
-      variant_title: li.variant_title,
-      variant_id: li.variant_id != null ? String(li.variant_id) : null,
-      quantity: li.quantity,
-    }));
-    return `A new order was just placed. Decide whether it can be fulfilled now.\n${JSON.stringify(
-      { order: o.name, financial_status: o.financial_status, total: o.total_price, line_items: items },
+    const summary = stockCheck.canShip
+      ? 'Stock check: every line item can ship.'
+      : `Stock check: ${stockCheck.short.length} line item(s) CANNOT ship - verdict must be HOLD.`;
+    return `A new order was just placed. Decide whether it can be fulfilled now.\n${summary}\n${JSON.stringify(
+      { order: o.name, financial_status: o.financial_status, total: o.total_price, line_items: stockCheck.lines },
       null,
       2
     )}`;
@@ -53,6 +52,19 @@ function describeTrigger(trigger) {
   }
 
   throw new Error(`Unknown trigger type: ${trigger.type}`);
+}
+
+// Backstop: if the model still says anything but HOLD for an order that
+// can't ship, the stock data wins — the dashboard and Slack must match inventory.
+function enforceStockCheck(reasoning, stockCheck) {
+  if (!stockCheck || stockCheck.canShip || actionFromReasoning(reasoning) === 'hold') {
+    return { reasoning, overridden: false };
+  }
+  const short = stockCheck.short.map((l) => `${l.title} (${l.quantity} ordered, ${l.stock_on_hand} on hand)`).join('; ');
+  return {
+    reasoning: `HOLD - stock check: ${short}\n(The agent's reply below disagreed; stock data wins.)\n\n${reasoning || ''}`,
+    overridden: true,
+  };
 }
 
 function headline(trigger) {
@@ -92,9 +104,10 @@ async function runAgent(sellerId, trigger) {
     console.log(`${tag} MCP tools: ${mcp.tools.map((t) => t.name).join(', ')}`);
     const llm = createLLMClient();
     const tools = toOpenAITools(mcp.tools);
+    const stockCheck = trigger.type === 'order_created' ? await checkOrderStock(sellerId, trigger.order) : null;
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: describeTrigger(trigger) },
+      { role: 'user', content: describeTrigger(trigger, stockCheck) },
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {
@@ -103,16 +116,19 @@ async function runAgent(sellerId, trigger) {
       messages.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
 
       if (!msg.tool_calls?.length) {
+        const { reasoning, overridden } = enforceStockCheck(msg.content, stockCheck);
+        if (overridden) console.warn(`${tag} model ignored the stock check - recorded as HOLD`);
+
         // Save before posting, so a Slack outage can't lose the decision. A DB
         // failure shouldn't silence the alert either, so it's only logged.
         try {
-          const saved = await saveDecision(sellerId, trigger, msg.content);
+          const saved = await saveDecision(sellerId, trigger, reasoning);
           console.log(`${tag} decision #${saved.id} saved (${saved.actionTaken})`);
         } catch (err) {
           console.error(`${tag} could not save decision: ${err.message}`);
         }
 
-        const decision = `*${headline(trigger)}*\n${msg.content}`;
+        const decision = `*${headline(trigger)}*\n${reasoning}`;
         await postDecision(decision);
         return decision;
       }
@@ -148,4 +164,4 @@ function triggerAgent(sellerId, trigger) {
   });
 }
 
-module.exports = { runAgent, triggerAgent, describeTrigger, toOpenAITools, createLLMClient };
+module.exports = { runAgent, triggerAgent, describeTrigger, enforceStockCheck, toOpenAITools, createLLMClient };

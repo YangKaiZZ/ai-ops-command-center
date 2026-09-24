@@ -17,6 +17,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const pool = require('../src/config/db');
 const { connectAsSeller } = require('../src/services/mcpClient');
+const { checkOrderStock } = require('../src/services/stockCheck');
 const { describeTrigger, toOpenAITools, createLLMClient } = require('../src/services/agentService');
 
 const BASE = `http://localhost:${process.env.PORT || 3000}`;
@@ -161,7 +162,13 @@ async function main() {
 
     console.log('\n4. Agent decision');
     const trigger = { type: 'order_created', order };
-    console.log('    prompt the model will get:\n' + describeTrigger(trigger).replace(/^/gm, '      '));
+    const stockCheck = await checkOrderStock(seller.id, order);
+    for (const line of stockCheck.lines) {
+      console.log(`    stock check: ${line.quantity} x ${line.title} - ${line.stock_on_hand} on hand -> ${line.can_ship ? 'can ship' : 'CANNOT ship'}`);
+    }
+    // buildFakeOrder orders one more than we have of a low-stock item, when one exists.
+    const expectedAction = stockCheck.canShip ? null : 'hold';
+    console.log('    prompt the model will get:\n' + describeTrigger(trigger, stockCheck).replace(/^/gm, '      '));
     let decisionRow = null;
     if (!process.env.DEEPSEEK_API_KEY) {
       try {
@@ -182,6 +189,9 @@ async function main() {
       );
       if (decisionRow) {
         check(decisionRow.order_id === storedOrderId, 'decision linked to the order row', `order_id ${decisionRow.order_id}`);
+        if (expectedAction) {
+          check(decisionRow.action_taken === expectedAction, `unshippable order recorded as ${expectedAction}`, decisionRow.action_taken);
+        }
         console.log(decisionRow.reasoning.replace(/^/gm, '      '));
       }
     }
