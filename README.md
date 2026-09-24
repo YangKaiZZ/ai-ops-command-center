@@ -137,3 +137,5 @@ Next.js dashboard; security hardening (encryption at rest, API keys,
 scheduled sync); one-click onboarding (Shopify OAuth, email and Telegram
 alerts, per-item stock levels); and the Docker deployment. The four parts
 started as separate repositories and were merged here with their history.
+
+What's next: [ROADMAP.md](ROADMAP.md).
