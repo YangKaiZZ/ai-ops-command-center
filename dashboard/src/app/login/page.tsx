@@ -69,6 +69,11 @@ function LoginForm() {
         {submitting ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-center text-sm text-ink-2">
+        <Link href="/forgot-password" className="font-medium text-accent underline">
+          Forgot your password?
+        </Link>
+      </p>
+      <p className="text-center text-sm text-ink-2">
         New here?{" "}
         <Link href={signupHref} className="font-medium text-accent underline">
           Create an account

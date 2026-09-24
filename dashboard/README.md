@@ -6,7 +6,9 @@ orders, the agent's decisions, and stock.
 
 ## Pages
 - `/signup`: business name, email, password; then on to Settings to connect the store. Shopify's install link sends new stores here as `/signup?shop=<store>.myshopify.com`, and that store is carried through to Settings (also via "Sign in" for an existing account)
-- `/login`: sign-in, with a link to sign-up
+- `/login`: sign-in, with links to sign-up and to password reset
+- `/forgot-password`: asks for a reset link by email (the answer is the same whether or not the address has an account)
+- `/reset-password?token=...`: the page the emailed link opens; sets a new password and signs out older sessions
 - `/orders`: a setup checklist until the store is connected and an alert channel is on, then every synced order with its shipping status, payment status and the agent's latest verdict
 - `/decisions`: the agent's decisions, newest first, as cards (order, verdict, headline, reasoning as bullets)
 - `/stock`: one bar per item against its own low-stock level, which can be edited in place; shows low items or all items. Red = out of stock, amber = low. (`/low-stock` redirects here.)
