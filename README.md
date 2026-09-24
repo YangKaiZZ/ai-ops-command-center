@@ -48,6 +48,20 @@ tool layer and Claude agent get built on top of in later phases.
      -H "Authorization: Bearer PASTE_TOKEN_HERE"
    ```
 
+## Docker
+The `Dockerfile` builds this API with the MCP server inside (the agent starts
+it as a subprocess), so it takes the [ai-ops-mcp](../../ai-ops-mcp) folder as a
+second build context:
+
+```
+docker build --build-context mcp=../../ai-ops-mcp -t ai-ops-backend .
+```
+
+The container runs `npm run migrate` before starting, and takes its settings
+from environment variables (no `.env` inside the image). To run the whole app
+on a server, use the [ai-ops-deploy](../../ai-ops-deploy) folder's Docker
+Compose setup and its README.
+
 ## Connecting a store
 Sellers connect from the dashboard's Settings page, one of two ways.
 
