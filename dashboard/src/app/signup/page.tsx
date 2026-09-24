@@ -18,6 +18,15 @@ function SignupForm() {
   const signedUp = useRef(false); // set just before the session appears
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Whether the server wants an invite code (SIGNUP_INVITE_CODE). If we can't ask, don't show the field: the server still enforces it.
+  const [inviteRequired, setInviteRequired] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/config")
+      .then((res) => res.json())
+      .then((body) => setInviteRequired(body.invite_required === true))
+      .catch(() => {});
+  }, []);
 
   // Signed in: go connect the store they came from, or finish setting up a new
   // account. Someone who was already signed in goes to the dashboard.
@@ -40,6 +49,7 @@ function SignupForm() {
           business_name: String(form.get("business_name")).trim(),
           email: String(form.get("email")).trim(),
           password: form.get("password"),
+          invite_code: inviteRequired ? String(form.get("invite_code")).trim() : undefined,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -89,6 +99,13 @@ function SignupForm() {
           At least {MIN_PASSWORD} characters.
         </span>
       </label>
+      {inviteRequired && (
+        <label className="grid gap-1.5 text-sm font-medium">
+          Invite code
+          <input name="invite_code" autoComplete="off" required className={labelledInputClass} />
+          <span className="text-xs font-normal text-ink-2">Sign-up is invite-only for now. Use the code you were given.</span>
+        </label>
+      )}
       {error && (
         <p role="alert" className="text-sm text-error">
           {error}

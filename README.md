@@ -68,6 +68,9 @@ from their own dashboard.
   change settings or create more keys.
 - **Shopify requests are verified**: webhooks by HMAC over the raw body;
   OAuth redirects by HMAC, a one-time `state` and a timestamp.
+- **Sign-up can be invite-only**: set `SIGNUP_INVITE_CODE` and creating an
+  account needs that code (wrong guesses are rate-limited), so strangers can't
+  connect stores and spend LLM credits before you're ready.
 - **Sign-in is rate-limited**: 10 failed sign-ins per email and 30 per IP
   per 15 minutes, 10 sign-ups per IP per hour. Emails and IPs are stored only
   as keyed hashes, and unknown emails take as long to reject as wrong passwords.

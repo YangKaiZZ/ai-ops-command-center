@@ -13,6 +13,7 @@
 // Usage:  npm run test:password-reset
 const path = require('path');
 process.chdir(path.join(__dirname, '..'));
+process.env.SIGNUP_INVITE_CODE = ''; // these tests sign up without one
 process.env.TRUST_PROXY = '1';
 
 const crypto = require('crypto');

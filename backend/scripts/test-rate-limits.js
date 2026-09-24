@@ -11,6 +11,7 @@
 // Usage:  npm run test:rate-limits
 const path = require('path');
 process.chdir(path.join(__dirname, '..'));
+process.env.SIGNUP_INVITE_CODE = ''; // these tests sign up without one
 process.env.TRUST_PROXY = '1';
 
 const crypto = require('crypto');
@@ -105,6 +106,29 @@ async function main() {
     const unknown = await post('login', { email: email('nobody'), password: 'guess' }, ip());
     const wrong = await post('login', { email: second, password: 'guess' }, ip());
     check(unknown.status === 401 && wrong.status === 401 && unknown.body.error === wrong.body.error, 'same status and message', unknown.body.error);
+
+    console.log('\n7. Invite code');
+    process.env.SIGNUP_INVITE_CODE = `invite-${run}`;
+    const guesser = ip();
+    const signupBody = (name) => ({ business_name: 'Rate limit test', email: email(name), password });
+    let cfg = await (await fetch(`${base}/api/auth/config`)).json();
+    check(cfg.invite_required === true, 'config says a code is required');
+    res = await post('register', signupBody('noinvite'), guesser);
+    check(res.status === 403 && /Enter your invite code/.test(res.body.error), 'no code: 403', res.body.error);
+    res = await post('register', { ...signupBody('wronginvite'), invite_code: 'not-it' }, guesser);
+    check(res.status === 403 && /isn't right/.test(res.body.error), 'wrong code: 403', res.body.error);
+    res = await post('register', { ...signupBody('goodinvite'), invite_code: ` invite-${run} ` }, guesser);
+    check(res.status === 201, 'the right code creates the account');
+    for (let i = 0; i < 8; i++) await post('register', { ...signupBody('g' + i), invite_code: 'guess' + i }, guesser);
+    res = await post('register', { ...signupBody('lockedout'), invite_code: `invite-${run}` }, guesser);
+    check(res.status === 429 && /wrong invite codes/.test(res.body.error), '10 wrong codes from one address lock guessing, even for the right one', res.body.error);
+    res = await post('register', { ...signupBody('otherip'), invite_code: `invite-${run}` }, ip());
+    check(res.status === 201, 'another address is unaffected');
+    process.env.SIGNUP_INVITE_CODE = '';
+    cfg = await (await fetch(`${base}/api/auth/config`)).json();
+    check(cfg.invite_required === false, 'with no code set, config says so');
+    res = await post('register', signupBody('open'), ip());
+    check(res.status === 201, 'and sign-up needs none');
   } finally {
     server.close();
     await pool.query("DELETE FROM sellers WHERE business_name = 'Rate limit test' AND email LIKE ?", [`rl-${run}-%`]);

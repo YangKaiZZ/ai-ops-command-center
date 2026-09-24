@@ -32,6 +32,7 @@ test('the limits are the documented ones', () => {
       loginFailuresPerAccount: [10, 900],
       loginFailuresPerIp: [30, 900],
       signupsPerIp: [10, 3600],
+      inviteFailuresPerIp: [10, 3600],
       resetRequestsPerAccount: [3, 3600],
       resetRequestsPerIp: [10, 3600],
       resetFailuresPerIp: [20, 900],

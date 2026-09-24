@@ -13,6 +13,8 @@ const LIMITS = {
   loginFailuresPerIp: { bucket: 'login-fail:ip', max: 30, windowSeconds: 15 * 60 },
   // New accounts from one address.
   signupsPerIp: { bucket: 'signup:ip', max: 10, windowSeconds: 60 * 60 },
+  // Wrong invite codes from one address: slows guessing the sign-up code.
+  inviteFailuresPerIp: { bucket: 'invite-fail:ip', max: 10, windowSeconds: 60 * 60 },
   // Reset emails per address (known or not): stops mail-bombing one inbox.
   resetRequestsPerAccount: { bucket: 'reset-request:account', max: 3, windowSeconds: 60 * 60 },
   // Reset emails asked for from one address, for any email.

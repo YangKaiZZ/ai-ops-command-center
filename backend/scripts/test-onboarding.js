@@ -14,6 +14,7 @@
 // Usage:  npm run test:onboarding
 const path = require('path');
 process.chdir(path.join(__dirname, '..'));
+process.env.SIGNUP_INVITE_CODE = ''; // these tests sign up without one
 // Test app credentials, set before anything loads .env (dotenv never overrides them).
 Object.assign(process.env, {
   SHOPIFY_API_KEY: 'onboarding-test-client',

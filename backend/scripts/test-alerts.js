@@ -8,6 +8,7 @@
 // Usage:  npm run test:alerts
 const path = require('path');
 process.chdir(path.join(__dirname, '..'));
+process.env.SIGNUP_INVITE_CODE = ''; // these tests sign up without one
 
 const net = require('net');
 const http = require('http');

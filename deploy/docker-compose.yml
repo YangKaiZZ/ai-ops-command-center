@@ -61,6 +61,7 @@ services:
       # Blank means the defaults (50 runs per account, 200 in total, per 24 hours).
       AGENT_DAILY_LIMIT_PER_ACCOUNT: ${AGENT_DAILY_LIMIT_PER_ACCOUNT:-}
       AGENT_DAILY_LIMIT_TOTAL: ${AGENT_DAILY_LIMIT_TOTAL:-}
+      SIGNUP_INVITE_CODE: ${SIGNUP_INVITE_CODE:-}
       SMTP_URL: ${SMTP_URL:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

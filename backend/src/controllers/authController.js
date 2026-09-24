@@ -5,6 +5,7 @@ const { JWT_SECRET } = require('../config/secrets');
 const { isEmail } = require('../utils/isEmail');
 const rateLimit = require('../services/rateLimit');
 const passwordReset = require('../services/passwordReset');
+const { isInviteRequired, isValidInviteCode } = require('../services/inviteCode');
 
 const { LIMITS } = rateLimit;
 const MIN_PASSWORD = 8;
@@ -33,6 +34,15 @@ async function register(req, res) {
     if (input.error) return res.status(400).json({ error: input.error });
 
     const limitedByIp = !rateLimit.isLoopback(req.ip);
+    if (isInviteRequired()) {
+      const guessWait = limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.inviteFailuresPerIp, req.ip) : 0;
+      if (guessWait) return rateLimit.tooManyRequests(res, guessWait, 'Too many wrong invite codes');
+      if (!isValidInviteCode(req.body?.invite_code)) {
+        if (limitedByIp) await rateLimit.record(LIMITS.inviteFailuresPerIp, req.ip);
+        return res.status(403).json({ error: req.body?.invite_code ? "That invite code isn't right" : 'Enter your invite code' });
+      }
+    }
+
     const wait = limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.signupsPerIp, req.ip) : 0;
     if (wait) return rateLimit.tooManyRequests(res, wait, 'Too many new accounts from your network');
 
@@ -53,6 +63,11 @@ async function register(req, res) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong creating the account' });
   }
+}
+
+// GET /api/auth/config: what the sign-up page needs to know before showing its form.
+function config(req, res) {
+  res.json({ invite_required: isInviteRequired() });
 }
 
 // POST /api/auth/login
@@ -149,4 +164,4 @@ async function resetPassword(req, res) {
   }
 }
 
-module.exports = { register, login, forgotPassword, resetPassword, validateRegistration };
+module.exports = { register, config, login, forgotPassword, resetPassword, validateRegistration };

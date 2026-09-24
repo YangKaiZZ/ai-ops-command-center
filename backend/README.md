@@ -283,6 +283,20 @@ ask for, go through a job queue in MySQL (the `jobs` table,
 This assumes one backend process, as the per-seller locks already do.
 `npm run test:jobs` checks all of it against a fake DeepSeek.
 
+## Invite-only sign-up
+
+Set `SIGNUP_INVITE_CODE` in `.env` and `POST /api/auth/register` must include
+a matching `invite_code` (403 otherwise). Empty or unset means anyone can sign
+up. It is one shared code, not per-person invites; change it (and restart) to
+retire it. Existing accounts are unaffected.
+- The check is constant-time, and 10 wrong codes per IP per hour stop guessing
+  (429, even for the right code from that address).
+- `GET /api/auth/config` returns `{ "invite_required": true|false }`, which is
+  how the dashboard's sign-up page knows whether to show the field.
+- Shopify's install link sends new stores through the same sign-up page, so
+  they need the code too.
+- The tests clear the variable so a code in your `.env` doesn't break them.
+
 ## Sign-in rate limiting
 
 Failed attempts are recorded in `rate_limit_events` (`src/services/rateLimit.js`):
