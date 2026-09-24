@@ -7,12 +7,15 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "node scripts/migrate.js",
+    "migrate:status": "node scripts/migrate.js status",
+    "migrate:new": "node scripts/migrate.js new",
     "test": "node --test \"tests/*.test.js\"",
     "test:agent": "node scripts/test-agent-flow.js",
     "test:onboarding": "node scripts/test-onboarding.js",
     "test:alerts": "node scripts/test-alerts.js",
     "test:agent-limit": "node scripts/test-agent-limit.js",
-    "test:jobs": "node scripts/test-jobs.js"
+    "test:jobs": "node scripts/test-jobs.js",
+    "test:migrations": "node scripts/test-migrations.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

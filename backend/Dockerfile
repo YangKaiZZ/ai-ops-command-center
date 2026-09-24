@@ -18,7 +18,7 @@ COPY --from=mcp *.js ./
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY schema.sql ./
+COPY migrations ./migrations
 COPY scripts ./scripts
 COPY src ./src
 

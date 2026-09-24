@@ -19,11 +19,10 @@ services:
       MYSQL_USER: aiops
       MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    # Just the empty ai_ops database: the backend's migrations create and
+    # update the tables each time it starts.
     volumes:
       - mysql-data:/var/lib/mysql
-      # Creates the tables the first time only (while the data volume is empty).
-      # Later changes arrive through the backend's migrate step on every start.
-      - ../backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
       # Over TCP on purpose: during first-time setup MySQL runs without
       # networking, so this only passes once the real server is up.

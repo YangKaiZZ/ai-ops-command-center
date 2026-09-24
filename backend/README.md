@@ -5,22 +5,19 @@ accounts, Shopify connection and webhooks, the order/stock agent, alerts,
 and the endpoints the dashboard and the MCP server use.
 
 ## What's here
-- `schema.sql` — multi-tenant MySQL schema (every table is scoped by `seller_id`)
+- `migrations/` — the database schema as numbered migrations; `001_initial_schema.sql` has every table (multi-tenant: each is scoped by `seller_id`)
+- `src/db/` — the migrator that applies them
 - `src/app.js`, `src/server.js` — the Express app, and the entrypoint that starts it with the scheduler and Telegram polling
 - `src/routes/`, `src/controllers/` — endpoints: auth, orders, inventory, store, Shopify OAuth, webhooks, settings, alerts, decisions
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
 1. MySQL 8 (or run the whole stack with Docker instead: see [deploy](../deploy)).
-2. Create the database and tables:
-   ```
-   mysql -u root -p < schema.sql
-   ```
-3. Copy `.env.example` to `.env` and fill in your DB password, plus a random
+2. Copy `.env.example` to `.env` and fill in your DB password, plus a random
    `JWT_SECRET` and `ENCRYPTION_KEY` (the server refuses to start without them).
    Generate each with:
    ```
@@ -28,16 +25,13 @@ and the endpoints the dashboard and the MCP server use.
    ```
    Shopify access tokens are encrypted with `ENCRYPTION_KEY` before they're
    stored. Keep the key safe: without it, stored tokens can't be read.
-
-   **Upgrading an existing database?** Run `npm run migrate`. It adds any
-   new columns/tables and encrypts tokens that were stored in plain text.
-   It's safe to run more than once.
-4. Install deps and run:
+3. Install deps, create the database, and run:
    ```
    npm install
+   npm run migrate    # creates the ai_ops database and its tables; run it again after pulling changes
    npm run dev
    ```
-5. Test it:
+4. Test it:
    ```
    curl http://localhost:3000/health
 
@@ -63,6 +57,34 @@ The container runs `npm run migrate` before starting, and takes its settings
 from environment variables (no `.env` inside the image). To run the whole app
 on a server, use the [deploy](../deploy) folder's Docker
 Compose setup and its README.
+
+## Database migrations
+The schema lives in `migrations/` as numbered files. Each runs once per
+database, in number order, and is recorded in `schema_migrations` with a
+checksum of its text.
+
+```
+npm run migrate                          # apply what's pending (creates the database if needed)
+npm run migrate:status                   # applied / pending / changed, per file
+npm run migrate:new -- add_line_items    # creates migrations/NNN_add_line_items.sql
+```
+
+- **A change to the schema is a new file.** Plain SQL, or a `.js` file
+  exporting `async up(db)` for data changes. Once a migration has run
+  anywhere, don't edit it: the next run stops, naming the file, if its text
+  changed. (Windows and Linux line endings count as the same text.)
+- **Forward only.** MySQL commits each schema change on its own, so there's no
+  reliable rollback; undo with a new migration, or restore a backup
+  ([deploy](../deploy) has the backup script). If a migration fails partway,
+  the error says so; check what it already changed before running again.
+- **One at a time.** A named MySQL lock (`migrate:<database>`) makes a second
+  run wait, so two backends starting together can't both migrate.
+- **Databases from before this** (created from the old `schema.sql` and
+  upgraded by the old `npm run migrate` checks) are adopted on their first
+  run: those checks, kept in `src/db/legacyUpgrade.js`, bring the database up
+  to `001_initial_schema.sql`, which is then recorded as applied.
+
+`npm run test:migrations` runs all of this against throwaway databases.
 
 ## Connecting a store
 Sellers connect from the dashboard's Settings page, one of two ways.
@@ -278,9 +300,6 @@ Read endpoints for the dashboard (all need the seller's JWT):
 
 Syncs never overwrite a threshold the seller set. Changing a threshold doesn't
 send an alert by itself; alerts come when stock drops past it.
-
-Existing database? Create the new table with the `CREATE TABLE decisions`
-block from `schema.sql`.
 
 ### Dashboard UI
 The dashboard is a separate Next.js app in [dashboard](../dashboard), which

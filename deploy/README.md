@@ -80,8 +80,8 @@ docker compose ps                 # all four "running"; mysql and backend "healt
 docker compose logs -f backend    # "Database is up to date." then "AI Ops backend running on port 3000"
 ```
 
-The first start takes a few minutes: it builds the two images, and MySQL
-creates the tables. Then open `https://<DOMAIN>/signup` and create your
+The first start takes a few minutes: it builds the two images, and the
+backend's migrations create the tables. Then open `https://<DOMAIN>/signup` and create your
 account. The first request can take a few seconds while Caddy gets the
 certificate.
 

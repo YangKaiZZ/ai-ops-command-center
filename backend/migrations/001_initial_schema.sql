@@ -1,8 +1,8 @@
--- AI Ops Command Center — Database Schema
--- Multi-tenant: every table (except sellers/users) is scoped by seller_id
-
-CREATE DATABASE IF NOT EXISTS ai_ops;
-USE ai_ops;
+-- AI Ops Command Center: the database schema when versioned migrations
+-- began. Multi-tenant: every table except sellers is scoped by seller_id.
+--
+-- Never edit a migration that has run somewhere: add a new numbered file
+-- instead (npm run migrate:new -- <name>). See README, "Database migrations".
 
 -- One row per seller account (a "tenant")
 CREATE TABLE sellers (
@@ -122,7 +122,7 @@ CREATE TABLE api_keys (
   UNIQUE KEY uniq_key_hash (key_hash)
 );
 
--- Every decision the Phase 4 agent makes, for the dashboard.
+-- Every decision the agent makes, for the dashboard.
 -- action_taken is what the agent *recommended* (it doesn't act on Shopify yet):
 -- fulfill, hold, low_stock_alert, unknown if its verdict couldn't be parsed,
 -- or skipped when a daily limit stopped the run (see agent_runs).
