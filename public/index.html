@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Ops Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <main id="login-view" class="login" hidden>
+    <form id="login-form" class="login-card" novalidate>
+      <h1 class="brand">AI Ops Command Center</h1>
+      <p class="note">Sign in to see your store's orders and what the agent decided.</p>
+      <label>Email
+        <input type="email" name="email" autocomplete="username" required>
+      </label>
+      <label>Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="form-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary">Sign in</button>
+    </form>
+  </main>
+
+  <div id="app-view" class="app" hidden>
+    <header class="topbar">
+      <div>
+        <h1 class="brand">AI Ops Command Center</h1>
+        <p class="note" id="store-name"></p>
+      </div>
+      <div class="topbar-actions">
+        <span class="note" id="updated-at" aria-live="polite"></span>
+        <button type="button" class="btn" id="sync-btn">Sync from Shopify</button>
+        <button type="button" class="btn btn-ghost" id="logout-btn">Log out</button>
+      </div>
+    </header>
+
+    <p id="banner" class="banner" role="status" hidden></p>
+
+    <section class="kpis" aria-label="Summary">
+      <div class="tile">
+        <p class="tile-label">Orders needing action</p>
+        <p class="tile-value" id="kpi-pending">–</p>
+        <p class="note">Unfulfilled or not yet paid</p>
+      </div>
+      <div class="tile">
+        <p class="tile-label">On hold</p>
+        <p class="tile-value" id="kpi-hold">–</p>
+        <p class="note">Pending orders the agent says can't ship</p>
+      </div>
+      <div class="tile">
+        <p class="tile-label">Low-stock items</p>
+        <p class="tile-value" id="kpi-low">–</p>
+        <p class="note">At or below their threshold</p>
+      </div>
+    </section>
+
+    <div class="columns">
+      <section class="panel" aria-labelledby="decisions-heading">
+        <h2 id="decisions-heading">Agent decisions</h2>
+        <ol id="decisions" class="decisions"></ol>
+      </section>
+
+      <section class="panel" aria-labelledby="low-heading">
+        <h2 id="low-heading">Low stock</h2>
+        <ul id="low-stock" class="stock-list"></ul>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="orders-heading">
+      <h2 id="orders-heading">Orders</h2>
+      <div class="table-wrap">
+        <table class="orders">
+          <thead>
+            <tr>
+              <th scope="col">Order</th>
+              <th scope="col">Customer</th>
+              <th scope="col" class="num">Total</th>
+              <th scope="col">Fulfillment</th>
+              <th scope="col">Payment</th>
+              <th scope="col">Placed</th>
+              <th scope="col">Agent</th>
+            </tr>
+          </thead>
+          <tbody id="orders-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
