@@ -126,11 +126,13 @@ async function requeueInterrupted() {
   return result.affectedRows;
 }
 
-// Finished jobs and old webhook ids aren't needed for long.
+// Housekeeping, hourly: finished jobs, old webhook ids and counters for
+// limits whose windows are long past aren't needed.
 async function pruneOldRows() {
   await pool.query("DELETE FROM jobs WHERE status IN ('done', 'failed') AND finished_at < NOW() - INTERVAL 30 DAY");
   await pool.query('DELETE FROM webhook_deliveries WHERE received_at < NOW() - INTERVAL 7 DAY');
   await pool.query('DELETE FROM agent_runs WHERE started_at < NOW() - INTERVAL 7 DAY');
+  await pool.query('DELETE FROM rate_limit_events WHERE created_at < NOW() - INTERVAL 1 DAY');
 }
 
 // --- the worker ---

@@ -12,7 +12,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -282,6 +282,24 @@ ask for, go through a job queue in MySQL (the `jobs` table,
 
 This assumes one backend process, as the per-seller locks already do.
 `npm run test:jobs` checks all of it against a fake DeepSeek.
+
+## Sign-in rate limiting
+
+Failed attempts are recorded in `rate_limit_events` (`src/services/rateLimit.js`):
+- 10 failed sign-ins per email and 30 per IP per 15 minutes; 10 sign-ups per
+  IP per hour. Over the limit gives a 429 with `Retry-After`.
+- Emails and IPs are stored only as keyed hashes (`keyedHash()` in
+  `src/config/secrets.js`), never in the clear.
+- A successful sign-in clears that account's failures. Requests from localhost
+  are exempt from the per-IP limits only, so local development isn't blocked.
+- Unknown emails take as long to reject as wrong passwords, and give the same
+  message, so the response doesn't reveal which accounts exist.
+- Behind a reverse proxy set `TRUST_PROXY` (compose sets `1` for Caddy) so the
+  client IP comes from `X-Forwarded-For`; without it every request looks like
+  it comes from the proxy.
+- Old events are pruned by the job worker.
+
+`npm run test:rate-limits` checks it through the real routes.
 
 ## Dashboard API
 Every agent decision is saved to the `decisions` table (before any alert is

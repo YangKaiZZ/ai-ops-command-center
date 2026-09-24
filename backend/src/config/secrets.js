@@ -61,4 +61,13 @@ function decryptSecret(stored) {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
-module.exports = { JWT_SECRET, encryptSecret, decryptSecret, isEncrypted };
+// A keyed hash (HMAC-SHA256) for values that must be matched but never stored
+// as themselves, like the emails and addresses the sign-in limits count. Its
+// key is derived from ENCRYPTION_KEY, separate from the one that encrypts.
+const HASH_KEY = crypto.createHmac('sha256', ENCRYPTION_KEY).update('ai-ops keyed hash v1').digest();
+
+function keyedHash(value) {
+  return crypto.createHmac('sha256', HASH_KEY).update(String(value)).digest('hex');
+}
+
+module.exports = { JWT_SECRET, encryptSecret, decryptSecret, isEncrypted, keyedHash };

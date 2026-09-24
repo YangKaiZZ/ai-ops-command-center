@@ -15,7 +15,8 @@
     "test:alerts": "node scripts/test-alerts.js",
     "test:agent-limit": "node scripts/test-agent-limit.js",
     "test:jobs": "node scripts/test-jobs.js",
-    "test:migrations": "node scripts/test-migrations.js"
+    "test:migrations": "node scripts/test-migrations.js",
+    "test:rate-limits": "node scripts/test-rate-limits.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",
