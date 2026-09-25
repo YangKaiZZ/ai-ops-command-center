@@ -1,4 +1,7 @@
 const pool = require('../config/db');
+const orderModel = require('../models/orderModel');
+const sellerModel = require('../models/sellerModel');
+const shopifyService = require('../services/shopifyService');
 
 const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
 const FINANCIAL_STATUSES = ['pending', 'authorized', 'partially_paid', 'paid', 'partially_refunded', 'refunded', 'voided', 'expired'];
@@ -149,4 +152,68 @@ async function getPendingOrders(req, res) {
   }
 }
 
-module.exports = { getOrders, getPendingOrders, parseOrderQuery, FULFILLMENT_STATUSES, FINANCIAL_STATUSES };
+// The order's page in the Shopify admin (the myshopify.com address redirects there).
+function shopifyAdminUrl(shopDomain, shopifyOrderId) {
+  if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shopDomain || '') || !/^\d+$/.test(shopifyOrderId || '')) return null;
+  return `https://${shopDomain}/admin/orders/${shopifyOrderId}`;
+}
+
+// Orders synced before line items were stored get them from Shopify, once.
+// Returns a note for the seller when that isn't possible, or null.
+async function backfillLineItems(sellerId, order) {
+  try {
+    const creds = await sellerModel.getStoreCredentials(sellerId);
+    if (!creds) return 'Connect your store to see what was in this order.';
+    const shopifyOrder = await shopifyService.fetchOrder(creds.shopDomain, creds.accessToken, order.shopify_order_id);
+    if (!shopifyOrder) return "Shopify no longer has this order, so its items can't be shown.";
+    await orderModel.upsertOrder(sellerId, shopifyOrder);
+    return null;
+  } catch (err) {
+    console.error(`[orders] line items for order ${order.id} (seller ${sellerId}): ${err.message}`);
+    return "Couldn't load this order's items from Shopify just now. Try again in a minute.";
+  }
+}
+
+// GET /api/orders/:id
+// One order with its line items, every agent decision about it (newest
+// first) and a link to it in the Shopify admin.
+async function getOrder(req, res) {
+  const id = Number(req.params.id);
+  const findOrder = async () =>
+    (await pool.query(`SELECT ${COLUMNS}, line_items_synced_at FROM orders WHERE id = ? AND seller_id = ?`, [id, req.sellerId]))[0][0];
+  try {
+    let order = await findOrder();
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    let lineItemsNote = null;
+    if (!order.line_items_synced_at) {
+      lineItemsNote = await backfillLineItems(req.sellerId, order);
+      if (!lineItemsNote) order = await findOrder(); // statuses may have changed too
+    }
+
+    const [items] = await pool.query(
+      `SELECT shopify_line_item_id, shopify_variant_id, title, variant_title, sku, quantity, fulfillable_quantity, price
+       FROM order_line_items WHERE order_id = ? ORDER BY id`,
+      [id]
+    );
+    const [decisions] = await pool.query(
+      `SELECT id, action_taken, reasoning, created_at FROM decisions
+       WHERE seller_id = ? AND order_id = ? ORDER BY created_at DESC, id DESC`,
+      [req.sellerId, id]
+    );
+    const [[seller]] = await pool.query('SELECT shopify_shop_domain FROM sellers WHERE id = ?', [req.sellerId]);
+
+    const { line_items_synced_at, ...fields } = order;
+    res.json({
+      order: fields,
+      line_items: line_items_synced_at ? items : null,
+      line_items_note: line_items_synced_at ? null : lineItemsNote,
+      decisions,
+      shopify_admin_url: shopifyAdminUrl(seller?.shopify_shop_domain, order.shopify_order_id),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch the order' });
+  }
+}
+
+module.exports = { getOrders, getPendingOrders, getOrder, parseOrderQuery, shopifyAdminUrl, FULFILLMENT_STATUSES, FINANCIAL_STATUSES };

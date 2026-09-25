@@ -18,7 +18,8 @@
     "test:migrations": "node scripts/test-migrations.js",
     "test:rate-limits": "node scripts/test-rate-limits.js",
     "test:password-reset": "node scripts/test-password-reset.js",
-    "test:order-queries": "node scripts/test-order-queries.js"
+    "test:order-queries": "node scripts/test-order-queries.js",
+    "test:order-detail": "node scripts/test-order-detail.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

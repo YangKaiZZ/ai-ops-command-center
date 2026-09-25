@@ -84,4 +84,15 @@ async function fetchVariant(shopDomain, accessToken, variantId) {
   }
 }
 
-module.exports = { fetchOrders, fetchProducts, fetchVariant, nextPageUrl };
+// One order, or null if the store no longer has it.
+async function fetchOrder(shopDomain, accessToken, orderId) {
+  try {
+    const { data } = await shopifyClient(shopDomain, accessToken).get(`/orders/${encodeURIComponent(orderId)}.json`);
+    return data.order;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+module.exports = { fetchOrders, fetchOrder, fetchProducts, fetchVariant, nextPageUrl };

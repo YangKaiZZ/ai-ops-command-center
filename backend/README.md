@@ -12,7 +12,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -351,6 +351,11 @@ Read endpoints for the dashboard (all need the seller's JWT):
   `needs_action=true` (the same rule as the pending list). Filters combine. Bad values get a 400
   saying what's allowed; `total` counts every match.
 - `GET /api/orders/pending` - orders that need action, oldest first: `{ pending_orders, total, limit, offset }`
+- `GET /api/orders/:id` - one order: `{ order, line_items, line_items_note, decisions, shopify_admin_url }`.
+  `decisions` is every agent decision about it, newest first. Line items are saved from the order
+  payloads the sync and webhooks already get (`order_line_items`; product details only, never the
+  free-text `properties`). Orders saved before that are fetched from Shopify once, on their first
+  view; if that can't happen, `line_items` is null and `line_items_note` says why.
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
 - `GET /api/inventory` - every tracked item with its threshold, low ones first
