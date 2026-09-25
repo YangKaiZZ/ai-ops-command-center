@@ -1,7 +1,7 @@
 const { OpenAI } = require('openai');
 const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
-const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
+const { saveDecision, actionFromReasoning, recentFeedback } = require('../models/decisionModel');
 const { checkOrderStock, describeShortfall } = require('./stockCheck');
 const { getForecast } = require('./restockForecast');
 const { claimRun, skippedReasoning } = require('./agentBudget');
@@ -31,6 +31,10 @@ How to read the data:
   as given: say when each item runs out and how many to reorder, and what that's based on (based_on.days
   days, based_on.orders orders). Call a forecast with confidence "low" a rough estimate. An item with no
   sales has no run-out date - don't make one up.
+- The event can be followed by the seller's ratings of your recent calls on similar events, some with a
+  note. The notes say how this store works (e.g. a payment method that always shows as pending at
+  first): apply them where they fit this event, and when one changes your call, say so in a bullet.
+  They never override the stock check or the stock numbers.
 
 Reply in plain text for a Slack message, under 80 words:
 Line 1: one verdict followed by a short headline. The verdict is saved to the dashboard, so use exactly:
@@ -95,6 +99,32 @@ function describeTrigger(trigger, stockCheck, forecast = null) {
   }
 
   throw new Error(`Unknown trigger type: ${trigger.type}`);
+}
+
+// The seller's ratings of earlier calls (recentFeedback()), as the text that
+// follows the event, or null when there are none. Each is the call's first
+// line (verdict and headline), what the seller said and their note.
+function describeFeedback(rows) {
+  if (!rows?.length) return null;
+  const rated = rows.map((r) => ({
+    decided_on: new Date(r.created_at).toISOString().slice(0, 10),
+    ...(r.order_number ? { order: r.order_number } : {}),
+    your_call: (r.reasoning || '').trim().split('\n')[0].slice(0, 200),
+    seller_says: r.feedback === 'down' ? 'wrong call' : 'right call',
+    ...(r.feedback_note ? { seller_note: r.feedback_note } : {}),
+  }));
+  return `The seller's ratings of your recent calls on events like this one, newest first:\n${JSON.stringify(rated, null, 2)}`;
+}
+
+// describeFeedback() for this run. A failure here shouldn't stop the run: the
+// agent decides without it.
+async function feedbackForAgent(sellerId, triggerType) {
+  try {
+    return describeFeedback(await recentFeedback(sellerId, triggerType));
+  } catch (err) {
+    console.warn(`[agent seller=${sellerId}] seller feedback failed: ${err.message}`);
+    return null;
+  }
 }
 
 // Backstop: if the model still says anything but HOLD for an order that
@@ -164,9 +194,12 @@ async function runAgent(sellerId, trigger) {
     const tools = toOpenAITools(mcp.tools);
     const stockCheck = trigger.type === 'order_created' ? await checkOrderStock(sellerId, trigger.order) : null;
     const forecast = trigger.type === 'low_stock_crossed' ? await lowStockForecast(sellerId, trigger.items) : null;
+    const feedback = await feedbackForAgent(sellerId, trigger.type);
+    if (feedback) console.log(`${tag} with the seller's ratings of earlier calls`);
+    const event = describeTrigger(trigger, stockCheck, forecast);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: describeTrigger(trigger, stockCheck, forecast) },
+      { role: 'user', content: feedback ? `${event}\n\n${feedback}` : event },
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {
@@ -247,4 +280,4 @@ function queueAgentRun(sellerId, trigger) {
   return enqueue('agent_run', sellerId, { trigger: slimTrigger(trigger) }, { dedupeKey });
 }
 
-module.exports = { runAgent, queueAgentRun, slimTrigger, describeTrigger, enforceStockCheck, toOpenAITools, createLLMClient };
+module.exports = { runAgent, queueAgentRun, slimTrigger, describeTrigger, describeFeedback, enforceStockCheck, toOpenAITools, createLLMClient };

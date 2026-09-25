@@ -27,6 +27,7 @@ function Thumb({ down = false, pressed }: { down?: boolean; pressed: boolean }) 
 export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSaved?: (saved: SavedFeedback) => void }) {
   const api = useApi();
   const labelId = useId();
+  const hintId = useId();
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const fromProps: Saved = { feedback: decision.feedback, note: decision.feedback_note };
   const [saved, setSaved] = useState<Saved>(fromProps);
@@ -137,9 +138,13 @@ export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSav
               onChange={(e) => setDraft(e.target.value)}
               maxLength={NOTE_MAX_LENGTH}
               rows={2}
+              aria-describedby={hintId}
               className={`${inputClass} resize-y`}
             />
           </label>
+          <p id={hintId} className="text-xs text-ink-2">
+            The agent reads your wrong calls and notes before it decides on similar events, so a few words on how your store works help it.
+          </p>
           <div className="flex items-center gap-2">
             <button type="submit" disabled={busy} className={primaryButton}>
               Save note

@@ -22,7 +22,8 @@
     "test:order-detail": "node scripts/test-order-detail.js",
     "test:forecast": "node scripts/test-forecast.js",
     "test:overview": "node scripts/test-overview.js",
-    "test:decision-feedback": "node scripts/test-decision-feedback.js"
+    "test:decision-feedback": "node scripts/test-decision-feedback.js",
+    "test:agent-feedback": "node scripts/test-agent-feedback.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

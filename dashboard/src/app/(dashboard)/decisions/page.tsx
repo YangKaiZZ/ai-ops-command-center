@@ -18,7 +18,7 @@ function Accuracy({ ratings }: { ratings: Ratings }) {
     return (
       <p className="text-sm text-ink-2">
         Rate each decision with <span className="font-medium text-ink">Yes</span> or <span className="font-medium text-ink">No</span> to see how
-        often the agent makes the right call.
+        often the agent makes the right call. It reads the ones you mark wrong, with your notes, before deciding on similar events.
       </p>
     );
   }

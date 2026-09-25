@@ -61,8 +61,8 @@ function countRatings(rows) {
   return { up: total('up'), down: total('down'), unrated: total('unrated'), by_verdict: byVerdict };
 }
 
-// The SQL behind countRatings: a seller's decisions grouped by verdict, with
-// how many were rated up and down. `where` narrows it further (e.g. by date).
+// The SQL behind countRatings: decisions with how many were rated up and down.
+// Callers add the WHERE (seller, dates) and GROUP BY action_taken.
 const RATINGS_SELECT = `SELECT action_taken, COUNT(*) AS n, SUM(feedback = 'up') AS up, SUM(feedback = 'down') AS down FROM decisions`;
 
 // The seller's thumbs up or down on one of their decisions, with an optional
@@ -82,4 +82,25 @@ async function setFeedback(sellerId, decisionId, { feedback, note }) {
   return saved;
 }
 
-module.exports = { saveDecision, actionFromReasoning, countRatings, setFeedback, RATINGS_SELECT };
+// How much of the seller's feedback the agent reads before a run.
+const AGENT_FEEDBACK = { limit: 8, days: 90 };
+
+// The seller's recent ratings for the agent to learn from, on one kind of
+// event: orders ('order_created', decisions with an order number) or low
+// stock (the rest). Every call marked wrong, plus calls marked right that
+// came with a note; newest rating first.
+async function recentFeedback(sellerId, triggerType, { limit = AGENT_FEEDBACK.limit, days = AGENT_FEEDBACK.days } = {}) {
+  const kind = triggerType === 'order_created' ? 'order_number IS NOT NULL' : 'order_number IS NULL';
+  const [rows] = await pool.query(
+    `SELECT order_number, action_taken, reasoning, feedback, feedback_note, created_at FROM decisions
+     WHERE seller_id = ? AND ${kind}
+       AND (feedback = 'down' OR (feedback = 'up' AND feedback_note IS NOT NULL))
+       AND feedback_at >= NOW() - INTERVAL ? DAY
+     ORDER BY feedback_at DESC, id DESC
+     LIMIT ?`,
+    [sellerId, days, limit]
+  );
+  return rows;
+}
+
+module.exports = { saveDecision, actionFromReasoning, countRatings, setFeedback, recentFeedback, RATINGS_SELECT, AGENT_FEEDBACK };

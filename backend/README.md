@@ -159,6 +159,18 @@ The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 every alert channel the seller turned on (Slack, email, Telegram), or to the
 server console if none is.
 
+**Learning from the seller's ratings.** Before each run the agent also gets
+the seller's recent ratings of its calls on the same kind of event (orders,
+or low stock): every call marked wrong, and calls marked right that came with
+a note, newest first, at most 8 from the last 90 days (`recentFeedback` in
+`src/models/decisionModel.js`). Each is the call's verdict line, what the
+seller said and their note. The prompt treats the notes as how this store
+works (e.g. "bank transfers always show pending first; ship them"): the agent
+applies them where they fit, says so in a bullet when one changed its call,
+and never lets them override the stock check. Notes go to DeepSeek with those
+later events. `npm run test:agent-feedback` checks what's sent, against a
+fake DeepSeek.
+
 **Daily limits.** So no account (or crowd of new accounts) can run up the
 LLM bill, runs are capped over any 24 hours: `AGENT_DAILY_LIMIT_PER_ACCOUNT`
 (default 50) per seller and `AGENT_DAILY_LIMIT_TOTAL` (default 200) for all
@@ -358,7 +370,8 @@ verdict line couldn't be parsed. Nothing is changed in Shopify yet.
 
 The seller can rate each decision thumbs up (the right call) or down, with an
 optional note (`feedback`, `feedback_note`, `feedback_at`), which gives the
-agent an accuracy figure. Skipped runs can't be rated: the agent never saw
+agent an accuracy figure and teaches it (see "Learning from the seller's
+ratings" above). Skipped runs can't be rated: the agent never saw
 the order. Notes are the seller's own words, so the privacy webhooks treat
 them like the agent's text: a customer's name is scrubbed from them, and
 they're included in data requests.

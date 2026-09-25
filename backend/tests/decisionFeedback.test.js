@@ -5,6 +5,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-0123456789abcdef';
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 const { parseFeedback } = require('../src/controllers/decisionsController');
 const { countRatings } = require('../src/models/decisionModel');
+const { describeFeedback } = require('../src/services/agentService');
 
 test('feedback is up, down or null, with an optional note', () => {
   assert.deepEqual(parseFeedback({ feedback: 'up' }), { feedback: 'up', note: null });
@@ -46,4 +47,38 @@ test('ratings are counted per verdict, skipped runs left out', () => {
   });
   assert.deepEqual(countRatings([]).by_verdict.fulfill, { up: 0, down: 0, unrated: 0 });
   assert.equal(countRatings([]).unrated, 0);
+});
+
+test('the agent gets the seller\'s ratings as data: its call, the rating and the note', () => {
+  const text = describeFeedback([
+    {
+      order_number: '#1042',
+      action_taken: 'hold',
+      reasoning: 'HOLD - Payment still pending\n- Wait for the payment to clear',
+      feedback: 'down',
+      feedback_note: 'Bank transfers always show pending first; ship them.',
+      created_at: new Date('2026-09-24T10:00:00Z'),
+    },
+    { order_number: null, action_taken: 'low_stock_alert', reasoning: `RESTOCK - ${'x'.repeat(300)}`, feedback: 'up', feedback_note: 'Good.', created_at: '2026-09-20T08:00:00.000Z' },
+    { order_number: '#1001', action_taken: 'fulfill', reasoning: 'FULFILL - All in stock', feedback: 'down', feedback_note: null, created_at: '2026-09-19T08:00:00.000Z' },
+  ]);
+  const [intro, json] = [text.slice(0, text.indexOf('\n')), text.slice(text.indexOf('\n') + 1)];
+  assert.match(intro, /seller's ratings of your recent calls/);
+  const rated = JSON.parse(json);
+  assert.deepEqual(rated[0], {
+    decided_on: '2026-09-24',
+    order: '#1042',
+    your_call: 'HOLD - Payment still pending', // the first line only
+    seller_says: 'wrong call',
+    seller_note: 'Bank transfers always show pending first; ship them.',
+  });
+  assert.equal(rated[1].order, undefined); // low stock: no order
+  assert.equal(rated[1].your_call.length, 200); // a long headline is cut
+  assert.equal(rated[1].seller_says, 'right call');
+  assert.equal('seller_note' in rated[2], false); // no note, no key
+});
+
+test('no ratings, no feedback text', () => {
+  assert.equal(describeFeedback([]), null);
+  assert.equal(describeFeedback(undefined), null);
 });

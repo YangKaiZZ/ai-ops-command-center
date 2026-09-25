@@ -20,9 +20,6 @@ listed at the end.
 
 ## Agent quality
 
-- **Learn from thumbs-down notes.** Put the seller's recent "wrong call"
-  notes into the agent's prompt, so it stops repeating the same mistake
-  (e.g. holding bank-transfer orders that always show as pending).
 - **Rate from Slack or Telegram**, with buttons on the alert itself.
 
 ## Done: before production
@@ -60,3 +57,7 @@ listed at the end.
   rated right on the Decisions page (overall and per verdict, with filters
   for not rated and marked wrong) and on the Overview
   (`PUT /api/decisions/:id/feedback`).
+- The agent learns from those ratings: before each decision it reads the
+  seller's recent wrong calls and notes on similar events, applies them
+  where they fit and says when one changed its call (never over the stock
+  check).
