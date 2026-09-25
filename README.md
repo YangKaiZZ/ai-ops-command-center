@@ -37,6 +37,10 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   sales, what needs action, what runs out soon, the agent's decisions), orders with the agent's verdict (searchable, filterable, paginated, each with its own page of line items and decisions), the decision history with
   its reasoning, stock with editable levels and restock forecasts, settings,
   and a setup checklist for new accounts.
+- **Is the agent right?** The seller rates each decision thumbs up or down,
+  with an optional note on what it should have done. The Decisions page shows
+  the share rated right (overall and per verdict) and filters for what's not
+  rated yet or marked wrong; the Overview shows it for the last 7 days.
 - **Claude Desktop.** The MCP server gives Claude the same store tools,
   authenticated with revocable API keys.
 - **Shopify compliance.** The mandatory privacy webhooks (customer data

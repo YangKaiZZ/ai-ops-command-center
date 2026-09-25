@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import { apiFetch, UnauthorizedError } from "@/lib/api";
 import { clearSession, loadSession, takeSignOutReason, useSession } from "@/lib/session";
-import type { Decision, InventoryItem, Session, Settings } from "@/lib/types";
+import type { Decision, InventoryItem, Ratings, Session, Settings } from "@/lib/types";
 
 const REFRESH_MS = 30_000;
 
@@ -12,7 +12,8 @@ type DashboardData = {
   pendingCount: number; // orders that need action; the Orders page loads its own page of orders
   inventory: InventoryItem[]; // every tracked item, low ones first
   lowStock: InventoryItem[];
-  decisions: Decision[];
+  decisions: Decision[]; // the latest 200
+  ratings: Ratings; // over every decision, not just those 200
   settings: Settings; // store connection and alert channels, for setup prompts
 };
 
@@ -58,14 +59,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [pending, { items }, { decisions }, settings] = await Promise.all([
+      const [pending, { items }, { decisions, ratings }, settings] = await Promise.all([
         apiFetch<{ total: number }>("/api/orders/pending?limit=1", token),
         apiFetch<{ items: InventoryItem[] }>("/api/inventory", token),
-        apiFetch<{ decisions: Decision[] }>("/api/decisions?limit=200", token),
+        apiFetch<{ decisions: Decision[]; ratings: Ratings }>("/api/decisions?limit=200", token),
         apiFetch<Settings>("/api/settings", token),
       ]);
       const lowStock = items.filter((item) => item.is_low);
-      setData({ pendingCount: pending.total, inventory: items, lowStock, decisions, settings });
+      setData({ pendingCount: pending.total, inventory: items, lowStock, decisions, ratings, settings });
       setUpdatedAt(new Date());
       setBanner((b) => (b?.isError ? null : b));
     } catch (err) {

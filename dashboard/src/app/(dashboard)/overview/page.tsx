@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
+import { accuracyText } from "@/lib/feedback";
 import { ACTIONS, formatDaysLeft, historySummary, roughNote, shortDate, timeAgo } from "@/lib/format";
 import { change, localDay, periodStart, PERIOD_DAYS, tileCount, tileMoney, type Change } from "@/lib/overview";
 import type { Action, Overview } from "@/lib/types";
@@ -137,6 +138,11 @@ function OverviewView({ overview }: { overview: Overview }) {
               <Badge key={v} label={`${ACTIONS[v].label} ${decisions[v]}`} tone={decisions[v] ? ACTIONS[v].tone : "neutral"} icon={ACTIONS[v].icon} />
             ))}
           </span>
+          {decisions.total > decisions.skipped && (
+            <span className="text-sm text-ink-2">
+              {accuracyText(decisions.ratings) ?? "None rated yet. Rate them on the Decisions page to see how often it's right."}
+            </span>
+          )}
         </Tile>
       </Section>
     </div>

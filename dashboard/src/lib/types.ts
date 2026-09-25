@@ -27,7 +27,7 @@ export type OrderDetail = {
   order: Omit<Order, "latest_decision"> & { shopify_order_id: string; synced_at: string | null };
   line_items: LineItem[] | null; // null: not available, and line_items_note says why
   line_items_note: string | null;
-  decisions: Pick<Decision, "id" | "action_taken" | "reasoning" | "created_at">[];
+  decisions: Pick<Decision, "id" | "action_taken" | "reasoning" | "created_at" | "feedback" | "feedback_note" | "feedback_at">[];
   shopify_admin_url: string | null;
 };
 
@@ -92,11 +92,14 @@ export type Overview = {
     running_out: ItemForecast[]; // still in stock, but run out within running_out_within_days
     forecast: { lookback_days: number; cover_days: number; history: ForecastHistory };
   };
-  decisions: Record<Action, number> & { total: number };
+  decisions: Record<Action, number> & { total: number; ratings: Ratings }; // ratings: of this period's decisions
 };
 
 // "skipped": a daily limit stopped the agent before it ran.
 export type Action = "fulfill" | "hold" | "low_stock_alert" | "unknown" | "skipped";
+
+// The seller's rating of a decision: up = the right call, down = the wrong one.
+export type Feedback = "up" | "down";
 
 export type Decision = {
   id: number;
@@ -105,7 +108,17 @@ export type Decision = {
   action_taken: Action;
   reasoning: string;
   created_at: string;
+  feedback: Feedback | null;
+  feedback_note: string | null;
+  feedback_at: string | null;
 };
+
+// PUT /api/decisions/:id/feedback
+export type SavedFeedback = Pick<Decision, "id" | "feedback" | "feedback_note" | "feedback_at">;
+
+// How decisions have been rated. Skipped runs can't be rated, so they're not in `unrated`.
+export type RatingCounts = { up: number; down: number; unrated: number };
+export type Ratings = RatingCounts & { by_verdict: Record<Exclude<Action, "skipped">, RatingCounts> };
 
 export type Session = { token: string; business_name?: string };
 

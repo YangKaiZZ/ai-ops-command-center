@@ -18,9 +18,12 @@ listed at the end.
   with OAuth, so power users paste a URL instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
 
-## Dashboard
+## Agent quality
 
-- **Thumbs up/down on each agent decision**, to get an accuracy figure.
+- **Learn from thumbs-down notes.** Put the seller's recent "wrong call"
+  notes into the agent's prompt, so it stops repeating the same mistake
+  (e.g. holding bank-transfer orders that always show as pending).
+- **Rate from Slack or Telegram**, with buttons on the alert itself.
 
 ## Done: before production
 
@@ -53,3 +56,7 @@ listed at the end.
   before (orders, sales, what needs action), stock that's low, to reorder or
   running out within a week, and the agent's decisions by verdict, each
   linking to the filtered page (`GET /api/overview`).
+- Thumbs up/down on each agent decision, with an optional note: the share
+  rated right on the Decisions page (overall and per verdict, with filters
+  for not rated and marked wrong) and on the Overview
+  (`PUT /api/decisions/:id/feedback`).
