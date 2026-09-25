@@ -346,8 +346,10 @@ Read endpoints for the dashboard (all need the seller's JWT):
   Each order has `status` (fulfillment), `financial_status` and `latest_decision` (the agent's most
   recent verdict and reasoning, or null). Query: `limit` (1-200, default 50), `offset`, `status`
   (unfulfilled, partial, fulfilled, restocked), `financial_status` (paid, pending, refunded, ...),
-  `from` / `to` (a UTC day `YYYY-MM-DD`, whole day included, or an ISO date-time) and `number`
-  (`#1001` or `1001`). Bad values get a 400 saying what's allowed; `total` counts every match.
+  `from` / `to` (a UTC day `YYYY-MM-DD`, whole day included, or an ISO date-time), `number`
+  (`#1001` or `1001`, exact), `q` (part of an order number or customer name) and
+  `needs_action=true` (the same rule as the pending list). Filters combine. Bad values get a 400
+  saying what's allowed; `total` counts every match.
 - `GET /api/orders/pending` - orders that need action, oldest first: `{ pending_orders, total, limit, offset }`
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)

@@ -40,6 +40,22 @@ test('an order number matches with or without #', () => {
   assert.match(parseOrderQuery({ number: '#' }).error, /order number/);
 });
 
+test('search matches part of a number or name, with wildcards taken literally', () => {
+  const parsed = parseOrderQuery({ q: '  Smith ' });
+  assert.equal(parsed.where[0], '(order_number LIKE ? OR buyer_name LIKE ?)');
+  assert.deepEqual(parsed.params, ['%Smith%', '%Smith%']);
+  assert.deepEqual(parseOrderQuery({ q: '50%_off\\' }).params, ['%50\\%\\_off\\\\%', '%50\\%\\_off\\\\%']);
+  assert.deepEqual(parseOrderQuery({ q: '   ' }).where, [], 'blank search is no search');
+  assert.match(parseOrderQuery({ q: 'x'.repeat(101) }).error, /at most 100/);
+  assert.match(parseOrderQuery({ q: ['a', 'b'] }).error, /at most 100/);
+});
+
+test('needs_action narrows to the pending rule', () => {
+  assert.match(parseOrderQuery({ needs_action: 'true' }).where[0], /status IN \('unfulfilled', 'partial'\)/);
+  assert.deepEqual(parseOrderQuery({ needs_action: 'false' }).where, []);
+  assert.match(parseOrderQuery({ needs_action: 'yes' }).error, /true or false/);
+});
+
 test('the pending list takes paging only', () => {
   assert.deepEqual(parseOrderQuery({ status: 'bogus', limit: '5' }, { filters: false }), { limit: 5, offset: 0, where: [], params: [] });
 });

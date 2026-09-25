@@ -77,6 +77,20 @@ function parseOrderQuery(query = {}, { defaultLimit = 50, filters = true } = {})
       where.push('order_number IN (?, ?)');
       params.push(`#${number}`, number);
     }
+    if (query.q !== undefined) {
+      const q = typeof query.q === 'string' ? query.q.trim() : null;
+      if (q === null || q.length > 100) return { error: 'q must be text of at most 100 characters' };
+      if (q) {
+        // Part of an order number or customer name; % and _ are searched for literally.
+        const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+        where.push('(order_number LIKE ? OR buyer_name LIKE ?)');
+        params.push(pattern, pattern);
+      }
+    }
+    if (query.needs_action !== undefined) {
+      if (!['true', 'false'].includes(query.needs_action)) return { error: 'needs_action must be true or false' };
+      if (query.needs_action === 'true') where.push(`(${PENDING_WHERE})`);
+    }
   }
   return { limit: limit.value, offset: offset.value, where, params };
 }
@@ -106,7 +120,7 @@ async function pageOfOrders(sellerId, parsed, extraWhere, orderBy) {
   return { orders: rows, total: Number(total) };
 }
 
-// GET /api/orders?limit=50&offset=0&status=&financial_status=&from=&to=&number=
+// GET /api/orders?limit=50&offset=0&status=&financial_status=&from=&to=&number=&q=&needs_action=
 // This seller's orders, newest first, a page at a time, each with the agent's
 // latest decision. `total` counts every order matching the filters.
 async function getOrders(req, res) {

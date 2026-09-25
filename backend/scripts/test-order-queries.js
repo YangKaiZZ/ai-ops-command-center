@@ -2,7 +2,8 @@
 // through the MCP tools (connected the way the agent connects). Runs
 // in-process on a throwaway seller with 55 orders; they are removed at the end.
 //   1. /api/orders pages newest first, with a total; pages don't overlap
-//   2. filters: fulfillment status, payment status, UTC date range, order number
+//   2. filters: fulfillment status, payment status, UTC date range, order number,
+//      search by part of a number or name, needs action
 //   3. each order carries the agent's latest decision
 //   4. bad input gets a 400 that says what to fix
 //   5. /api/orders/pending pages oldest first, with a total
@@ -26,6 +27,8 @@ const COUNT = 55;
 // Order i: #2000+i, placed 2026-08-01 + floor(i/5) days at 10:00+i%5 UTC.
 // i%3: 0 fulfilled+paid, 1 unfulfilled+paid, 2 unfulfilled+pending.
 const placedAt = (i) => Date.UTC(2026, 7, 1 + Math.floor(i / 5), 10 + (i % 5)) / 1000;
+// Buyers: every 5th is Ana Smith, #2013 has a % in its name, the rest Test Buyer.
+const buyer = (i) => (i % 5 === 0 ? 'Ana Smith' : i === 13 ? 'Promo 50%_Off' : 'Test Buyer');
 const kind = (i) => [['fulfilled', 'paid'], ['unfulfilled', 'paid'], ['unfulfilled', 'pending']][i % 3];
 
 async function main() {
@@ -51,8 +54,8 @@ async function main() {
     const [status, financial] = kind(i);
     const [r] = await pool.query(
       `INSERT INTO orders (seller_id, shopify_order_id, order_number, status, financial_status, buyer_name, total_amount, order_placed_at)
-       VALUES (?, ?, ?, ?, ?, 'Test Buyer', 10.00, FROM_UNIXTIME(?))`,
-      [sellerId, `oq-${run}-${sellerId}-${i}`, `#${2000 + i}`, status, financial, placedAt(i)]
+       VALUES (?, ?, ?, ?, ?, ?, 10.00, FROM_UNIXTIME(?))`,
+      [sellerId, `oq-${run}-${sellerId}-${i}`, `#${2000 + i}`, status, financial, buyer(i), placedAt(i)]
     );
     return r.insertId;
   };
@@ -104,15 +107,26 @@ async function main() {
       res = await get(`/api/orders?number=${n}`);
       check(res.body.total === 1 && res.body.orders[0].order_number === '#2007', `number=${decodeURIComponent(n)} finds #2007`);
     }
+    const byNumber = res;
+    res = await get('/api/orders?q=smith');
+    check(res.body.total === 11 && res.body.orders.every((o) => o.buyer_name === 'Ana Smith'), 'q=smith: part of a name, any case', String(res.body.total));
+    res = await get('/api/orders?q=205');
+    check(res.body.total === 5 && numbers(res.body.orders).join() === '#2054,#2053,#2052,#2051,#2050', 'q=205: part of an order number', numbers(res.body.orders).join(' '));
+    res = await get(`/api/orders?q=${encodeURIComponent('%')}`);
+    check(res.body.total === 1 && res.body.orders[0].order_number === '#2013', 'q=%: a literal %, not a wildcard', String(res.body.total));
+    res = await get('/api/orders?needs_action=true&limit=1');
+    check(res.body.total === 36, 'needs_action=true: same rule as the pending list', String(res.body.total));
+    res = await get('/api/orders?needs_action=true&q=smith');
+    check(res.body.total === 7 && numbers(res.body.orders)[0] === '#2050', 'filters combine, still newest first', `${res.body.total}: ${numbers(res.body.orders).join(' ')}`);
 
     console.log('\n3. Latest decision');
-    const d = res.body.orders[0].latest_decision;
+    const d = byNumber.body.orders[0].latest_decision;
     check(d?.action_taken === 'fulfill' && /stock confirmed/.test(d.reasoning), 'the newest of two decisions', d?.action_taken);
     res = await get('/api/orders?number=2008');
     check(res.body.orders[0].latest_decision === null, 'null when the agent hasn\'t decided');
 
     console.log('\n4. Bad input');
-    for (const [q, pattern] of [['limit=500', /limit must be/], ['offset=-1', /offset must be/], ['status=shipped', /status must be one of/], ['from=last-week', /from must be a date/], ['from=2026-09-02&to=2026-09-01', /from must not be after to/]]) {
+    for (const [q, pattern] of [['limit=500', /limit must be/], ['offset=-1', /offset must be/], ['status=shipped', /status must be one of/], ['from=last-week', /from must be a date/], ['from=2026-09-02&to=2026-09-01', /from must not be after to/], ['needs_action=yes', /true or false/], [`q=${'x'.repeat(101)}`, /at most 100/]]) {
       res = await get(`/api/orders?${q}`);
       check(res.status === 400 && pattern.test(res.body.error), q, res.body.error);
     }

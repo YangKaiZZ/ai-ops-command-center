@@ -24,9 +24,6 @@ listed at the end.
 
 - **Overview page** with the key numbers.
 - **Order detail view** with line items and an "Open in Shopify" link.
-- **Search and filters on the Orders page.** The API already filters by
-  status, payment status, date range and order number; the page only pages
-  through them so far.
 - **Thumbs up/down on each agent decision**, to get an accuracy figure.
 
 ## Done: before production
@@ -42,6 +39,9 @@ listed at the end.
 
 - Orders come a page at a time with a total, filterable by status, payment
   status, date range and order number; the Orders page is paginated.
+- Search and filters on the Orders page: order number or customer, shipping
+  and payment status, a date range in the seller's time zone, and "needs
+  action", all kept in the URL.
 - MCP tools take matching inputs (`limit`, `offset`, `status`,
   `financial_status`, `from`/`to`) and return a page with `total` and
   `next_offset`; `get_order` looks one order up with the agent's reasoning.

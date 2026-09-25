@@ -28,7 +28,7 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
 - **Alerts where the seller is.** Slack, email (address confirmed with a
   6-digit code, rate-limited) and Telegram (one-time link; `/stop` unlinks),
   with a test button that reports how each channel did.
-- **Dashboard.** Orders with the agent's verdict, the decision history with
+- **Dashboard.** Orders with the agent's verdict (searchable, filterable, paginated), the decision history with
   its reasoning, stock with editable levels, settings, and a setup checklist
   for new accounts.
 - **Claude Desktop.** The MCP server gives Claude the same store tools,
@@ -118,7 +118,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 67 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters |
+| backend | `npm test` | 69 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
