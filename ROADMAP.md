@@ -9,8 +9,8 @@ listed at the end.
   in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
   and in Slack. Needs write scopes from Shopify, which the app doesn't request
   yet.
-- **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". Needs
-  order line items stored, which the orders table doesn't have yet.
+- **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". Order
+  line items are stored now, so sales per variant can be counted from them.
 - **Daily morning summary**: yesterday's orders and revenue, what needs
   action, what's running low.
 - **Late-order alerts** for orders still unfulfilled after 24-48 hours.
