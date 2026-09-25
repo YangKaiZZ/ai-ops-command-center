@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { PENDING_WHERE } = require('./ordersController');
 const { getForecast } = require('../services/restockForecast');
+const { countRatings, RATINGS_SELECT } = require('../models/decisionModel');
 
 // The dashboard's Overview: the key numbers for a period (by default the last
 // 7 days) next to the same length of time just before it. Everything is
@@ -93,8 +94,7 @@ async function getOverview(req, res) {
     );
     const forecast = await getForecast(seller, {}, nowMs);
     const [decisionRows] = await pool.query(
-      `SELECT action_taken, COUNT(*) AS n FROM decisions
-       WHERE seller_id = ? AND created_at >= FROM_UNIXTIME(?) GROUP BY action_taken`,
+      `${RATINGS_SELECT} WHERE seller_id = ? AND created_at >= FROM_UNIXTIME(?) GROUP BY action_taken`,
       [seller, from]
     );
 
@@ -121,7 +121,7 @@ async function getOverview(req, res) {
         running_out: runningOut(forecast.items),
         forecast: { lookback_days: forecast.lookback_days, cover_days: forecast.cover_days, history: forecast.history },
       },
-      decisions: countDecisions(decisionRows),
+      decisions: { ...countDecisions(decisionRows), ratings: countRatings(decisionRows) },
     });
   } catch (err) {
     console.error(err);

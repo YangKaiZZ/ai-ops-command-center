@@ -114,8 +114,10 @@ async function main() {
     check(s.running_out?.length === 1 && s.running_out[0].item_name === 'Mug' && s.running_out[0].days_left === 3 && s.running_out[0].reorder_quantity === 27, 'runs out within 7 days: the Mug, in 3 days, reorder 27', JSON.stringify(s.running_out));
     check(s.running_out_within_days === 7 && s.forecast?.history?.days === 20 && s.forecast.lookback_days === 30, 'with what the forecasts are based on', JSON.stringify(s.forecast?.history));
     check(
-      JSON.stringify(o.decisions) === JSON.stringify({ fulfill: 2, hold: 1, low_stock_alert: 0, unknown: 0, skipped: 1, total: 4 }),
-      'agent decisions this period, by verdict',
+      JSON.stringify({ ...o.decisions, ratings: undefined }) === JSON.stringify({ fulfill: 2, hold: 1, low_stock_alert: 0, unknown: 0, skipped: 1, total: 4 }) &&
+        o.decisions.ratings?.unrated === 3 &&
+        o.decisions.ratings.up === 0,
+      'agent decisions this period, by verdict, none rated yet (test:decision-feedback rates them)',
       JSON.stringify(o.decisions)
     );
 

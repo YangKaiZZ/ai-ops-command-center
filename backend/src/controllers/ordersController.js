@@ -196,7 +196,7 @@ async function getOrder(req, res) {
       [id]
     );
     const [decisions] = await pool.query(
-      `SELECT id, action_taken, reasoning, created_at FROM decisions
+      `SELECT id, action_taken, reasoning, created_at, feedback, feedback_note, feedback_at FROM decisions
        WHERE seller_id = ? AND order_id = ? ORDER BY created_at DESC, id DESC`,
       [req.sellerId, id]
     );

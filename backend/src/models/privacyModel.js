@@ -26,16 +26,17 @@ async function customerData(sellerId, shopifyOrderIds) {
     [sellerId, ids]
   );
   const [decisions] = orders.length
-    ? await pool.query('SELECT order_number, action_taken, reasoning, created_at FROM decisions WHERE seller_id = ? AND order_id IN (?)', [
-        sellerId,
-        orders.map((o) => o.id),
-      ])
+    ? await pool.query(
+        'SELECT order_number, action_taken, reasoning, created_at, feedback_note FROM decisions WHERE seller_id = ? AND order_id IN (?)',
+        [sellerId, orders.map((o) => o.id)]
+      )
     : [[]];
   return { orders: orders.map(({ id, ...o }) => o), decisions };
 }
 
 // customers/redact: removes the buyer's name from their orders and from any
-// decision text that mentions it. Returns how many orders were redacted.
+// decision text (the agent's or the seller's note) that mentions it. Returns
+// how many orders were redacted.
 async function redactCustomer(sellerId, shopifyOrderIds) {
   const ids = shopifyOrderIds.map(String);
   if (!ids.length) return 0;
@@ -45,7 +46,10 @@ async function redactCustomer(sellerId, shopifyOrderIds) {
   );
   for (const { buyer_name: name } of orders) {
     if (!name || name === 'Guest' || name === 'Redacted' || name.length < 3) continue;
-    await pool.query("UPDATE decisions SET reasoning = REPLACE(reasoning, ?, '[redacted]') WHERE seller_id = ?", [name, sellerId]);
+    await pool.query(
+      "UPDATE decisions SET reasoning = REPLACE(reasoning, ?, '[redacted]'), feedback_note = REPLACE(feedback_note, ?, '[redacted]') WHERE seller_id = ?",
+      [name, name, sellerId]
+    );
   }
   const [result] = await pool.query(
     "UPDATE orders SET buyer_name = 'Redacted' WHERE seller_id = ? AND shopify_order_id IN (?)",

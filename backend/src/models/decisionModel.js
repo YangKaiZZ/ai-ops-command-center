@@ -39,4 +39,47 @@ async function saveDecision(sellerId, trigger, reasoning) {
   return { id: result.insertId, actionTaken };
 }
 
-module.exports = { saveDecision, actionFromReasoning };
+// Verdicts the seller can rate. A skipped run never reached the agent, so
+// there's no call to judge.
+const RATED_ACTIONS = ['fulfill', 'hold', 'low_stock_alert', 'unknown'];
+
+// Thumbs up and down so far, from rows of { action_taken, n, up, down }
+// (decisions grouped by verdict): { up, down, unrated, by_verdict }, with
+// the same three counts for each verdict. Skipped runs aren't counted.
+function countRatings(rows) {
+  const byVerdict = Object.fromEntries(RATED_ACTIONS.map((action) => [action, { up: 0, down: 0, unrated: 0 }]));
+  for (const row of rows) {
+    if (row.action_taken === 'skipped') continue;
+    const counts = byVerdict[RATED_ACTIONS.includes(row.action_taken) ? row.action_taken : 'unknown'];
+    const up = Number(row.up) || 0;
+    const down = Number(row.down) || 0;
+    counts.up += up;
+    counts.down += down;
+    counts.unrated += Number(row.n) - up - down;
+  }
+  const total = (key) => Object.values(byVerdict).reduce((sum, counts) => sum + counts[key], 0);
+  return { up: total('up'), down: total('down'), unrated: total('unrated'), by_verdict: byVerdict };
+}
+
+// The SQL behind countRatings: a seller's decisions grouped by verdict, with
+// how many were rated up and down. `where` narrows it further (e.g. by date).
+const RATINGS_SELECT = `SELECT action_taken, COUNT(*) AS n, SUM(feedback = 'up') AS up, SUM(feedback = 'down') AS down FROM decisions`;
+
+// The seller's thumbs up or down on one of their decisions, with an optional
+// note; feedback null clears both. Returns the saved { id, feedback,
+// feedback_note, feedback_at }, 'not_found' when the decision isn't the
+// seller's, or 'skipped' for a skipped run (nothing to rate).
+async function setFeedback(sellerId, decisionId, { feedback, note }) {
+  const [[decision]] = await pool.query('SELECT action_taken FROM decisions WHERE id = ? AND seller_id = ?', [decisionId, sellerId]);
+  if (!decision) return 'not_found';
+  if (decision.action_taken === 'skipped') return 'skipped';
+  await pool.query(
+    `UPDATE decisions SET feedback = ?, feedback_note = ?, feedback_at = IF(? IS NULL, NULL, CURRENT_TIMESTAMP)
+     WHERE id = ? AND seller_id = ?`,
+    [feedback, feedback ? note : null, feedback, decisionId, sellerId]
+  );
+  const [[saved]] = await pool.query('SELECT id, feedback, feedback_note, feedback_at FROM decisions WHERE id = ?', [decisionId]);
+  return saved;
+}
+
+module.exports = { saveDecision, actionFromReasoning, countRatings, setFeedback, RATINGS_SELECT };

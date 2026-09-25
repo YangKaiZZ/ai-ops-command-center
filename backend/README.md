@@ -356,7 +356,14 @@ sent, so an outage can't lose one). `action_taken` is the agent's
 *recommendation* - `fulfill`, `hold`, `low_stock_alert`, or `unknown` if the
 verdict line couldn't be parsed. Nothing is changed in Shopify yet.
 
-Read endpoints for the dashboard (all need the seller's JWT):
+The seller can rate each decision thumbs up (the right call) or down, with an
+optional note (`feedback`, `feedback_note`, `feedback_at`), which gives the
+agent an accuracy figure. Skipped runs can't be rated: the agent never saw
+the order. Notes are the seller's own words, so the privacy webhooks treat
+them like the agent's text: a customer's name is scrubbed from them, and
+they're included in data requests.
+
+Endpoints for the dashboard (all need the seller's JWT):
 - `GET /api/orders` - synced orders, newest first, a page at a time: `{ orders, total, limit, offset }`.
   Each order has `status` (fulfillment), `financial_status` and `latest_decision` (the agent's most
   recent verdict and reasoning, or null). Query: `limit` (1-200, default 50), `offset`, `status`
@@ -367,7 +374,7 @@ Read endpoints for the dashboard (all need the seller's JWT):
   saying what's allowed; `total` counts every match.
 - `GET /api/orders/pending` - orders that need action, oldest first: `{ pending_orders, total, limit, offset }`
 - `GET /api/orders/:id` - one order: `{ order, line_items, line_items_note, decisions, shopify_admin_url }`.
-  `decisions` is every agent decision about it, newest first. Line items are saved from the order
+  `decisions` is every agent decision about it, newest first, with its rating. Line items are saved from the order
   payloads the sync and webhooks already get (`order_line_items`; product details only, never the
   free-text `properties`). Orders saved before that are fetched from Shopify once, on their first
   view; if that can't happen, `line_items` is null and `line_items_note` says why.
@@ -377,9 +384,16 @@ Read endpoints for the dashboard (all need the seller's JWT):
   placed), `sales` and `previous_sales` (order totals, refunded and voided left out),
   `needs_action` and `oldest_unshipped`. `stock`: `tracked`, `low` (out of stock included),
   `out_of_stock`, `to_reorder`, `running_out` (items that run out within 7 days, from the restock
-  forecasts) and what the forecasts are based on. `decisions`: this period's count per verdict.
+  forecasts) and what the forecasts are based on. `decisions`: this period's count per verdict,
+  and `ratings` of those decisions (as below).
 - `GET /api/inventory/low-stock` - items at or below their threshold
-- `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
+- `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200), each with its
+  rating: `{ decisions, ratings }`. `ratings` covers every decision so far, not just this page:
+  `up`, `down`, `unrated` (skipped runs left out) and the same per verdict in `by_verdict`.
+- `PUT /api/decisions/:id/feedback` with `{ "feedback": "down", "note": "Should have held" }` -
+  rate a decision `up` or `down` (the note is optional, up to 500 characters); `null` clears the
+  rating and its note. Returns `{ id, feedback, feedback_note, feedback_at }`. A skipped run gets a
+  400; another seller's decision a 404.
 - `GET /api/inventory` - every tracked item with its threshold, low ones first
 - `GET /api/inventory/forecast?days=30&cover_days=30` - restock forecasts, soonest to run out
   first: `{ lookback_days, cover_days, history, items }`. `history` is what they're based on:
