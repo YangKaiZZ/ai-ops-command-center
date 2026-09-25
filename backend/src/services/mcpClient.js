@@ -6,7 +6,7 @@ const { JWT_SECRET } = require('../config/secrets');
 // The agent only gets read-only tools. sync_latest_data is left out on
 // purpose: an inventory sync can itself trigger the agent, so letting the
 // agent sync would be a trigger -> sync -> trigger loop.
-const AGENT_TOOLS = ['get_pending_orders', 'check_low_stock', 'get_all_orders', 'get_order'];
+const AGENT_TOOLS = ['get_pending_orders', 'check_low_stock', 'get_all_orders', 'get_order', 'forecast_restock'];
 
 // Spawns the Phase 3 MCP server as a subprocess and connects to it — the
 // agent uses the exact same tools Claude Desktop does. The server is handed a

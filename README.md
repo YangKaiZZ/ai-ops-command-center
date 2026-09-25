@@ -128,7 +128,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:password-reset` | reset links against a fake mail server: one use, expiry, hashed storage, sign-out of old sessions, limits |
 | backend | `npm run test:order-queries` | order paging and filters through the API and the MCP tools: totals, date ranges, lookups, bad input, other sellers' orders |
 | backend | `npm run test:order-detail` | line items saved and replaced, the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
-| backend | `npm run test:forecast` | restock forecasts through the API: pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
+| backend | `npm run test:forecast` | restock forecasts through the API and the MCP tool: pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 

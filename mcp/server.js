@@ -5,7 +5,7 @@ const api = require('./apiClient');
 
 const server = new McpServer({
   name: 'ai-ops-command-center',
-  version: '1.1.0',
+  version: '1.2.0',
 });
 
 const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
@@ -135,7 +135,51 @@ server.registerTool(
   }
 );
 
-// --- Tool 5: trigger a fresh sync ---
+// --- Tool 5: restock forecast ---
+// "What should I reorder?", "when does the Mug run out?"
+server.registerTool(
+  'forecast_restock',
+  {
+    title: 'Forecast Restock',
+    description:
+      'Forecasts for tracked items, worked out from stored orders: units sold, sales per day, days of stock left, the date it runs out ' +
+      '(runs_out_at) and how many to reorder so stock lasts cover_days. Soonest to run out first. `history` says what the forecasts ' +
+      'are based on (days of orders, orders counted); always say that when you give a forecast, and call one with confidence "low" ' +
+      'a rough estimate (few orders or a short history). By default only items that need a reorder are returned; pass `item` to look ' +
+      'up items by name, or all_items for every item.',
+    inputSchema: {
+      item: z.string().min(1).max(100).optional().describe('Only items whose name contains this text (any case)'),
+      all_items: z.boolean().optional().describe('Include items that need no reorder (default false; ignored with `item`)'),
+      days: z.number().int().min(1).max(90).optional().describe('How many days of sales to base the pace on (default 30)'),
+      cover_days: z.number().int().min(1).max(180).optional().describe('How many days a reorder should last (default 30)'),
+      limit: z.number().int().min(1).max(100).optional().describe('How many items to return (default 25, at most 100)'),
+    },
+  },
+  async ({ item, all_items = false, days, cover_days, limit = 25 }) => {
+    const { data } = await api.get('/api/inventory/forecast', { params: query({ days, cover_days }) });
+    const needle = item?.toLowerCase();
+    const matching = data.items.filter((i) =>
+      needle ? i.item_name.toLowerCase().includes(needle) : all_items || i.reorder_quantity > 0
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            lookback_days: data.lookback_days,
+            cover_days: data.cover_days,
+            history: data.history,
+            matching: matching.length,
+            returned: Math.min(matching.length, limit),
+            items: matching.slice(0, limit).map(({ id, ...rest }) => rest),
+          }),
+        },
+      ],
+    };
+  }
+);
+
+// --- Tool 6: trigger a fresh sync ---
 // Lets the seller say "refresh my data" or "pull the latest orders"
 // and have Claude actually trigger the sync before answering.
 server.registerTool(

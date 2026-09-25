@@ -7,12 +7,14 @@
 //      and orders whose items we don't have yet don't
 //   3. ?days= and ?cover_days=, and bad values
 //   4. each seller sees only their own items and sales
-//   5. an order sync fetches the items of older orders in the last 90 days, 100
+//   5. the forecast_restock MCP tool, connected the way the agent connects
+//   6. an order sync fetches the items of older orders in the last 90 days, 100
 //      ids at a time, and still succeeds when that fails
 //
 // Usage:  npm run test:forecast
 const path = require('path');
 process.chdir(path.join(__dirname, '..'));
+process.env.MCP_SERVER_PATH = path.join(__dirname, '..', '..', 'mcp', 'server.js');
 
 const crypto = require('crypto');
 
@@ -46,9 +48,11 @@ async function main() {
   const { JWT_SECRET, encryptSecret } = require('../src/config/secrets');
   const { upsertOrder } = require('../src/models/orderModel');
   const shopifyService = require('../src/services/shopifyService');
+  const { connectAsSeller } = require('../src/services/mcpClient');
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
   });
+  process.env.PORT = String(server.address().port); // where the MCP server reaches the backend
   const base = `http://localhost:${server.address().port}`;
   const run = crypto.randomBytes(3).toString('hex');
   const sellerIds = [];
@@ -167,7 +171,36 @@ async function main() {
     res = await forecast(empty);
     check(res.status === 200 && res.body.history.from === null && res.body.history.days === 0 && res.body.items[0].days_left === null, 'no orders at all: no history, no run-out date', JSON.stringify(res.body?.history));
 
-    console.log('\n5. The order sync fetches older orders\' items');
+    console.log('\n5. The MCP tool');
+    const mcp = await connectAsSeller(seller);
+    try {
+      check(mcp.tools.some((t) => t.name === 'forecast_restock'), 'the agent gets forecast_restock');
+      const tool = async (args) => {
+        const r = await mcp.callTool('forecast_restock', args);
+        let json = null;
+        try {
+          json = JSON.parse(r.text);
+        } catch {
+          // an error message, not JSON
+        }
+        return { ...r, json };
+      };
+      let r = await tool({});
+      check(r.json?.matching === 2 && r.json.items.map((i) => i.item_name).join() === 'Scarf,Mug', 'by default, the items that need a reorder, soonest first', r.text.slice(0, 120));
+      check(r.json?.history?.days === 30 && r.json.history.orders === 3 && !('id' in (r.json.items[0] || {})), 'with the history, without internal ids');
+      r = await tool({ item: 'CANDLE' });
+      check(r.json?.returned === 1 && r.json.items[0].item_name === 'Candle' && r.json.items[0].units_sold === 0, 'look up by name, any case, even with nothing to reorder', r.text.slice(0, 120));
+      r = await tool({ all_items: true, limit: 3 });
+      check(r.json?.matching === 4 && r.json.returned === 3 && r.json.items.length === 3, 'all_items, with a limit', `${r.json?.matching} matching, ${r.json?.returned} returned`);
+      r = await tool({ days: 7, cover_days: 60 });
+      check(r.json?.lookback_days === 7 && r.json.cover_days === 60 && r.json.history.days === 7, 'days and cover_days pass through');
+      r = await tool({ days: 365 });
+      check(r.isError, 'days over 90 is refused before reaching the API', r.text.slice(0, 80));
+    } finally {
+      await mcp.close();
+    }
+
+    console.log('\n6. The order sync fetches older orders\' items');
     shopifyHas = new Map([['7777', shopifyOrder(7777, 2, [line(5001, 6)])]]);
     res = await call('POST', '/api/orders/sync', seller);
     check(res.status === 200 && /fetched the items of 1 older ones/.test(res.body?.message), 'the sync says how many it filled in', res.body?.message);
