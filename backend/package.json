@@ -20,7 +20,8 @@
     "test:password-reset": "node scripts/test-password-reset.js",
     "test:order-queries": "node scripts/test-order-queries.js",
     "test:order-detail": "node scripts/test-order-detail.js",
-    "test:forecast": "node scripts/test-forecast.js"
+    "test:forecast": "node scripts/test-forecast.js",
+    "test:overview": "node scripts/test-overview.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

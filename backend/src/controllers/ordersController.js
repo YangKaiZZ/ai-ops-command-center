@@ -216,4 +216,4 @@ async function getOrder(req, res) {
   }
 }
 
-module.exports = { getOrders, getPendingOrders, getOrder, parseOrderQuery, shopifyAdminUrl, FULFILLMENT_STATUSES, FINANCIAL_STATUSES };
+module.exports = { getOrders, getPendingOrders, getOrder, parseOrderQuery, shopifyAdminUrl, FULFILLMENT_STATUSES, FINANCIAL_STATUSES, PENDING_WHERE };

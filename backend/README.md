@@ -371,6 +371,13 @@ Read endpoints for the dashboard (all need the seller's JWT):
   payloads the sync and webhooks already get (`order_line_items`; product details only, never the
   free-text `properties`). Orders saved before that are fetched from Shopify once, on their first
   view; if that can't happen, `line_items` is null and `line_items_note` says why.
+- `GET /api/overview?from=<ISO date-time>` - the dashboard's key numbers for a period (default the
+  last 7 days; `from` at most 31 days back) next to the same length of time before it:
+  `{ period, orders, stock, decisions }`. `orders`: `count` and `previous_count` (every order
+  placed), `sales` and `previous_sales` (order totals, refunded and voided left out),
+  `needs_action` and `oldest_unshipped`. `stock`: `tracked`, `low` (out of stock included),
+  `out_of_stock`, `to_reorder`, `running_out` (items that run out within 7 days, from the restock
+  forecasts) and what the forecasts are based on. `decisions`: this period's count per verdict.
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
 - `GET /api/inventory` - every tracked item with its threshold, low ones first
