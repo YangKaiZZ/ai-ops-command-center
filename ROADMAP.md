@@ -23,7 +23,6 @@ listed at the end.
 ## Dashboard
 
 - **Overview page** with the key numbers.
-- **Order detail view** with line items and an "Open in Shopify" link.
 - **Thumbs up/down on each agent decision**, to get an accuracy figure.
 
 ## Done: before production
@@ -42,6 +41,8 @@ listed at the end.
 - Search and filters on the Orders page: order number or customer, shipping
   and payment status, a date range in the seller's time zone, and "needs
   action", all kept in the URL.
+- Order detail page: line items (now stored from the orders Shopify already
+  sends), every agent decision with its reasoning, and "Open in Shopify".
 - MCP tools take matching inputs (`limit`, `offset`, `status`,
   `financial_status`, `from`/`to`) and return a page with `total` and
   `next_offset`; `get_order` looks one order up with the agent's reasoning.

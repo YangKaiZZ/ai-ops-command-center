@@ -11,6 +11,26 @@ export type Order = {
   latest_decision: { action_taken: Action; created_at: string } | null; // the agent's most recent verdict
 };
 
+// GET /api/orders/:id
+export type LineItem = {
+  shopify_line_item_id: string;
+  shopify_variant_id: string | null;
+  title: string;
+  variant_title: string | null;
+  sku: string | null;
+  quantity: number;
+  fulfillable_quantity: number | null; // still to ship
+  price: string | null; // per unit
+};
+
+export type OrderDetail = {
+  order: Omit<Order, "latest_decision"> & { shopify_order_id: string; synced_at: string | null };
+  line_items: LineItem[] | null; // null: not available, and line_items_note says why
+  line_items_note: string | null;
+  decisions: Pick<Decision, "id" | "action_taken" | "reasoning" | "created_at">[];
+  shopify_admin_url: string | null;
+};
+
 // GET /api/orders: one page, and how many orders there are in all.
 export type OrdersPage = { orders: Order[]; total: number; limit: number; offset: number };
 

@@ -39,3 +39,12 @@ test('the API query pages, renames payment, and turns local days into exact inst
   assert.equal(params.get('from'), '2026-08-02T16:00:00.000Z', 'midnight on the 3rd in UTC+8');
   assert.equal(params.get('to'), '2026-08-03T15:59:59.999Z', 'the last moment of the 3rd in UTC+8');
 });
+
+test('"Back to orders" only goes to an Orders list URL', async () => {
+  const { backToList } = await import('../src/lib/orderFilters.ts');
+  assert.equal(backToList('/orders?q=smith&page=2'), '/orders?q=smith&page=2');
+  assert.equal(backToList('/orders'), '/orders');
+  for (const bad of [null, '', 'https://evil.example', '//evil.example/orders', '/settings', '/orders/5', '/ordersx', '/orders?q=1#x', 'javascript:alert(1)']) {
+    assert.equal(backToList(bad), '/orders', String(bad));
+  }
+});

@@ -73,6 +73,12 @@ function localDayBoundary(day: string, end: boolean): string {
   return (end ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d)).toISOString();
 }
 
+// Where "Back to orders" goes: the list view the seller came from (passed as
+// ?back=), if it really is an Orders list URL; otherwise the plain list.
+export function backToList(back: string | null): string {
+  return back && /^\/orders(\?[^#]*)?$/.test(back) ? back : "/orders";
+}
+
 // The GET /api/orders query for one page.
 export function ordersApiQuery(f: OrderFilters, page: number, pageSize: number): string {
   const params = new URLSearchParams({ limit: String(pageSize), offset: String((page - 1) * pageSize) });

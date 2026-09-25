@@ -54,7 +54,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <nav aria-label="Dashboard sections" className="flex flex-wrap gap-1 border-b border-hairline">
         {tabs.map((tab) => {
-          const active = pathname === tab.href;
+          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
             <Link
               key={tab.href}

@@ -204,6 +204,8 @@ function OrdersList() {
   }
 
   const stale = result !== null && result.query !== query; // the previous view, until this one arrives
+  const listUrl = filtersUrl(filters, page);
+  const detailHref = (id: number) => (listUrl === "/orders" ? `/orders/${id}` : `/orders/${id}?back=${encodeURIComponent(listUrl)}`);
   let body: React.ReactNode;
   if (!result) {
     body = null;
@@ -247,7 +249,11 @@ function OrdersList() {
                 const placed = order.order_placed_at ? new Date(order.order_placed_at) : null;
                 return (
                   <tr key={order.id} className="border-b border-hairline last:border-0" data-order={order.order_number ?? ""}>
-                    <td className="py-2.5 pr-3 font-semibold">{order.order_number ?? "—"}</td>
+                    <td className="py-2.5 pr-3 font-semibold">
+                      <Link href={detailHref(order.id)} className="text-accent hover:underline focus-visible:underline">
+                        {order.order_number ?? `Order ${order.id}`}
+                      </Link>
+                    </td>
                     <td className="py-2.5 pr-3">{order.buyer_name || "Guest"}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(order.total_amount)}</td>
                     <td className="py-2.5 pr-3"><Chip>{order.status || "—"}</Chip></td>

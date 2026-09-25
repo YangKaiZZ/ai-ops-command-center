@@ -28,7 +28,7 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
 - **Alerts where the seller is.** Slack, email (address confirmed with a
   6-digit code, rate-limited) and Telegram (one-time link; `/stop` unlinks),
   with a test button that reports how each channel did.
-- **Dashboard.** Orders with the agent's verdict (searchable, filterable, paginated), the decision history with
+- **Dashboard.** Orders with the agent's verdict (searchable, filterable, paginated, each with its own page of line items and decisions), the decision history with
   its reasoning, stock with editable levels, settings, and a setup checklist
   for new accounts.
 - **Claude Desktop.** The MCP server gives Claude the same store tools,
