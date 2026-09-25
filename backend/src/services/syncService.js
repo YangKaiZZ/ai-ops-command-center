@@ -1,5 +1,6 @@
-const { fetchOrders, fetchProducts, fetchVariant } = require('./shopifyService');
-const { upsertOrder } = require('../models/orderModel');
+const shopifyService = require('./shopifyService');
+const { upsertOrder, ordersMissingLineItems } = require('../models/orderModel');
+const { MAX_LOOKBACK_DAYS } = require('./restockForecast');
 const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt, getDefaultThreshold } = require('../models/sellerModel');
 const inventory = require('../models/inventoryModel');
 const { queueAgentRun } = require('./agentService');
@@ -8,6 +9,7 @@ const { withLock } = require('../utils/lock');
 // Re-ask for orders changed a little before the last sync, in case our clock
 // and Shopify's disagree or an update landed while that sync was running.
 const ORDER_SYNC_OVERLAP_MS = 10 * 60 * 1000;
+const BACKFILL_BATCH = 100; // order ids per Shopify request
 
 class StoreNotConnectedError extends Error {
   constructor() {
@@ -32,6 +34,22 @@ async function requireCredentials(sellerId) {
 // seller's data at once, so each runs under a per-seller lock: that keeps the
 // "did this cross the threshold?" check from alerting twice.
 
+// Orders saved before line items were kept have none, so restock forecasts
+// would miss what they sold. Fetch the ones from the forecast's longest
+// window again, a batch at a time. Returns how many got their items.
+// An order deleted in Shopify stays without items and is asked about again
+// at the next sync: one small request, only until it leaves the window.
+async function backfillLineItems(sellerId, creds) {
+  const ids = await ordersMissingLineItems(sellerId, MAX_LOOKBACK_DAYS);
+  let filled = 0;
+  for (let i = 0; i < ids.length; i += BACKFILL_BATCH) {
+    const orders = await shopifyService.fetchOrdersByIds(creds.shopDomain, creds.accessToken, ids.slice(i, i + BACKFILL_BATCH));
+    for (const order of orders) await upsertOrder(sellerId, order);
+    filled += orders.length;
+  }
+  return filled;
+}
+
 // Pulls orders into our table. The first sync takes everything; after that
 // only orders created or updated since the last one.
 function syncOrders(sellerId) {
@@ -41,13 +59,23 @@ function syncOrders(sellerId) {
     const lastSync = await getOrdersSyncedAt(sellerId);
     const updatedAtMin = lastSync ? new Date(new Date(lastSync).getTime() - ORDER_SYNC_OVERLAP_MS) : null;
 
-    const orders = await fetchOrders(creds.shopDomain, creds.accessToken, { updatedAtMin });
+    const orders = await shopifyService.fetchOrders(creds.shopDomain, creds.accessToken, { updatedAtMin });
     for (const order of orders) await upsertOrder(sellerId, order);
     await setOrdersSyncedAt(sellerId, startedAt);
 
+    // The sync itself has worked by now, so a failure here is only logged;
+    // the next sync tries again.
+    let filled = 0;
+    try {
+      filled = await backfillLineItems(sellerId, creds);
+    } catch (err) {
+      console.warn(`[sync seller=${sellerId}] fetching older orders' items failed: ${err.response?.status || err.message}`);
+    }
+
+    const synced = updatedAtMin ? `Synced ${orders.length} new or updated orders` : `Synced ${orders.length} orders`;
     return {
       count: orders.length,
-      message: updatedAtMin ? `Synced ${orders.length} new or updated orders` : `Synced ${orders.length} orders`,
+      message: filled ? `${synced} (and fetched the items of ${filled} older ones)` : synced,
     };
   });
 }
@@ -57,7 +85,7 @@ function syncOrders(sellerId) {
 function syncInventory(sellerId) {
   return withLock(`inventory:${sellerId}`, async () => {
     const creds = await requireCredentials(sellerId);
-    const products = await fetchProducts(creds.shopDomain, creds.accessToken);
+    const products = await shopifyService.fetchProducts(creds.shopDomain, creds.accessToken);
     const before = await inventory.getStockSnapshot(sellerId);
     const defaultThreshold = await getDefaultThreshold(sellerId);
     const trackedVariantIds = [];
@@ -119,7 +147,7 @@ function refreshInventoryItem(sellerId, inventoryItemId) {
     if (!row) return { status: 'unknown item' }; // new product: the next full sync adds it
 
     const creds = await requireCredentials(sellerId);
-    const variant = await fetchVariant(creds.shopDomain, creds.accessToken, row.shopify_variant_id);
+    const variant = await shopifyService.fetchVariant(creds.shopDomain, creds.accessToken, row.shopify_variant_id);
     if (!variant || !variant.inventory_management) {
       await inventory.deleteInventoryItem(row.id);
       return { status: 'removed' };

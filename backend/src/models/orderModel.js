@@ -68,4 +68,16 @@ async function upsertOrder(sellerId, order) {
   }
 }
 
-module.exports = { upsertOrder, lineItemRow };
+// Shopify ids of orders placed in the last `days` that were saved before line
+// items were kept, oldest first.
+async function ordersMissingLineItems(sellerId, days) {
+  const [rows] = await pool.query(
+    `SELECT shopify_order_id FROM orders
+     WHERE seller_id = ? AND line_items_synced_at IS NULL AND order_placed_at >= NOW() - INTERVAL ? DAY
+     ORDER BY order_placed_at, id`,
+    [sellerId, days]
+  );
+  return rows.map((row) => row.shopify_order_id);
+}
+
+module.exports = { upsertOrder, lineItemRow, ordersMissingLineItems };

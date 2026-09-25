@@ -10,7 +10,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/app.js`, `src/server.js` — the Express app, and the entrypoint that starts it with the scheduler and Telegram polling
 - `src/routes/`, `src/controllers/` — endpoints: auth, orders, inventory, store, Shopify OAuth, webhooks, settings, alerts, decisions
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
-- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
+- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), restock forecasts (`restockForecast`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
 - `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
@@ -223,7 +223,19 @@ can't be reached, the last sync is used, read strictly.
 **Syncing.** Order and product syncs follow Shopify's pagination to the last
 page (250 per request, retrying on rate limits), so big stores are complete.
 A product sync also removes rows for variants that were deleted or stopped
-being tracked.
+being tracked. An order sync also fetches the line items of orders from the
+last 90 days that were saved before line items were kept (100 per request),
+so restock forecasts count what they sold.
+
+**Restock forecasts.** `src/services/restockForecast.js` works out in code
+how fast each tracked item sells, from the stored line items of the last
+`days` (default 30; refunded and voided orders don't count). If the store's
+first order is more recent than that, the history starts there, and a
+history under a day is read as one day. From that pace: days of stock left,
+the date it runs out, and how many to reorder to last `cover_days` (default
+30; oversold units are added). Every forecast says what it's based on (units,
+orders, days of history) and is marked `low` confidence under 3 orders or 7
+days of history. `npm run test:forecast` checks it against a fake Shopify.
 
 Test the full flow with a signed fake order (backend running; with
 `DEEPSEEK_API_KEY` set, this makes one real LLM call):
@@ -359,6 +371,12 @@ Read endpoints for the dashboard (all need the seller's JWT):
 - `GET /api/inventory/low-stock` - items at or below their threshold
 - `GET /api/decisions?limit=50` - agent decisions, newest first (limit 1-200)
 - `GET /api/inventory` - every tracked item with its threshold, low ones first
+- `GET /api/inventory/forecast?days=30&cover_days=30` - restock forecasts, soonest to run out
+  first: `{ lookback_days, cover_days, history, items }`. `history` is what they're based on:
+  `from`, `days`, `orders` counted and `orders_missing_items` (in that stretch, but items not
+  fetched yet). Each item adds `units_sold`, `orders`, `per_day`, `days_left` (0 when out of
+  stock, null when not selling), `runs_out_at`, `reorder_quantity` and `confidence` (`low` or
+  `normal`). `days` is 1-90, `cover_days` 1-180.
 - `PATCH /api/inventory/:id` with `{ "low_stock_threshold": 3 }` - an item counts as low at or below this
 - `PUT /api/settings/inventory` with `{ "default_low_stock_threshold": 5, "apply_to_all": false }` -
   what new items start with (`apply_to_all` also resets every existing item)

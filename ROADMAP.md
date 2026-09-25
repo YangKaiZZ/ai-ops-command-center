@@ -9,8 +9,10 @@ listed at the end.
   in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
   and in Slack. Needs write scopes from Shopify, which the app doesn't request
   yet.
-- **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". Order
-  line items are stored now, so sales per variant can be counted from them.
+- **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". In
+  progress: the API works it out from stored line items
+  (`GET /api/inventory/forecast`); still to come are the MCP tool, the Stock
+  page and the low-stock alert.
 - **Daily morning summary**: yesterday's orders and revenue, what needs
   action, what's running low.
 - **Late-order alerts** for orders still unfulfilled after 24-48 hours.

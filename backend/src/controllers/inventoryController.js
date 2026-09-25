@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const inventory = require('../models/inventoryModel');
+const restockForecast = require('../services/restockForecast');
 
 const MAX_THRESHOLD = 1000000;
 
@@ -38,6 +39,21 @@ async function getInventory(req, res) {
   }
 }
 
+// GET /api/inventory/forecast?days=30&cover_days=30
+// How fast each tracked item sells over the last `days`, when it runs out at
+// that pace and how many to reorder to last `cover_days`, soonest to run out
+// first, with how much order history that's based on.
+async function getForecast(req, res) {
+  const parsed = restockForecast.parseForecastQuery(req.query);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  try {
+    res.json(await restockForecast.getForecast(req.sellerId, parsed));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not work out the restock forecast' });
+  }
+}
+
 // PATCH /api/inventory/:id   Body: { low_stock_threshold }
 // The item counts as low at or below this number. Changing it never sends an
 // alert by itself; alerts come when stock drops past the threshold.
@@ -58,4 +74,4 @@ async function updateItem(req, res) {
   }
 }
 
-module.exports = { getLowStock, getInventory, updateItem, parseThreshold };
+module.exports = { getLowStock, getInventory, getForecast, updateItem, parseThreshold };

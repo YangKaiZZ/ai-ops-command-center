@@ -67,6 +67,12 @@ async function fetchOrders(shopDomain, accessToken, { updatedAtMin } = {}) {
   return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', params, 'orders');
 }
 
+// The given orders (any status). An id Shopify no longer has is left out.
+async function fetchOrdersByIds(shopDomain, accessToken, ids) {
+  if (!ids.length) return [];
+  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', { status: 'any', ids: ids.join(',') }, 'orders');
+}
+
 // Every product with its variants (variants hold the actual stock counts).
 async function fetchProducts(shopDomain, accessToken) {
   return fetchAllPages(shopifyClient(shopDomain, accessToken), '/products.json', {}, 'products');
@@ -95,4 +101,4 @@ async function fetchOrder(shopDomain, accessToken, orderId) {
   }
 }
 
-module.exports = { fetchOrders, fetchOrder, fetchProducts, fetchVariant, nextPageUrl };
+module.exports = { fetchOrders, fetchOrder, fetchOrdersByIds, fetchProducts, fetchVariant, nextPageUrl };
