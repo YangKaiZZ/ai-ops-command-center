@@ -149,6 +149,9 @@ Two triggers run the same agent loop (`src/services/agentService.js`):
 2. **Low stock** — any tracked item that goes from above its threshold to
    at/below it triggers the agent, whether the drop arrives by an
    `inventory_levels/update` webhook, a scheduled sync or `POST /api/inventory/sync`.
+   The event comes with those items' restock forecasts (see "Restock
+   forecasts" below), so the alert can say when each runs out, how many to
+   reorder and how much order history that's based on.
 
 The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 [MCP server](../mcp)'s read-only tools — the backend spawns that server with a

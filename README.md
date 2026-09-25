@@ -25,6 +25,11 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
 - **Low-stock watch.** Every item has its own low-stock level. When stock
   drops to or below it (by webhook, scheduled sync or manual sync), the agent
   recommends what to restock and flags pending orders at risk.
+- **Restock forecasts.** From stored order line items, worked out in code:
+  how fast each item sells, when it runs out and how many to reorder (e.g.
+  "runs out in about 4 days, reorder 40"), always with how much order history
+  that's based on, and flagged as rough when that's under 3 orders or a week.
+  On the Stock page, in low-stock alerts, and as an MCP tool.
 - **Alerts where the seller is.** Slack, email (address confirmed with a
   6-digit code, rate-limited) and Telegram (one-time link; `/stop` unlinks),
   with a test button that reports how each channel did.
@@ -118,7 +123,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 82 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts |
+| backend | `npm test` | 83 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
@@ -128,7 +133,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:password-reset` | reset links against a fake mail server: one use, expiry, hashed storage, sign-out of old sessions, limits |
 | backend | `npm run test:order-queries` | order paging and filters through the API and the MCP tools: totals, date ranges, lookups, bad input, other sellers' orders |
 | backend | `npm run test:order-detail` | line items saved and replaced, the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
-| backend | `npm run test:forecast` | restock forecasts through the API and the MCP tool: pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
+| backend | `npm run test:forecast` | restock forecasts through the API, the MCP tool and a low-stock agent run (fake DeepSeek): pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 

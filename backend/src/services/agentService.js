@@ -3,6 +3,7 @@ const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
 const { saveDecision, actionFromReasoning } = require('../models/decisionModel');
 const { checkOrderStock, describeShortfall } = require('./stockCheck');
+const { getForecast } = require('./restockForecast');
 const { claimRun, skippedReasoning } = require('./agentBudget');
 const { enqueue } = require('./jobQueue');
 
@@ -25,6 +26,11 @@ How to read the data:
   stock couldn't be confirmed, so a person has to check it.
 - check_low_stock returns items at or below their low-stock threshold, keyed by shopify_variant_id.
   Its stock_quantity values are authoritative.
+- A low-stock event can come with a restock forecast, computed from the store's orders: per_day (units
+  sold a day), days_left, runs_out_on and reorder_quantity (enough to last cover_days). Use its numbers
+  as given: say when each item runs out and how many to reorder, and what that's based on (based_on.days
+  days, based_on.orders orders). Call a forecast with confidence "low" a rough estimate. An item with no
+  sales has no run-out date - don't make one up.
 
 Reply in plain text for a Slack message, under 80 words:
 Line 1: one verdict followed by a short headline. The verdict is saved to the dashboard, so use exactly:
@@ -32,9 +38,40 @@ Line 1: one verdict followed by a short headline. The verdict is saved to the da
 - for a low-stock event: RESTOCK
 Then 2-4 bullets with the specific reasons (item names, quantities, stock numbers).`;
 
+// The restock forecast for the items in a low-stock event (restockForecast.js),
+// trimmed to what the model reads, or null when there's none to give: items
+// without a variant id, or the forecast failed (the alert goes out without it).
+async function lowStockForecast(sellerId, items) {
+  const variantIds = items.map((i) => i.shopify_variant_id).filter(Boolean);
+  if (!variantIds.length) return null;
+  try {
+    const forecast = await getForecast(sellerId, { variantIds });
+    if (!forecast.items.length) return null;
+    return {
+      based_on: { days: forecast.history.days, orders: forecast.history.orders },
+      cover_days: forecast.cover_days,
+      items: forecast.items.map((f) => ({
+        item_name: f.item_name,
+        shopify_variant_id: f.shopify_variant_id,
+        stock_quantity: f.stock_quantity,
+        units_sold: f.units_sold,
+        per_day: f.per_day,
+        days_left: f.days_left,
+        runs_out_on: f.runs_out_at ? f.runs_out_at.slice(0, 10) : null,
+        reorder_quantity: f.reorder_quantity,
+        confidence: f.confidence,
+      })),
+    };
+  } catch (err) {
+    console.warn(`[agent seller=${sellerId}] restock forecast failed: ${err.message}`);
+    return null;
+  }
+}
+
 // Turns the raw trigger into the user message the model sees. Orders need
-// the stock check from checkOrderStock().
-function describeTrigger(trigger, stockCheck) {
+// the stock check from checkOrderStock(); a low-stock event can carry the
+// forecast from lowStockForecast().
+function describeTrigger(trigger, stockCheck, forecast = null) {
   if (trigger.type === 'order_created') {
     const o = trigger.order;
     const summary = stockCheck.canShip
@@ -48,11 +85,13 @@ function describeTrigger(trigger, stockCheck) {
   }
 
   if (trigger.type === 'low_stock_crossed') {
-    return `An inventory sync just pushed these items to or below their low-stock threshold. Decide what the seller should restock, and whether pending orders are at risk.\n${JSON.stringify(
+    const event = `An inventory sync just pushed these items to or below their low-stock threshold. Decide what the seller should restock, and whether pending orders are at risk.\n${JSON.stringify(
       trigger.items,
       null,
       2
     )}`;
+    if (!forecast) return event;
+    return `${event}\nRestock forecast for these items, computed from the store's orders:\n${JSON.stringify(forecast, null, 2)}`;
   }
 
   throw new Error(`Unknown trigger type: ${trigger.type}`);
@@ -124,9 +163,10 @@ async function runAgent(sellerId, trigger) {
     console.log(`${tag} MCP tools: ${mcp.tools.map((t) => t.name).join(', ')}`);
     const tools = toOpenAITools(mcp.tools);
     const stockCheck = trigger.type === 'order_created' ? await checkOrderStock(sellerId, trigger.order) : null;
+    const forecast = trigger.type === 'low_stock_crossed' ? await lowStockForecast(sellerId, trigger.items) : null;
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: describeTrigger(trigger, stockCheck) },
+      { role: 'user', content: describeTrigger(trigger, stockCheck, forecast) },
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {

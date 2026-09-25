@@ -9,11 +9,6 @@ listed at the end.
   in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
   and in Slack. Needs write scopes from Shopify, which the app doesn't request
   yet.
-- **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". In
-  progress: the API works it out from stored line items
-  (`GET /api/inventory/forecast`), the `forecast_restock` MCP tool gives it
-  to the agent and Claude Desktop, and the Stock page shows it; still to come
-  is the low-stock alert.
 - **Daily morning summary**: yesterday's orders and revenue, what needs
   action, what's running low.
 - **Late-order alerts** for orders still unfulfilled after 24-48 hours.
@@ -49,3 +44,9 @@ listed at the end.
 - MCP tools take matching inputs (`limit`, `offset`, `status`,
   `financial_status`, `from`/`to`) and return a page with `total` and
   `next_offset`; `get_order` looks one order up with the agent's reasoning.
+- Restock forecasting, e.g. "runs out in about 4 days, reorder 40", from
+  stored line items, always saying how much order history it's based on
+  (`GET /api/inventory/forecast`). It's on the Stock page (with a Reorder
+  tab), in low-stock alerts, and in the `forecast_restock` MCP tool. The order
+  sync fetches the items of older orders from the last 90 days so their sales
+  count.

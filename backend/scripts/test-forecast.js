@@ -10,6 +10,8 @@
 //   5. the forecast_restock MCP tool, connected the way the agent connects
 //   6. an order sync fetches the items of older orders in the last 90 days, 100
 //      ids at a time, and still succeeds when that fails
+//   7. a low-stock agent run gives the model the items' forecast, against a
+//      fake DeepSeek on localhost (no real LLM call)
 //
 // Usage:  npm run test:forecast
 const path = require('path');
@@ -17,6 +19,31 @@ process.chdir(path.join(__dirname, '..'));
 process.env.MCP_SERVER_PATH = path.join(__dirname, '..', '..', 'mcp', 'server.js');
 
 const crypto = require('crypto');
+const http = require('http');
+
+// --- a fake DeepSeek: records each request, answers RESTOCK with no tool calls ---
+function startFakeLLM() {
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      requests.push({ url: req.url, body });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          id: 'fake',
+          object: 'chat.completion',
+          created: Math.floor(Date.now() / 1000),
+          model: 'deepseek-chat',
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'RESTOCK - fake agent reply' } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        })
+      );
+    });
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, requests, port: server.address().port })));
+}
 
 let failures = 0;
 const check = (ok, label, detail = '') => {
@@ -42,6 +69,15 @@ let lineId = 1;
 const line = (variantId, quantity) => ({ id: lineId++, variant_id: variantId, title: `Variant ${variantId}`, quantity, price: '1.00' });
 
 async function main() {
+  const llm = await startFakeLLM();
+  // Set before anything loads the .env: real environment variables win over
+  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  Object.assign(process.env, {
+    DEEPSEEK_API_KEY: 'test-key',
+    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AGENT_DAILY_LIMIT_PER_ACCOUNT: '100000',
+    AGENT_DAILY_LIMIT_TOTAL: '100000',
+  });
   const app = require('../src/app');
   const pool = require('../src/config/db');
   const jwt = require('jsonwebtoken');
@@ -225,14 +261,51 @@ async function main() {
     res = await call('POST', '/api/orders/sync', many);
     const sizes = byIdCalls.slice(before).map((c) => c.ids.length).join();
     check(res.status === 200 && sizes === '100,1', '101 older orders: two requests, 100 then 1', sizes);
+
+    console.log('\n7. The low-stock alert');
+    const { runAgent } = require('../src/services/agentService');
+    const lastRequest = () => JSON.parse(llm.requests[llm.requests.length - 1]?.body || '{}');
+    const expected = await forecast(seller);
+    const mugNow = itemNamed(expected.body, 'Mug');
+    await runAgent(seller, {
+      type: 'low_stock_crossed',
+      items: [{ item_name: 'Mug', shopify_variant_id: '5001', previous_stock: 12, current_stock: 10, low_stock_threshold: 10 }],
+    });
+    const sent = lastRequest();
+    const prompt = sent.messages?.find((m) => m.role === 'user')?.content || '';
+    const marker = "Restock forecast for these items, computed from the store's orders:\n";
+    let given = null;
+    try {
+      given = JSON.parse(prompt.split(marker)[1]);
+    } catch {
+      // no forecast in the prompt
+    }
+    check(Boolean(given), 'the model gets the forecast with the event', prompt.slice(0, 80));
+    const mugGiven = given?.items?.[0] || {};
+    check(
+      given?.items?.length === 1 && mugGiven.reorder_quantity === mugNow.reorder_quantity && mugGiven.days_left === mugNow.days_left && mugGiven.per_day === mugNow.per_day,
+      'with the same numbers as the API, for that item only',
+      JSON.stringify(mugGiven)
+    );
+    check(mugGiven.runs_out_on === mugNow.runs_out_at?.slice(0, 10) && !('id' in mugGiven), 'the run-out day as a date, without internal ids', mugGiven.runs_out_on);
+    check(given?.based_on?.days === 30 && given.based_on.orders === expected.body.history.orders && given.cover_days === 30, 'and what it\'s based on', JSON.stringify(given?.based_on));
+    check(/restock forecast/.test(sent.messages?.[0]?.content) && /rough estimate/.test(sent.messages?.[0]?.content), 'the system prompt says how to use it');
+    check(sent.tools?.some((t) => t.function?.name === 'forecast_restock'), 'and forecast_restock is among the agent\'s tools');
+    const [[saved]] = await pool.query('SELECT action_taken FROM decisions WHERE seller_id = ? ORDER BY id DESC LIMIT 1', [seller]);
+    check(saved?.action_taken === 'low_stock_alert', 'the decision is saved as a restock', saved?.action_taken);
+    await runAgent(seller, { type: 'low_stock_crossed', items: [{ item_name: 'Mystery item', current_stock: 1, low_stock_threshold: 5 }] });
+    const noVariant = lastRequest().messages?.find((m) => m.role === 'user')?.content || '';
+    check(/Mystery item/.test(noVariant) && !noVariant.includes(marker), 'an item without a variant id: the event goes out without a forecast');
   } finally {
     server.close();
+    llm.server.close();
     if (sellerIds.length) {
+      await pool.query('DELETE FROM decisions WHERE seller_id IN (?)', [sellerIds]);
       await pool.query('DELETE FROM orders WHERE seller_id IN (?)', [sellerIds]); // line items go with them
       await pool.query('DELETE FROM inventory_items WHERE seller_id IN (?)', [sellerIds]);
       await pool.query('DELETE FROM sellers WHERE id IN (?)', [sellerIds]);
     }
-    console.log('\nRemoved the test sellers, their orders and items.');
+    console.log('\nRemoved the test sellers, their orders, items and decisions.');
     await pool.end();
   }
 }

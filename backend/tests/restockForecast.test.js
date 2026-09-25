@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 process.env.JWT_SECRET = 'test-jwt-secret-0123456789abcdef';
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 const { forecastItem, historyWindow, parseForecastQuery, byUrgency } = require('../src/services/restockForecast');
+const { describeTrigger } = require('../src/services/agentService');
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse('2026-09-26T12:00:00Z');
@@ -90,4 +91,20 @@ test('query: days and cover_days are whole days in range, with defaults', () => 
   }
   assert.match(parseForecastQuery({ cover_days: '181' }).error, /cover_days must be a whole number of days from 1 to 180/);
   assert.match(parseForecastQuery({ days: ['30', '60'] }).error, /days/); // ?days=30&days=60
+});
+
+test('a low-stock prompt carries the forecast when there is one', () => {
+  const trigger = { type: 'low_stock_crossed', items: [{ item_name: 'Mug', shopify_variant_id: '5001', current_stock: 4, low_stock_threshold: 5 }] };
+  const forecast = {
+    based_on: { days: 30, orders: 12 },
+    cover_days: 30,
+    items: [{ item_name: 'Mug', per_day: 1.33, days_left: 3, runs_out_on: '2026-09-29', reorder_quantity: 36, confidence: 'normal' }],
+  };
+  const withForecast = describeTrigger(trigger, null, forecast);
+  assert.match(withForecast, /^An inventory sync just pushed these items/);
+  assert.match(withForecast, /Restock forecast for these items, computed from the store's orders:/);
+  assert.match(withForecast, /"reorder_quantity": 36/);
+  assert.match(withForecast, /"based_on": \{\s*"days": 30,\s*"orders": 12/);
+  assert.doesNotMatch(describeTrigger(trigger, null, null), /Restock forecast/);
+  assert.doesNotMatch(describeTrigger(trigger, null), /Restock forecast/);
 });
