@@ -11,9 +11,9 @@ listed at the end.
   yet.
 - **Restock forecasting**, e.g. "X runs out in ~4 days, reorder 40". In
   progress: the API works it out from stored line items
-  (`GET /api/inventory/forecast`) and the `forecast_restock` MCP tool gives
-  it to the agent and Claude Desktop; still to come are the Stock page and
-  the low-stock alert.
+  (`GET /api/inventory/forecast`), the `forecast_restock` MCP tool gives it
+  to the agent and Claude Desktop, and the Stock page shows it; still to come
+  is the low-stock alert.
 - **Daily morning summary**: yesterday's orders and revenue, what needs
   action, what's running low.
 - **Late-order alerts** for orders still unfulfilled after 24-48 hours.

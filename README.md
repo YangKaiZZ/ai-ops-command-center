@@ -29,8 +29,8 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   6-digit code, rate-limited) and Telegram (one-time link; `/stop` unlinks),
   with a test button that reports how each channel did.
 - **Dashboard.** Orders with the agent's verdict (searchable, filterable, paginated, each with its own page of line items and decisions), the decision history with
-  its reasoning, stock with editable levels, settings, and a setup checklist
-  for new accounts.
+  its reasoning, stock with editable levels and restock forecasts, settings,
+  and a setup checklist for new accounts.
 - **Claude Desktop.** The MCP server gives Claude the same store tools,
   authenticated with revocable API keys.
 - **Shopify compliance.** The mandatory privacy webhooks (customer data

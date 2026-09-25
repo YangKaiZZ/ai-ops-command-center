@@ -44,6 +44,34 @@ export type InventoryItem = {
   is_low: boolean;
 };
 
+// GET /api/inventory/forecast: one tracked item's pace and restock need.
+export type ItemForecast = {
+  id: number; // same id as the InventoryItem
+  item_name: string;
+  stock_quantity: number;
+  units_sold: number; // over the history below
+  orders: number;
+  per_day: number;
+  days_left: number | null; // 0: out of stock; null: not selling, so no run-out date
+  runs_out_at: string | null;
+  reorder_quantity: number; // enough to last cover_days; 0 = none needed
+  confidence: "low" | "normal"; // low: under 3 orders or under 7 days of history
+};
+
+export type ForecastHistory = {
+  from: string | null; // null: the store has no orders yet
+  days: number;
+  orders: number; // orders counted
+  orders_missing_items: number; // in that stretch, but their items aren't stored yet
+};
+
+export type Forecast = {
+  lookback_days: number;
+  cover_days: number;
+  history: ForecastHistory;
+  items: ItemForecast[]; // soonest to run out first
+};
+
 // "skipped": a daily limit stopped the agent before it ran.
 export type Action = "fulfill" | "hold" | "low_stock_alert" | "unknown" | "skipped";
 

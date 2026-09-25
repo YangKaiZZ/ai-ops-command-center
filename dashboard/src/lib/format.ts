@@ -1,4 +1,4 @@
-import type { Action } from "./types";
+import type { Action, ForecastHistory, ItemForecast } from "./types";
 
 export type Tone = "good" | "warning" | "serious" | "critical" | "neutral";
 export type IconName = "check" | "pause" | "alert" | "empty" | "help";
@@ -27,6 +27,54 @@ export function stockTone(quantity: number, threshold: number): "critical" | "wa
 // How full the bar is: stock as a share of the threshold, clamped to 0-100.
 export function stockPercent(quantity: number, threshold: number): number {
   return Math.min(100, Math.max(0, (quantity / Math.max(threshold, 1)) * 100));
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// Units a day, rounded the way a person would say it: "about 1.3", "about 12".
+export function formatPace(perDay: number): string {
+  if (perDay <= 0) return "0";
+  if (perDay < 0.1) return "under 0.1";
+  return `about ${perDay < 10 ? Math.round(perDay * 10) / 10 : Math.round(perDay)}`;
+}
+
+export function formatDaysLeft(days: number): string {
+  return days < 1 ? "under a day" : `about ${plural(Math.round(days), "day")}`;
+}
+
+// The forecast line under a stock item, e.g. ["Sells about 1.3 a day",
+// "runs out in about 8 days (Oct 3)"]. The reorder amount is shown apart.
+export function forecastPhrases(
+  f: Pick<ItemForecast, "units_sold" | "per_day" | "days_left" | "runs_out_at">,
+  lookbackDays: number,
+  formatDate: (iso: string) => string
+): string[] {
+  if (f.units_sold === 0) return [`No sales in the last ${plural(lookbackDays, "day")}`];
+  const phrases = [`Sells ${formatPace(f.per_day)} a day`];
+  if (f.days_left != null && f.days_left > 0) {
+    phrases.push(`runs out in ${formatDaysLeft(f.days_left)}${f.runs_out_at ? ` (${formatDate(f.runs_out_at)})` : ""}`);
+  }
+  return phrases;
+}
+
+// Why a forecast is rough (confidence "low": under 3 orders or under a week
+// of history), or null when it isn't. An item that isn't selling has no forecast to doubt.
+export function roughNote(f: Pick<ItemForecast, "confidence" | "units_sold" | "orders">): string | null {
+  if (f.confidence !== "low" || f.units_sold === 0) return null;
+  return f.orders < 3 ? `rough estimate: ${plural(f.orders, "order")}` : "rough estimate: under a week of orders";
+}
+
+// What every forecast on the page is based on, in a sentence or three.
+export function historySummary(history: ForecastHistory, formatDate: (iso: string) => string): string {
+  if (!history.from) return "No orders yet, so there's nothing to forecast from.";
+  const days = history.days < 1 ? "less than a day" : plural(Math.round(history.days), "day");
+  let text = `Forecasts are based on ${days} of orders: ${plural(history.orders, "order")} since ${formatDate(history.from)}.`;
+  if (history.days < 7) text += " They're rough until there's at least a week of orders.";
+  const missing = history.orders_missing_items;
+  if (missing) {
+    text += ` ${plural(missing, "order")} from then ${missing === 1 ? "doesn't" : "don't"} have ${missing === 1 ? "its" : "their"} items yet, so ${missing === 1 ? "its" : "their"} sales aren't counted.`;
+  }
+  return text;
 }
 
 // The agent's reply is "VERDICT - headline" on line 1, then bullets.
