@@ -1,7 +1,7 @@
 export function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-border bg-surface p-4">
-      <h2 className="mb-3 text-[15px] font-semibold">{title}</h2>
+    <section className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
+      <h2 className="mb-3 text-[15px] font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
   );

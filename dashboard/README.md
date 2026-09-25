@@ -21,6 +21,17 @@ It refreshes every 30 seconds, and "Sync from Shopify" calls the backend's
 sync endpoints (disabled until a store is connected). An inventory sync can
 trigger the low-stock agent, which sends an alert.
 
+## Look
+One dark theme: graphite surfaces (`#13161C` page, `#1F232B` cards,
+`#2E3542` edges) and a single accent, "Lime Compute" `#B6FF2E`, kept for main
+actions, the current tab and what's going well. The color tokens live in
+`src/app/globals.css`; statuses are always a translucent pill with an icon
+and a word, never color alone. Text is Inter, small labels JetBrains Mono,
+both in `src/app/fonts` (SIL Open Font License) and loaded with
+`next/font/local`, so builds need no network and pages make no font requests.
+Icons are [Phosphor](https://phosphoricons.com), imported one file each from
+`src/components/icons.ts` so only those are bundled.
+
 ## Run it
 The backend must be running on port 3000.
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Logo } from "@/components/Logo";
 import { labelledInputClass, primaryButton } from "@/components/ui";
 import { shopParam } from "@/lib/format";
 import { saveSession, useSession } from "@/lib/session";
@@ -65,8 +66,11 @@ function SignupForm() {
   const loginHref = shop ? `/login?shop=${encodeURIComponent(shop)}` : "/login";
 
   return (
-    <form onSubmit={handleSubmit} className="grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-      <h1 className="text-lg font-semibold">AI Ops Command Center</h1>
+    <form onSubmit={handleSubmit} className="glow relative grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
+      <div className="flex items-center gap-3">
+        <Logo />
+        <h1 className="text-lg font-semibold tracking-tight">AI Ops Command Center</h1>
+      </div>
       <p className="text-sm text-ink-2">
         {shop ? (
           <>

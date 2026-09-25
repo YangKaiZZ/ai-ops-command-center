@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { useDashboard } from "@/components/DashboardProvider";
+import { ArrowLeftIcon, ArrowSquareOutIcon } from "@/components/icons";
 import { Empty, Panel } from "@/components/Panel";
 import { formatMoney } from "@/lib/format";
 import { backToList } from "@/lib/orderFilters";
@@ -13,14 +14,14 @@ import { useApi } from "@/lib/useApi";
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block whitespace-nowrap rounded-full border border-hairline px-2 text-xs text-ink-2">{children}</span>
+    <span className="inline-block whitespace-nowrap rounded-full border border-border bg-ink/5 px-2 text-xs text-ink-2">{children}</span>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-0.5">
-      <dt className="text-xs font-semibold text-ink-2">{label}</dt>
+      <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </div>
   );
@@ -33,7 +34,7 @@ function LineItems({ detail }: { detail: OrderDetail }) {
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-hairline text-left text-xs font-semibold text-ink-2">
+          <tr className="border-b border-hairline text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">
             <th scope="col" className="pb-2 pr-3">Item</th>
             <th scope="col" className="whitespace-nowrap pb-2 pr-3">SKU</th>
             <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">Qty</th>
@@ -97,8 +98,9 @@ function OrderView() {
   }, [api, id, validId, updatedAt]);
 
   const backLink = (
-    <Link href={back} className="text-sm font-medium text-accent hover:underline">
-      ← Back to orders
+    <Link href={back} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-accent hover:underline">
+      <ArrowLeftIcon aria-hidden="true" weight="bold" className="size-4" />
+      Back to orders
     </Link>
   );
 
@@ -134,9 +136,10 @@ function OrderView() {
             href={detail.shopify_admin_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-medium hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-medium transition-colors hover:border-ink-2/40 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            Open in Shopify ↗
+            Open in Shopify
+            <ArrowSquareOutIcon aria-hidden="true" className="size-4" />
           </a>
         )}
       </div>

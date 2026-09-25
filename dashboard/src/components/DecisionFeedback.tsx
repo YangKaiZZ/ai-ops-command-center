@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { NOTE_MAX_LENGTH } from "@/lib/feedback";
 import type { Decision, Feedback, SavedFeedback } from "@/lib/types";
 import { jsonBody, useApi } from "@/lib/useApi";
+import { ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui";
 
 type Rated = Pick<Decision, "id" | "feedback" | "feedback_note">;
@@ -12,15 +13,11 @@ type Saved = { feedback: Feedback | null; note: string | null };
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const linkButton = `rounded text-sm font-medium text-accent hover:underline ${focusRing}`;
 
-function Thumb({ down = false }: { down?: boolean }) {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4 shrink-0">
-      <g transform={down ? "matrix(1 0 0 -1 0 16)" : undefined} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
-        <rect x="1.5" y="7" width="3" height="7.5" rx="0.8" />
-        <path d="M4.5 7.5l2.7-5.2c.3-.6 1.1-.7 1.6-.3.5.4.6 1 .4 1.6L8.5 6h4.3c1.1 0 1.9 1 1.6 2.1l-1.2 4.8c-.2.9-1 1.6-1.9 1.6H4.5" />
-      </g>
-    </svg>
-  );
+// Outlined until pressed, then filled in the rating's color.
+function Thumb({ down = false, pressed }: { down?: boolean; pressed: boolean }) {
+  const Glyph = down ? ThumbsDownIcon : ThumbsUpIcon;
+  const tone = down ? "text-critical" : "text-good";
+  return <Glyph aria-hidden="true" weight={pressed ? "fill" : "regular"} className={`size-4 shrink-0 ${pressed ? tone : ""}`} />;
 }
 
 // "Right call?" with thumbs up and down under a decision, and an optional
@@ -89,9 +86,9 @@ export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSav
 
   const thumbClass = (value: Feedback) => {
     const pressed = saved.feedback === value;
-    const tone = value === "up" ? "border-good/50 bg-good/15" : "border-critical/50 bg-critical/15";
+    const tone = value === "up" ? "border-good/30 bg-good/10" : "border-critical/30 bg-critical/10";
     return `inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-medium transition-colors disabled:cursor-progress ${focusRing} ${
-      pressed ? `${tone} text-ink` : "border-hairline text-ink-2 hover:border-border hover:text-ink"
+      pressed ? `${tone} text-ink` : "border-border text-ink-2 hover:border-ink-2/40 hover:text-ink"
     }`;
   };
 
@@ -103,15 +100,11 @@ export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSav
         </span>
         <div role="group" aria-labelledby={labelId} className="flex gap-1.5">
           <button type="button" aria-pressed={saved.feedback === "up"} disabled={busy} onClick={() => rate("up")} className={thumbClass("up")}>
-            <span className={saved.feedback === "up" ? "text-good" : undefined}>
-              <Thumb />
-            </span>
+            <Thumb pressed={saved.feedback === "up"} />
             Yes
           </button>
           <button type="button" aria-pressed={saved.feedback === "down"} disabled={busy} onClick={() => rate("down")} className={thumbClass("down")}>
-            <span className={saved.feedback === "down" ? "text-critical" : undefined}>
-              <Thumb down />
-            </span>
+            <Thumb down pressed={saved.feedback === "down"} />
             No
           </button>
         </div>

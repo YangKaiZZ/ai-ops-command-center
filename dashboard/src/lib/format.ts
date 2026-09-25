@@ -1,7 +1,7 @@
 import type { Action, ForecastHistory, ItemForecast } from "./types";
 
 export type Tone = "good" | "warning" | "serious" | "critical" | "neutral";
-export type IconName = "check" | "pause" | "alert" | "empty" | "help";
+export type IconName = "check" | "pause" | "alert" | "empty" | "help" | "todo";
 
 export const ACTIONS: Record<Action, { label: string; tone: Tone; icon: IconName }> = {
   fulfill: { label: "Fulfill", tone: "good", icon: "check" },

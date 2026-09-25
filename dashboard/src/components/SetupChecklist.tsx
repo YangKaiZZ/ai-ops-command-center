@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Badge } from "./Badge";
 import { Panel } from "./Panel";
+import { primaryButton, secondaryButton } from "./ui";
 import type { Settings } from "@/lib/types";
 
 // What a new seller still has to do before the agent is useful. Disappears
@@ -21,6 +22,8 @@ export function SetupChecklist({ settings }: { settings: Settings }) {
     },
   ];
   if (steps.every((s) => s.done)) return null;
+  // Only the next step gets the lime button; later ones wait their turn.
+  const next = steps.findIndex((s) => !s.done);
 
   return (
     <Panel title="Get set up">
@@ -28,17 +31,14 @@ export function SetupChecklist({ settings }: { settings: Settings }) {
         {steps.map((step, i) => (
           <li key={step.title} className="flex flex-wrap items-start gap-3" data-step-done={step.done}>
             <span className="mt-0.5">
-              {step.done ? <Badge label="Done" tone="good" icon="check" /> : <Badge label={`Step ${i + 1}`} tone="neutral" icon="empty" />}
+              {step.done ? <Badge label="Done" tone="good" icon="check" /> : <Badge label={`Step ${i + 1}`} tone="neutral" icon="todo" />}
             </span>
-            <span className="grid min-w-0 flex-1 gap-0.5">
+            <span className="grid min-w-48 flex-1 gap-0.5">
               <span className={`font-medium ${step.done ? "text-ink-2 line-through" : ""}`}>{step.title}</span>
               {!step.done && <span className="text-sm text-ink-2">{step.detail}</span>}
             </span>
             {!step.done && (
-              <Link
-                href="/settings"
-                className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
+              <Link href="/settings" className={i === next ? primaryButton : secondaryButton}>
                 Open Settings
               </Link>
             )}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
+import { MinusIcon, TrendDownIcon, TrendUpIcon } from "@/components/icons";
 import { Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { accuracyText } from "@/lib/feedback";
@@ -13,32 +14,42 @@ import type { Action, Overview } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+// A small label in capitals, like an instrument panel's.
+const eyebrow = "font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2";
 
 // The change against the period before: an arrow and a signed number, so it
 // never rests on color alone. More orders or sales is the good direction.
+const TRENDS = {
+  up: { Glyph: TrendUpIcon, tone: "text-good" },
+  down: { Glyph: TrendDownIcon, tone: "text-critical" },
+  same: { Glyph: MinusIcon, tone: "text-ink-2" },
+};
+
 function ChangeLine({ value }: { value: Change }) {
-  const arrow = { up: { glyph: "↑", tone: "text-good" }, down: { glyph: "↓", tone: "text-critical" }, same: { glyph: "→", tone: "text-ink-2" } }[
-    value.direction
-  ];
+  const { Glyph, tone } = TRENDS[value.direction];
   return (
     <span className="text-sm text-ink-2">
-      <span aria-hidden="true" className={`font-semibold ${arrow.tone}`}>
-        {arrow.glyph}
+      <span className={`inline-flex items-center gap-1 font-semibold tabular-nums ${tone}`}>
+        <Glyph aria-hidden="true" weight="bold" className="size-4" />
+        {value.text}
       </span>{" "}
-      {value.text} vs the {PERIOD_DAYS} days before
+      vs the {PERIOD_DAYS} days before
     </span>
   );
 }
 
 // One number with its label. The whole card is the link (the label's link is
 // stretched over it); anything linked inside sits above it with `relative`.
-function Tile({ label, value, href, children }: { label: string; value: string; href: string; children?: React.ReactNode }) {
+// `glow` lights the card from behind, for the one number that leads the page.
+function Tile({ label, value, href, glow = false, children }: { label: string; value: string; href: string; glow?: boolean; children?: React.ReactNode }) {
   return (
-    <div className="relative grid content-start gap-1 rounded-xl border border-border bg-surface p-4 hover:border-ink/25">
-      <Link href={href} className={`text-sm font-medium text-ink-2 after:absolute after:inset-0 after:rounded-xl ${focusRing}`}>
+    <div
+      className={`relative grid content-start gap-1.5 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent/40 sm:p-5 ${glow ? "glow" : ""}`}
+    >
+      <Link href={href} className={`${eyebrow} after:absolute after:inset-0 after:rounded-xl ${focusRing}`}>
         {label}
       </Link>
-      <span className="text-3xl font-semibold leading-tight">{value}</span>
+      <span className="text-3xl font-semibold leading-tight tracking-tight tabular-nums">{value}</span>
       {children}
     </div>
   );
@@ -47,7 +58,7 @@ function Tile({ label, value, href, children }: { label: string; value: string; 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-2.5">
-      <h2 className="text-[15px] font-semibold">{title}</h2>
+      <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
   );
@@ -71,7 +82,7 @@ function OverviewView({ overview }: { overview: Overview }) {
           <Tile label="Orders" value={tileCount(orders.count)} href={`/orders?from=${from}`}>
             <ChangeLine value={change(orders.count, orders.previous_count, tileCount)} />
           </Tile>
-          <Tile label="Sales" value={tileMoney(Number(orders.sales))} href={`/orders?from=${from}`}>
+          <Tile label="Sales" value={tileMoney(Number(orders.sales))} href={`/orders?from=${from}`} glow>
             <ChangeLine value={change(Number(orders.sales), Number(orders.previous_sales), tileMoney)} />
           </Tile>
           <Tile label="Need action" value={tileCount(orders.needs_action)} href="/orders?needs_action=1">
@@ -103,8 +114,8 @@ function OverviewView({ overview }: { overview: Overview }) {
           <Tile label="To reorder" value={tileCount(stock.to_reorder)} href="/stock?show=reorder">
             <span className="text-sm text-ink-2">To last {stock.forecast.cover_days} days at the current pace</span>
           </Tile>
-          <div className="grid content-start gap-2 rounded-xl border border-border bg-surface p-4 sm:col-span-2 lg:col-span-1">
-            <h3 className="text-sm font-medium text-ink-2">Runs out within {stock.running_out_within_days} days</h3>
+          <div className="grid content-start gap-2 rounded-xl border border-border bg-surface p-4 sm:col-span-2 sm:p-5 lg:col-span-1">
+            <h3 className={eyebrow}>Runs out within {stock.running_out_within_days} days</h3>
             {stock.running_out.length === 0 ? (
               <p className="text-sm text-ink-2">Nothing, at the current pace.</p>
             ) : (

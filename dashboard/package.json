@@ -10,6 +10,7 @@
     "test": "node --test tests/format.test.mjs tests/orderFilters.test.mjs tests/overview.test.mjs tests/feedback.test.mjs"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"

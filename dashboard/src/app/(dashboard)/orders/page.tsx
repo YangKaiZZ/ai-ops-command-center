@@ -30,7 +30,7 @@ const fieldClass =
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block whitespace-nowrap rounded-full border border-hairline px-2 text-xs text-ink-2">{children}</span>
+    <span className="inline-block whitespace-nowrap rounded-full border border-border bg-ink/5 px-2 text-xs text-ink-2">{children}</span>
   );
 }
 
@@ -233,7 +233,7 @@ function OrdersList() {
         <div className="overflow-x-auto" aria-busy={stale}>
           <table className={`w-full border-collapse text-sm ${stale ? "opacity-60" : ""}`}>
             <thead>
-              <tr className="border-b border-hairline text-left text-xs font-semibold text-ink-2">
+              <tr className="border-b border-hairline text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">
                 <th scope="col" className="whitespace-nowrap pb-2 pr-3">Order</th>
                 <th scope="col" className="whitespace-nowrap pb-2 pr-3">Customer</th>
                 <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">Total</th>
@@ -248,7 +248,7 @@ function OrdersList() {
                 const action = order.latest_decision && actionInfo(order.latest_decision.action_taken);
                 const placed = order.order_placed_at ? new Date(order.order_placed_at) : null;
                 return (
-                  <tr key={order.id} className="border-b border-hairline last:border-0" data-order={order.order_number ?? ""}>
+                  <tr key={order.id} className="border-b border-hairline transition-colors last:border-0 hover:bg-ink/[0.03]" data-order={order.order_number ?? ""}>
                     <td className="py-2.5 pr-3 font-semibold">
                       <Link href={detailHref(order.id)} className="text-accent hover:underline focus-visible:underline">
                         {order.order_number ?? `Order ${order.id}`}
@@ -258,7 +258,7 @@ function OrdersList() {
                     <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(order.total_amount)}</td>
                     <td className="py-2.5 pr-3"><Chip>{order.status || "—"}</Chip></td>
                     <td className="py-2.5 pr-3"><Chip>{order.financial_status || "—"}</Chip></td>
-                    <td className="whitespace-nowrap py-2.5 pr-3" title={placed?.toLocaleString()}>
+                    <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums" title={placed?.toLocaleString()}>
                       {placed ? placed.toLocaleDateString() : "—"}
                     </td>
                     <td className="py-2.5">

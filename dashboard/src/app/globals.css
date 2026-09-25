@@ -1,31 +1,20 @@
 @import "tailwindcss";
 
-/* Role tokens: light values here, dark values below. Tailwind utilities
-   (bg-surface, text-ink-2, bg-critical/20, ...) resolve to these. */
+/* One dark theme: graphite surfaces and a single high-voltage accent,
+   "Lime Compute", kept for what matters most (the main action, where you
+   are, what's going well). Tailwind utilities (bg-surface, text-ink-2,
+   border-accent/25, ...) resolve to these tokens. */
 :root {
-  color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --hairline: #e1e0d9;
-  --border: rgba(11, 11, 11, 0.1);
-  --accent: #2a78d6;
-  --error: #b42525;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --hairline: #2c2c2a;
-    --border: rgba(255, 255, 255, 0.1);
-    --accent: #3987e5;
-    --error: #f08080;
-  }
+  color-scheme: dark;
+  --page: #13161c; /* primary background */
+  --surface: #1f232b; /* cards: "Deep Graphite" */
+  --ink: #ffffff; /* numbers and titles */
+  --ink-2: #94a3b8; /* labels and secondary text */
+  --hairline: #2a303b; /* dividers inside cards */
+  --border: #2e3542; /* card edges */
+  --accent: #b6ff2e; /* "Lime Compute" */
+  --on-accent: #13161c; /* text on a lime fill */
+  --error: #f87171;
 }
 
 @theme inline {
@@ -36,20 +25,44 @@
   --color-hairline: var(--hairline);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-error: var(--error);
 
-  /* Status palette: fixed in both themes and never reused for anything else.
-     Always shown with an icon + text label, never color alone. */
-  --color-good: #0ca30c;
-  --color-warning: #fab219;
-  --color-serious: #ec835a;
-  --color-critical: #d03b3b;
-  --color-neutral: #898781;
+  /* Status palette. Always shown with an icon + text label, never color
+     alone. Good is the accent lime: a right call, sales going up. */
+  --color-good: #b6ff2e;
+  --color-warning: #fbbf24;
+  --color-serious: #fb923c;
+  --color-critical: #f87171;
+  --color-neutral: #94a3b8;
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Set on <html> by next/font (self-hosted, no requests to Google). */
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
 body {
   background: var(--page);
   color: var(--ink);
+}
+
+::selection {
+  background: rgb(182 255 46 / 0.3);
+  color: var(--ink);
+}
+
+/* A soft lime light behind a card (the Overview's Sales tile). The halo sits
+   behind the card, the tint inside it; neither catches clicks. Sideways the
+   halo stays inside the page's 16px gutter, so a phone never scrolls sideways. */
+.glow {
+  background-image: radial-gradient(120% 100% at 0% 0%, rgb(182 255 46 / 0.08), transparent 60%);
+}
+.glow::before {
+  content: "";
+  position: absolute;
+  inset: -28px -12px;
+  z-index: -1;
+  border-radius: 2rem;
+  background: radial-gradient(closest-side, rgb(182 255 46 / 0.08), transparent);
+  pointer-events: none;
 }

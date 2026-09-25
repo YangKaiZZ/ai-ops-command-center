@@ -124,7 +124,7 @@ export function ApiKeysSection() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-hairline text-left text-xs font-semibold text-ink-2">
+                <tr className="border-b border-hairline text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">
                   <th scope="col" className="whitespace-nowrap pb-2 pr-3">Name</th>
                   <th scope="col" className="whitespace-nowrap pb-2 pr-3">Key</th>
                   <th scope="col" className="whitespace-nowrap pb-2 pr-3">Created</th>
