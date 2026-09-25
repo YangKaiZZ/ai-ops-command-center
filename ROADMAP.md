@@ -20,7 +20,6 @@ listed at the end.
 
 ## Dashboard
 
-- **Overview page** with the key numbers.
 - **Thumbs up/down on each agent decision**, to get an accuracy figure.
 
 ## Done: before production
@@ -50,3 +49,7 @@ listed at the end.
   tab), in low-stock alerts, and in the `forecast_restock` MCP tool. The order
   sync fetches the items of older orders from the last 90 days so their sales
   count.
+- Overview page, the dashboard's landing page: the last 7 days against the 7
+  before (orders, sales, what needs action), stock that's low, to reorder or
+  running out within a week, and the agent's decisions by verdict, each
+  linking to the filtered page (`GET /api/overview`).

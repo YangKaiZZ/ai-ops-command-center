@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
 import { secondaryButton } from "@/components/ui";
-import { forecastPhrases, historySummary, roughNote, stockPercent, stockTone } from "@/lib/format";
+import { forecastPhrases, historySummary, roughNote, shortDate, stockPercent, stockTone } from "@/lib/format";
 import { jsonBody, useApi } from "@/lib/useApi";
 import type { Forecast, InventoryItem, ItemForecast } from "@/lib/types";
-
-const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 // Fill = the status color; track = a lighter step of the same hue.
 const METER_CLASSES = {
@@ -151,10 +150,17 @@ function noReorderText(forecast: Forecast | null, error: string) {
   return `Nothing needs reordering to last the next ${forecast.cover_days} days.`;
 }
 
-export default function StockPage() {
+type Show = "low" | "reorder" | "all";
+const SHOWS: Show[] = ["low", "reorder", "all"];
+
+function StockView() {
   const { data, refresh, updatedAt } = useDashboard();
   const api = useApi();
-  const [show, setShow] = useState<"low" | "reorder" | "all">("low");
+  const router = useRouter();
+  // The tab is kept in the URL (?show=reorder), so the Overview can link to it.
+  const shown = useSearchParams().get("show");
+  const show: Show = SHOWS.includes(shown as Show) ? (shown as Show) : "low";
+  const setShow = (next: Show) => router.replace(next === "low" ? "/stock" : `/stock?show=${next}`, { scroll: false });
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [forecastError, setForecastError] = useState("");
 
@@ -257,5 +263,20 @@ export default function StockPage() {
         </p>
       </div>
     </Panel>
+  );
+}
+
+export default function StockPage() {
+  return (
+    // useSearchParams needs a Suspense boundary so the page can still prerender.
+    <Suspense
+      fallback={
+        <Panel title="Stock">
+          <Empty>Loading stock…</Empty>
+        </Panel>
+      }
+    >
+      <StockView />
+    </Suspense>
   );
 }

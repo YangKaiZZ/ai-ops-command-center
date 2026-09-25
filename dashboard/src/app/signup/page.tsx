@@ -33,7 +33,7 @@ function SignupForm() {
   useEffect(() => {
     if (!session) return;
     if (shop) router.replace(`/settings?connect=${encodeURIComponent(shop)}`);
-    else router.replace(signedUp.current ? "/settings?welcome=1" : "/orders");
+    else router.replace(signedUp.current ? "/settings?welcome=1" : "/overview");
   }, [session, shop, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

@@ -21,7 +21,7 @@ function LoginForm() {
 
   // Already signed in (including right after a successful sign-in).
   useEffect(() => {
-    if (session) router.replace(shop ? `/settings?connect=${encodeURIComponent(shop)}` : "/orders");
+    if (session) router.replace(shop ? `/settings?connect=${encodeURIComponent(shop)}` : "/overview");
   }, [session, shop, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

@@ -12,6 +12,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const noStore = data != null && !data.settings.store.connected;
 
   const tabs = [
+    { href: "/overview", label: "Overview", count: undefined, countLabel: "" },
     { href: "/orders", label: "Orders", count: data?.pendingCount, countLabel: "need action" },
     { href: "/decisions", label: "Decisions", count: data?.decisions.length, countLabel: "total" },
     { href: "/stock", label: "Stock", count: data?.lowStock.length, countLabel: "running low" },

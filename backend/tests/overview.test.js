@@ -33,9 +33,22 @@ test('decision counts have every verdict and a total', () => {
 });
 
 test('running out soon: still in stock, gone within 7 days, soonest first', () => {
-  const item = (id, days_left) => ({ id, item_name: `Item ${id}`, stock_quantity: 5, per_day: 1, days_left, runs_out_at: null, reorder_quantity: 10, confidence: 'normal', units_sold: 30 });
+  const item = (id, days_left) => ({
+    id,
+    item_name: `Item ${id}`,
+    shopify_variant_id: String(id),
+    low_stock_threshold: 5,
+    stock_quantity: 5,
+    units_sold: 30,
+    orders: 12,
+    per_day: 1,
+    days_left,
+    runs_out_at: null,
+    reorder_quantity: 10,
+    confidence: 'normal',
+  });
   // The forecast already lists them soonest first.
   const soon = runningOut([item(1, 0), item(2, 0.5), item(3, 7), item(4, 7.1), item(5, null)]);
   assert.deepEqual(soon.map((i) => i.id), [2, 3]); // out of stock (0), later than a week and not selling are left out
-  assert.ok(!('units_sold' in soon[0]));
+  assert.deepEqual(Object.keys(soon[0]), ['id', 'item_name', 'stock_quantity', 'units_sold', 'orders', 'per_day', 'days_left', 'runs_out_at', 'reorder_quantity', 'confidence']);
 });

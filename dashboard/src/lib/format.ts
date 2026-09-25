@@ -38,6 +38,11 @@ export function formatPace(perDay: number): string {
   return `about ${perDay < 10 ? Math.round(perDay * 10) / 10 : Math.round(perDay)}`;
 }
 
+// A day without the year, in the seller's language, e.g. "Sep 28".
+export function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function formatDaysLeft(days: number): string {
   return days < 1 ? "under a day" : `about ${plural(Math.round(days), "day")}`;
 }

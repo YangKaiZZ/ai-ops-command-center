@@ -9,10 +9,11 @@ orders, the agent's decisions, and stock.
 - `/login`: sign-in, with links to sign-up and to password reset
 - `/forgot-password`: asks for a reset link by email (the answer is the same whether or not the address has an account)
 - `/reset-password?token=...`: the page the emailed link opens; sets a new password and signs out older sessions
+- `/overview` (where `/` and sign-in land): the setup checklist while it's needed, then the key numbers for the last 7 days (today included) next to the 7 days before: orders, sales (refunded and voided orders left out), orders that need action and the oldest unshipped one; items running low, items to reorder and what runs out within 7 days (from the restock forecasts, with the history they're based on); and the agent's decisions by verdict. Each tile opens the matching page, already filtered (e.g. `/orders?from=…`, `/orders?needs_action=1`, `/stock?show=reorder`)
 - `/orders`: a setup checklist until the store is connected and an alert channel is on, then the synced orders, newest first and 50 to a page, with shipping status, payment status and the agent's latest verdict. Search (order number or customer), shipping and payment status, a date range in the seller's own time zone, and "Needs action" narrow the list; all of it is kept in the URL (`/orders?q=smith&needs_action=1&page=2`) so reloads and shared links keep the view. Each order number opens its page
 - `/orders/<id>`: one order: customer, total, statuses, what was in it (items, quantities, how many are still to ship, prices), every agent decision about it with the reasoning, and "Open in Shopify". "Back to orders" returns to the filtered list it came from
 - `/decisions`: the agent's decisions, newest first, as cards (order, verdict, headline, reasoning as bullets)
-- `/stock`: one bar per item against its own low-stock level, which can be edited in place; shows low items, items to reorder (soonest to run out first) or all items. Red = out of stock, amber = low. Under each bar, the restock forecast: how fast it sells, when it runs out, how many to reorder, and "rough estimate" when it's based on little data; a line at the top says how much order history the forecasts use. (`/low-stock` redirects here.)
+- `/stock`: one bar per item against its own low-stock level, which can be edited in place; shows low items, items to reorder (soonest to run out first) or all items, kept in the URL (`?show=reorder`, `?show=all`). Red = out of stock, amber = low. Under each bar, the restock forecast: how fast it sells, when it runs out, how many to reorder, and "rough estimate" when it's based on little data; a line at the top says how much order history the forecasts use. (`/low-stock` redirects here.)
 - `/settings`: connect the store (Connect with Shopify, or a pasted Admin API token) and disconnect it; alerts by Slack, email (confirmed with a code) and Telegram, with a test alert; the default low-stock level; API keys for the MCP server in Claude Desktop; customer data requests
 
 The dashboard pages share one data layer (`src/components/DashboardProvider.tsx`).
@@ -50,7 +51,7 @@ folder's Docker Compose setup and its README.
 
 ## Checks
 ```bash
-npm test         # verdict/stock-color/reasoning/install-link/forecast-wording helpers
+npm test         # verdict/stock-color/reasoning/install-link/forecast-wording/overview helpers
 npm run lint
 npm run build
 ```

@@ -72,6 +72,29 @@ export type Forecast = {
   items: ItemForecast[]; // soonest to run out first
 };
 
+// GET /api/overview: this period's key numbers next to the same length of time before it.
+export type Overview = {
+  period: { from: string; to: string; days: number };
+  orders: {
+    count: number; // every order placed
+    previous_count: number;
+    sales: string; // order totals, refunded and voided left out (DECIMAL as a string)
+    previous_sales: string;
+    needs_action: number;
+    oldest_unshipped: { id: number; order_number: string | null; order_placed_at: string } | null;
+  };
+  stock: {
+    tracked: number;
+    low: number; // at or below the item's level, out of stock included
+    out_of_stock: number;
+    to_reorder: number;
+    running_out_within_days: number;
+    running_out: ItemForecast[]; // still in stock, but run out within running_out_within_days
+    forecast: { lookback_days: number; cover_days: number; history: ForecastHistory };
+  };
+  decisions: Record<Action, number> & { total: number };
+};
+
 // "skipped": a daily limit stopped the agent before it ran.
 export type Action = "fulfill" | "hold" | "low_stock_alert" | "unknown" | "skipped";
 

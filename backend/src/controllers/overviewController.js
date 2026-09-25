@@ -42,10 +42,12 @@ function countDecisions(rows) {
 function runningOut(items, days = RUNNING_OUT_DAYS) {
   return items
     .filter((f) => f.days_left != null && f.days_left > 0 && f.days_left <= days)
-    .map(({ id, item_name, stock_quantity, per_day, days_left, runs_out_at, reorder_quantity, confidence }) => ({
+    .map(({ id, item_name, stock_quantity, units_sold, orders, per_day, days_left, runs_out_at, reorder_quantity, confidence }) => ({
       id,
       item_name,
       stock_quantity,
+      units_sold,
+      orders,
       per_day,
       days_left,
       runs_out_at,
