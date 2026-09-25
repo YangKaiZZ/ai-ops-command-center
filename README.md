@@ -32,7 +32,14 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   On the Stock page, in low-stock alerts, and as an MCP tool.
 - **Alerts where the seller is.** Slack, email (address confirmed with a
   6-digit code, rate-limited) and Telegram (one-time link; `/stop` unlinks),
-  with a test button that reports how each channel did.
+  with a test button that reports how each channel did. Every decision alert
+  has Right call / Wrong call buttons: one tap in Telegram (a reply adds the
+  note), a signed, expiring rating page from Slack and email.
+- **Daily summary and late orders.** At an hour the seller picks, in their
+  time zone: yesterday's orders and sales against the day before, what needs
+  action, stock running out and the agent's decisions. Separately, an alert
+  when a paid order still isn't shipped after 12-72 hours, once per order.
+  Queued as jobs with keys, so each is sent exactly once.
 - **Dashboard.** An overview of the last 7 days against the 7 before (orders,
   sales, what needs action, what runs out soon, the agent's decisions), orders with the agent's verdict (searchable, filterable, paginated, each with its own page of line items and decisions), the decision history with
   its reasoning, stock with editable levels and restock forecasts, settings,
@@ -133,7 +140,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 92 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings |
+| backend | `npm test` | 101 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
@@ -147,6 +154,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:overview` | the Overview numbers: this period against the one before, sales without refunded or voided orders, what needs action, stock and what runs out soon, decisions by verdict, other sellers' data |
 | backend | `npm run test:decision-feedback` | thumbs up/down on decisions: rating, notes, changing and clearing, the counts on the feed and the Overview, bad input, skipped runs, other sellers, privacy redaction of notes |
 | backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake DeepSeek: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
+| backend | `npm run test:reports` | the daily summary through the job queue, late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 

@@ -132,6 +132,20 @@ export type Settings = {
   slack: { connected: boolean };
   email_alerts: { available: boolean; address: string | null; pending: string | null };
   telegram: { available: boolean; connected: boolean };
+  reports: ReportSettings;
+};
+
+// The daily summary and late-order alerts, both off until turned on.
+export type ReportSettings = {
+  timezone: string | null; // IANA name; null until saved once (then UTC)
+  summary: { enabled: boolean; hour: number }; // local hour, 0-23
+  late_orders: { enabled: boolean; after_hours: number }; // 12, 24, 48 or 72
+};
+
+// GET /api/rate/:token: the decision a rating link names.
+export type RatingLink = {
+  decision: Pick<Decision, "id" | "order_number" | "action_taken" | "created_at" | "feedback" | "feedback_note"> & { headline: string };
+  business_name: string | null;
 };
 
 export type AlertResult = { channel: "slack" | "email" | "telegram"; ok: boolean; error?: string };

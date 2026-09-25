@@ -212,16 +212,19 @@ async function runAgent(sellerId, trigger) {
         if (overridden) console.warn(`${tag} model ignored the stock check - recorded as HOLD`);
 
         // Save before posting, so a Slack outage can't lose the decision. A DB
-        // failure shouldn't silence the alert either, so it's only logged.
+        // failure shouldn't silence the alert either, so it's only logged
+        // (and the alert goes without its rating buttons).
+        let decisionId = null;
         try {
           const saved = await saveDecision(sellerId, trigger, reasoning);
+          decisionId = saved.id;
           console.log(`${tag} decision #${saved.id} saved (${saved.actionTaken})`);
         } catch (err) {
           console.error(`${tag} could not save decision: ${err.message}`);
         }
 
         const decision = `*${headline(trigger)}*\n${reasoning}`;
-        await postDecision(sellerId, decision);
+        await postDecision(sellerId, decision, { decisionId });
         return decision;
       }
 

@@ -1,6 +1,7 @@
 const { registerHandler } = require('./jobQueue');
 const { runAgent } = require('./agentService');
 const { refreshInventoryItem } = require('./syncService');
+const { sendDailySummary, sendLateOrderAlert } = require('./reports');
 
 // What each kind of job does. server.js loads this before starting the worker.
 
@@ -16,3 +17,10 @@ registerHandler('refresh_inventory_item', async (job) => {
     `[job ${job.id}] inventory item ${inventoryItemId} seller=${job.sellerId}: ${result.status}${result.stock != null ? `, stock ${result.stock}` : ''}`
   );
 });
+
+// A daily summary that came due (reports.queueDueReports); `today` is the
+// seller's local date, and the summary covers the day before it.
+registerHandler('daily_summary', (job) => sendDailySummary(job.sellerId, { today: job.payload.today }));
+
+// Paid orders that turned late since the last alert.
+registerHandler('late_orders', (job) => sendLateOrderAlert(job.sellerId));

@@ -95,7 +95,7 @@ registers the webhooks and imports orders and products in the background.
 It needs these in `.env`:
 - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`: client ID and secret of your app in the Shopify Dev Dashboard
 - `APP_URL`: this backend's public https URL (an ngrok tunnel while developing)
-- `DASHBOARD_URL`: where the dashboard runs (default `http://localhost:3005`)
+- `DASHBOARD_URL`: where the dashboard runs (default `http://localhost:3005`); links in emails and alerts point here
 - `SHOPIFY_SCOPES` (optional): default `read_orders,read_products,read_inventory`
 
 and, in the app's configuration on Shopify:
@@ -213,6 +213,53 @@ business account and approved message templates.
 
 `npm run test:alerts` checks email and Telegram against a fake mail server
 and a fake Telegram on localhost.
+
+**Rating from alerts.** Each decision alert comes with "Right call" and
+"Wrong call" buttons, so the seller can rate it where they read it:
+- Telegram: real buttons. A tap rates the decision at once (the bot answers,
+  and ticks the button); it only counts from the chat linked to the account
+  the decision belongs to. After "Wrong call" the bot asks what it should
+  have done, and a reply to that question becomes the note.
+- Slack and email: links to a rating page in the dashboard (`/rate`), with
+  the choice already made and a note box. Incoming webhooks can't receive
+  clicks, and mail scanners open links by themselves, so opening a link
+  never saves anything: the page's Save button does. Each link carries a
+  signed token for that one decision (`src/services/ratingLinks.js`, keyed
+  off `JWT_SECRET`), expires after 30 days, and points at `DASHBOARD_URL`.
+- `GET /api/rate/:token` shows the decision (order, verdict, first line,
+  rating); `PUT /api/rate/:token` with `{ "feedback", "note" }` rates it, as
+  on the dashboard. No sign-in: the token is the permission.
+
+## Daily summary and late orders
+Two reports a seller can turn on in Settings, both sent to their alert
+channels and worked out in code (no model call), in `src/services/reports.js`:
+- **Daily summary**, at an hour the seller picks in their time zone: the day
+  before's orders and sales against the day before that, what needs action
+  and the oldest unshipped order, late orders, stock running low and what
+  runs out this week (from the restock forecasts), and the agent's decisions
+  with how they were rated, plus a nudge to rate the week's unrated ones.
+- **Late orders**: a paid (or authorized) order still not shipped after 12,
+  24, 48 or 72 hours. One alert names the orders that turned late since the
+  last one; each order is named once (`orders.late_alerted_at`). Only orders
+  from the last 14 days are alerted, so turning it on doesn't bring up old
+  history; the summary counts them all.
+
+Every `REPORT_CHECK_MINUTES` (default 5, `0` = off) the backend queues what's
+due as jobs. The job keys (`summary:<seller>:<local date>`, and one per set
+of late orders) make each summary and each alert happen once, whatever
+restarts or repeated checks happen. Turning the summary on after its hour
+starts it the next day. Days are in the seller's time zone
+(`src/utils/timeZone.js`, built-in `Intl`, right on the days clocks change).
+- `GET /api/settings` includes `reports: { timezone, summary: { enabled, hour },
+  late_orders: { enabled, after_hours } }` (both off by default).
+- `PUT /api/settings/reports` with the same shape (`after_hours` 12, 24, 48 or
+  72; `timezone` an IANA name such as `Asia/Manila`).
+- `POST /api/settings/reports/summary` sends today's summary now, as a
+  preview; the scheduled one still comes.
+
+`npm run test:reports` checks all of it against a fake mail server and a
+fake Telegram: settings, the summary through the job queue, late orders,
+the rating links and page API, and Telegram's buttons and note replies.
 
 **API keys** let tools like the MCP server in Claude Desktop read a
 seller's data without a sign-in token that expires in 7 days. Keys look

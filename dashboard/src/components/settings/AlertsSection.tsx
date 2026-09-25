@@ -42,8 +42,9 @@ export function AlertsSection({ settings, onChange }: { settings: Settings; onCh
     <Panel title="Alerts">
       <div className="grid max-w-2xl gap-3">
         <p className="text-sm text-ink-2">
-          The agent sends each decision (new orders, items running low) to every channel you turn on. Decisions always show
-          on the Decisions tab too.
+          The agent sends each decision (new orders, items running low) to every channel you turn on, with Right call and
+          Wrong call buttons to rate it: one tap in Telegram, a short page from Slack or email. Decisions always show on the
+          Decisions tab too.
         </p>
         <SlackRow connected={settings.slack.connected} onChange={onChange} />
         <EmailRow alerts={settings.email_alerts} accountEmail={settings.email} onChange={onChange} />

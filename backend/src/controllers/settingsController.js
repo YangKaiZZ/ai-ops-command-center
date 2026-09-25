@@ -5,6 +5,8 @@ const { isSlackWebhookUrl } = require('../services/notifier');
 const { createApiKey, listApiKeys, revokeApiKey } = require('../models/apiKeyModel');
 const { listDataRequests } = require('../models/privacyModel');
 const { alertStatus } = require('./alertsController');
+const { reportSettings } = require('./reportsController');
+const { getReportSettings } = require('../models/reportModel');
 
 // GET /api/settings
 // Account, store and notification status for the settings page. Never returns secrets.
@@ -13,7 +15,11 @@ async function getSettings(req, res) {
     const loaded = await loadSettings(req.sellerId);
     if (!loaded) return res.status(404).json({ error: 'Account not found' });
     const { alertEmail, telegramConnected, ...settings } = loaded;
-    res.json({ ...settings, ...(await alertStatus(req.sellerId, { alertEmail, telegramConnected })) });
+    res.json({
+      ...settings,
+      ...(await alertStatus(req.sellerId, { alertEmail, telegramConnected })),
+      reports: reportSettings(await getReportSettings(req.sellerId)),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load settings' });

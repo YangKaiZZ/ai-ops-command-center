@@ -9,18 +9,11 @@ listed at the end.
   in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
   and in Slack. Needs write scopes from Shopify, which the app doesn't request
   yet.
-- **Daily morning summary**: yesterday's orders and revenue, what needs
-  action, what's running low.
-- **Late-order alerts** for orders still unfulfilled after 24-48 hours.
 - **Risk triage**: Shopify's fraud risk score and billing/shipping mismatch
   as reasons to hold.
 - **In-dashboard chat** using the same tools. Host the MCP server remotely
   with OAuth, so power users paste a URL instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
-
-## Agent quality
-
-- **Rate from Slack or Telegram**, with buttons on the alert itself.
 
 ## Done: before production
 
@@ -61,3 +54,10 @@ listed at the end.
   seller's recent wrong calls and notes on similar events, applies them
   where they fit and says when one changed its call (never over the stock
   check).
+- Daily summary at an hour the seller picks, in their time zone: yesterday
+  against the day before, what needs action, late orders, stock running out
+  and the agent's decisions with their ratings.
+- Late-order alerts: paid orders still not shipped after 12, 24, 48 or 72
+  hours, each named once.
+- Rating decisions from the alert itself: one tap (and a reply for the note)
+  in Telegram; a signed, expiring rating page from Slack and email.

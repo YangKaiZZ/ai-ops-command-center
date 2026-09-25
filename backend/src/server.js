@@ -1,6 +1,7 @@
 const app = require('./app');
 const { startScheduledSync } = require('./services/scheduler');
 const { startTelegramPolling } = require('./services/telegram');
+const { startReportScheduler } = require('./services/reports');
 const { startWorker, stopWorker } = require('./services/jobQueue');
 require('./services/jobHandlers'); // what each job type does
 
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`AI Ops backend running on port ${PORT}`);
   startScheduledSync();
+  startReportScheduler();
   startTelegramPolling();
   startWorker().catch((err) => console.error(`[jobs] worker failed to start: ${err.message}`));
 });

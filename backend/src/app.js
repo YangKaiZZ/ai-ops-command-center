@@ -12,6 +12,7 @@ const decisionsRoutes = require('./routes/decisionsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const shopifyRoutes = require('./routes/shopifyRoutes');
 const overviewRoutes = require('./routes/overviewRoutes');
+const rateRoutes = require('./routes/rateRoutes');
 
 const app = express();
 // Behind a reverse proxy (Caddy, in deploy/) every request arrives from the
@@ -36,5 +37,6 @@ app.use('/api/decisions', decisionsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/shopify', shopifyRoutes);
 app.use('/api/overview', overviewRoutes);
+app.use('/api/rate', rateRoutes);
 
 module.exports = app;

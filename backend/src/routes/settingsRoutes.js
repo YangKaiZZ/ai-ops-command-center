@@ -13,6 +13,7 @@ const {
   setInventoryDefaults,
 } = require('../controllers/settingsController');
 const alerts = require('../controllers/alertsController');
+const reports = require('../controllers/reportsController');
 
 router.use(requireAuth, requireSession);
 router.get('/', getSettings);
@@ -29,5 +30,7 @@ router.delete('/email', alerts.removeEmail);
 router.post('/telegram', alerts.startTelegram);
 router.delete('/telegram', alerts.removeTelegram);
 router.post('/test-alert', alerts.testAlert);
+router.put('/reports', reports.saveReports);
+router.post('/reports/summary', reports.sendSummaryNow);
 
 module.exports = router;

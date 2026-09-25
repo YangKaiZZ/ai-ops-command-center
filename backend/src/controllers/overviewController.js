@@ -129,4 +129,4 @@ async function getOverview(req, res) {
   }
 }
 
-module.exports = { getOverview, parseOverviewQuery, countDecisions, runningOut };
+module.exports = { getOverview, parseOverviewQuery, countDecisions, runningOut, COUNTED };

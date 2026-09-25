@@ -67,6 +67,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       # Not left blank: the backend reads a blank value as 0, which turns the sync off.
       SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-15}
+      # The same for the daily summary and late-order check.
+      REPORT_CHECK_MINUTES: ${REPORT_CHECK_MINUTES:-5}
     depends_on:
       mysql:
         condition: service_healthy

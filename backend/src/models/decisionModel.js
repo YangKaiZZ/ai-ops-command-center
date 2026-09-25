@@ -39,6 +39,8 @@ async function saveDecision(sellerId, trigger, reasoning) {
   return { id: result.insertId, actionTaken };
 }
 
+const NOTE_MAX_LENGTH = 500; // the feedback_note column
+
 // Verdicts the seller can rate. A skipped run never reached the agent, so
 // there's no call to judge.
 const RATED_ACTIONS = ['fulfill', 'hold', 'low_stock_alert', 'unknown'];
@@ -103,4 +105,40 @@ async function recentFeedback(sellerId, triggerType, { limit = AGENT_FEEDBACK.li
   return rows;
 }
 
-module.exports = { saveDecision, actionFromReasoning, countRatings, setFeedback, recentFeedback, RATINGS_SELECT, AGENT_FEEDBACK };
+// A decision, if it belongs to the account linked to this Telegram chat
+// (for rating it from the chat): { seller_id, action_taken, feedback, feedback_note }, or null.
+async function decisionForTelegramChat(decisionId, chatId) {
+  const [[row]] = await pool.query(
+    `SELECT d.seller_id, d.action_taken, d.feedback, d.feedback_note FROM decisions d
+     JOIN sellers s ON s.id = d.seller_id
+     WHERE d.id = ? AND s.telegram_chat_id = ?`,
+    [decisionId, String(chatId)]
+  );
+  return row || null;
+}
+
+// What a rating link or button shows about a decision: its order, verdict,
+// first line and current rating, not the full reasoning.
+async function decisionSummary(sellerId, decisionId) {
+  const [[row]] = await pool.query(
+    `SELECT id, order_number, action_taken, reasoning, created_at, feedback, feedback_note FROM decisions
+     WHERE id = ? AND seller_id = ?`,
+    [decisionId, sellerId]
+  );
+  if (!row) return null;
+  const { reasoning, ...rest } = row;
+  return { ...rest, headline: (reasoning || '').trim().split('\n')[0].slice(0, 300) };
+}
+
+module.exports = {
+  saveDecision,
+  actionFromReasoning,
+  countRatings,
+  setFeedback,
+  recentFeedback,
+  decisionForTelegramChat,
+  decisionSummary,
+  RATINGS_SELECT,
+  AGENT_FEEDBACK,
+  NOTE_MAX_LENGTH,
+};

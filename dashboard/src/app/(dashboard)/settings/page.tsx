@@ -7,6 +7,7 @@ import { Empty, Panel } from "@/components/Panel";
 import { AlertsSection } from "@/components/settings/AlertsSection";
 import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { PrivacySection } from "@/components/settings/PrivacySection";
+import { ReportsSection } from "@/components/settings/ReportsSection";
 import { StockDefaultsSection } from "@/components/settings/StockDefaultsSection";
 import { StoreSection } from "@/components/settings/StoreSection";
 import type { Message } from "@/components/ui";
@@ -64,6 +65,7 @@ function SettingsContent() {
       )}
       <StoreSection settings={settings} onChange={refresh} initialShop={initialShop} flash={flash} />
       <AlertsSection settings={settings} onChange={refresh} />
+      <ReportsSection settings={settings} onChange={refresh} />
       <StockDefaultsSection settings={settings} onChange={refresh} />
       <ApiKeysSection />
       <PrivacySection />

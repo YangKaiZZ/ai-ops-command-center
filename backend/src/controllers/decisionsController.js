@@ -1,8 +1,8 @@
 const pool = require('../config/db');
-const { countRatings, setFeedback, RATINGS_SELECT } = require('../models/decisionModel');
+const { countRatings, setFeedback, RATINGS_SELECT, NOTE_MAX_LENGTH } = require('../models/decisionModel');
 
 const FEEDBACK_VALUES = ['up', 'down'];
-const MAX_NOTE_LENGTH = 500;
+const MAX_NOTE_LENGTH = NOTE_MAX_LENGTH;
 
 // GET /api/decisions?limit=50
 // The agent's recent decisions for this seller, newest first — the dashboard
