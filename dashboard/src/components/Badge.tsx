@@ -1,4 +1,14 @@
-import { CheckIcon, CircleDashedIcon, PauseIcon, ProhibitIcon, QuestionIcon, WarningIcon, type Icon } from "@/components/icons";
+import {
+  CheckIcon,
+  CircleDashedIcon,
+  PauseIcon,
+  ProhibitIcon,
+  QuestionIcon,
+  ShieldCheckIcon,
+  ShieldWarningIcon,
+  WarningIcon,
+  type Icon,
+} from "@/components/icons";
 import type { IconName, Tone } from "@/lib/format";
 
 // A translucent pill in the tone's own color: a faint fill, a crisp edge.
@@ -18,6 +28,8 @@ const ICONS: Record<IconName, Icon> = {
   empty: ProhibitIcon,
   help: QuestionIcon,
   todo: CircleDashedIcon,
+  risk: ShieldWarningIcon,
+  safe: ShieldCheckIcon,
 };
 
 // A status is always icon + text label; the color is never the only signal.

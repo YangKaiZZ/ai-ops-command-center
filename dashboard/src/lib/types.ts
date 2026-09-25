@@ -9,6 +9,18 @@ export type Order = {
   total_amount: string | null; // DECIMAL comes back as a string
   order_placed_at: string | null;
   latest_decision: { action_taken: Action; created_at: string } | null; // the agent's most recent verdict
+  risk: OrderRisk | null; // null until Shopify's fraud check has been read
+};
+
+// Shopify's fraud check on an order: the worst assessment (Shopify's or a
+// fraud app's), Shopify's advice, and the facts that raised the risk.
+export type OrderRisk = {
+  level: "high" | "medium" | "low" | "none" | "pending"; // none: not rated
+  recommendation: "accept" | "investigate" | "cancel" | "none";
+  reasons: string[];
+  billing_matches_shipping: boolean | null; // false also when an address is missing; null: nothing ships
+  checked_at: string;
+  flagged: boolean; // high or medium, or Shopify advises cancelling or investigating
 };
 
 // GET /api/orders/:id
@@ -25,6 +37,7 @@ export type LineItem = {
 
 export type OrderDetail = {
   order: Omit<Order, "latest_decision"> & { shopify_order_id: string; synced_at: string | null };
+  risk_note: string | null; // why order.risk is null, when it is
   line_items: LineItem[] | null; // null: not available, and line_items_note says why
   line_items_note: string | null;
   decisions: Pick<Decision, "id" | "action_taken" | "reasoning" | "created_at" | "feedback" | "feedback_note" | "feedback_at">[];

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { Badge } from "@/components/Badge";
 import { DecisionCard } from "@/components/DecisionCard";
 import { useDashboard } from "@/components/DashboardProvider";
 import { ArrowLeftIcon, ArrowSquareOutIcon } from "@/components/icons";
 import { Empty, Panel } from "@/components/Panel";
-import { formatMoney } from "@/lib/format";
+import { addressMatchText, formatMoney, riskBadge, riskSummary, timeAgo } from "@/lib/format";
 import { backToList } from "@/lib/orderFilters";
 import type { OrderDetail } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
@@ -63,6 +64,35 @@ function LineItems({ detail }: { detail: OrderDetail }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// Shopify's fraud check: its verdict, the facts that raised the risk and the
+// address check. The agent reads the same thing before deciding.
+function FraudCheck({ detail }: { detail: OrderDetail }) {
+  const { risk } = detail.order;
+  if (!risk) return <Empty>{detail.risk_note ?? "Shopify's fraud check isn't available for this order."}</Empty>;
+  return (
+    <div className="grid gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Badge {...riskBadge(risk)} />
+        <p>{riskSummary(risk)}</p>
+      </div>
+      {risk.reasons.length > 0 && (
+        <div>
+          <p className="mb-1 text-ink-2">What raised the risk:</p>
+          <ul className="grid list-disc gap-0.5 pl-5">
+            {risk.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className={risk.billing_matches_shipping === false ? "" : "text-ink-2"}>{addressMatchText(risk.billing_matches_shipping)}</p>
+      <p className="text-xs text-ink-2" title={new Date(risk.checked_at).toLocaleString()}>
+        Checked {timeAgo(risk.checked_at)}
+      </p>
     </div>
   );
 }
@@ -162,6 +192,9 @@ function OrderView() {
           </Field>
           <Field label="Placed">{placed ? placed.toLocaleString() : "—"}</Field>
         </dl>
+      </Panel>
+      <Panel title="Fraud check">
+        <FraudCheck detail={detail} />
       </Panel>
       <Panel title="Items">
         <LineItems detail={detail} />

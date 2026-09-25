@@ -1,7 +1,7 @@
-import type { Action, ForecastHistory, ItemForecast } from "./types";
+import type { Action, ForecastHistory, ItemForecast, OrderRisk } from "./types";
 
 export type Tone = "good" | "warning" | "serious" | "critical" | "neutral";
-export type IconName = "check" | "pause" | "alert" | "empty" | "help" | "todo";
+export type IconName = "check" | "pause" | "alert" | "empty" | "help" | "todo" | "risk" | "safe";
 
 export const ACTIONS: Record<Action, { label: string; tone: Tone; icon: IconName }> = {
   fulfill: { label: "Fulfill", tone: "good", icon: "check" },
@@ -13,6 +13,48 @@ export const ACTIONS: Record<Action, { label: string; tone: Tone; icon: IconName
 
 export function actionInfo(action: string) {
   return ACTIONS[action as Action] ?? ACTIONS.unknown;
+}
+
+// Shopify's fraud check as a badge. The worst signal wins: a high level or
+// "cancel" (the agent must hold), then medium or "investigate".
+export function riskBadge(risk: OrderRisk): { label: string; tone: Tone; icon: IconName } {
+  if (risk.level === "high") return { label: "High risk", tone: "critical", icon: "risk" };
+  if (risk.recommendation === "cancel") return { label: "Cancel advised", tone: "critical", icon: "risk" };
+  if (risk.level === "medium") return { label: "Medium risk", tone: "serious", icon: "risk" };
+  if (risk.recommendation === "investigate") return { label: "Check advised", tone: "serious", icon: "risk" };
+  if (risk.level === "pending") return { label: "Risk pending", tone: "neutral", icon: "todo" };
+  if (risk.level === "low") return { label: "Low risk", tone: "good", icon: "safe" };
+  return { label: "Not rated", tone: "neutral", icon: "help" };
+}
+
+// Whether a list of orders shows the badge: only flagged orders and ones
+// still being checked, so those stand out among the (mostly low-risk) rest.
+export function riskWorthShowing(risk: OrderRisk | null): risk is OrderRisk {
+  return Boolean(risk && (risk.flagged || risk.level === "pending"));
+}
+
+const RISK_ADVICE: Record<OrderRisk["recommendation"], string | null> = {
+  accept: "recommends fulfilling it",
+  investigate: "recommends checking it with the buyer",
+  cancel: "recommends cancelling it",
+  none: null,
+};
+
+// What Shopify says, in a sentence: "Shopify rates it high risk and recommends cancelling it."
+export function riskSummary(risk: OrderRisk): string {
+  if (risk.level === "pending") return "Shopify's fraud analysis hasn't finished yet.";
+  const rated = risk.level === "none" ? null : `rates it ${risk.level} risk`;
+  const advice = RISK_ADVICE[risk.recommendation];
+  const said = rated && advice ? `${rated} and ${advice}` : (rated ?? advice ?? "gave it no risk rating");
+  return `Shopify ${said}.`;
+}
+
+// The billing/shipping address check in words.
+export function addressMatchText(matches: boolean | null): string {
+  if (matches === null) return "Nothing in this order ships, so there's no shipping address to compare.";
+  return matches
+    ? "The billing address matches the shipping address."
+    : "The billing address doesn't match the shipping address (or one is missing). Common for gifts; worth a look with other signs.";
 }
 
 // Low-stock bar color. Red means nothing left to sell; amber means some left

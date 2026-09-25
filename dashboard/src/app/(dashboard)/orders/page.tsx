@@ -7,7 +7,7 @@ import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
-import { actionInfo, formatMoney } from "@/lib/format";
+import { actionInfo, formatMoney, riskBadge, riskSummary, riskWorthShowing } from "@/lib/format";
 import {
   filtersUrl,
   hasFilters,
@@ -34,7 +34,7 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Search, the two statuses, a date range and "needs action". Every change
+// Search, the two statuses, a date range, "needs action" and fraud risk. Every change
 // goes to the URL (back to page 1); typing in the search box waits for a pause.
 function FilterBar({ filters, apply }: { filters: OrderFilters; apply: (f: OrderFilters) => void }) {
   const [text, setText] = useState(filters.q);
@@ -104,6 +104,10 @@ function FilterBar({ filters, apply }: { filters: OrderFilters; apply: (f: Order
       <label className="flex items-center gap-1.5 py-1.5 text-sm">
         <input type="checkbox" checked={filters.needsAction} onChange={(e) => set({ needsAction: e.target.checked })} className="size-4 accent-accent" />
         Needs action
+      </label>
+      <label className="flex items-center gap-1.5 py-1.5 text-sm">
+        <input type="checkbox" checked={filters.flagged} onChange={(e) => set({ flagged: e.target.checked })} className="size-4 accent-accent" />
+        Flagged for fraud
       </label>
       {hasFilters(filters) && (
         <button type="button" onClick={() => apply(NO_FILTERS)} className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-accent hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
@@ -247,12 +251,20 @@ function OrdersList() {
               {result.orders.map((order) => {
                 const action = order.latest_decision && actionInfo(order.latest_decision.action_taken);
                 const placed = order.order_placed_at ? new Date(order.order_placed_at) : null;
+                const risk = riskWorthShowing(order.risk) ? order.risk : null;
                 return (
                   <tr key={order.id} className="border-b border-hairline transition-colors last:border-0 hover:bg-ink/[0.03]" data-order={order.order_number ?? ""}>
                     <td className="py-2.5 pr-3 font-semibold">
-                      <Link href={detailHref(order.id)} className="text-accent hover:underline focus-visible:underline">
-                        {order.order_number ?? `Order ${order.id}`}
-                      </Link>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Link href={detailHref(order.id)} className="text-accent hover:underline focus-visible:underline">
+                          {order.order_number ?? `Order ${order.id}`}
+                        </Link>
+                        {risk && (
+                          <span title={[riskSummary(risk), ...risk.reasons].join("\n")}>
+                            <Badge {...riskBadge(risk)} />
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="py-2.5 pr-3">{order.buyer_name || "Guest"}</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(order.total_amount)}</td>

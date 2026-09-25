@@ -15,6 +15,8 @@ export { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
 export { PulseIcon } from "@phosphor-icons/react/dist/ssr/Pulse";
 export { QuestionIcon } from "@phosphor-icons/react/dist/ssr/Question";
 export { RobotIcon } from "@phosphor-icons/react/dist/ssr/Robot";
+export { ShieldCheckIcon } from "@phosphor-icons/react/dist/ssr/ShieldCheck";
+export { ShieldWarningIcon } from "@phosphor-icons/react/dist/ssr/ShieldWarning";
 export { SignOutIcon } from "@phosphor-icons/react/dist/ssr/SignOut";
 export { SquaresFourIcon } from "@phosphor-icons/react/dist/ssr/SquaresFour";
 export { StackIcon } from "@phosphor-icons/react/dist/ssr/Stack";

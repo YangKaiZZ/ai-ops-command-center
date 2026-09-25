@@ -1,5 +1,6 @@
-// The Orders page's search and filters, kept in the URL (?q=&status=&payment=&from=&to=&needs_action=1&page=)
-// so a filtered view survives reloads and can be shared.
+// The Orders page's search and filters, kept in the URL
+// (?q=&status=&payment=&from=&to=&needs_action=1&risk=flagged&page=) so a
+// filtered view survives reloads and can be shared.
 
 export type OrderFilters = {
   q: string;
@@ -8,6 +9,7 @@ export type OrderFilters = {
   from: string; // YYYY-MM-DD in the seller's own time zone, "" for open
   to: string;
   needsAction: boolean;
+  flagged: boolean; // only orders Shopify's fraud check flagged
 };
 
 export const SHIPPING_OPTIONS: [string, string][] = [
@@ -28,7 +30,7 @@ export const PAYMENT_OPTIONS: [string, string][] = [
   ["expired", "Expired"],
 ];
 
-export const NO_FILTERS: OrderFilters = { q: "", status: "", payment: "", from: "", to: "", needsAction: false };
+export const NO_FILTERS: OrderFilters = { q: "", status: "", payment: "", from: "", to: "", needsAction: false, flagged: false };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const isOption = (options: [string, string][], value: string | null) => options.some(([v]) => v === value);
@@ -46,11 +48,12 @@ export function readFilters(params: URLSearchParams): OrderFilters {
     from: DAY.test(from) ? from : "",
     to: DAY.test(to) ? to : "",
     needsAction: params.get("needs_action") === "1",
+    flagged: params.get("risk") === "flagged",
   };
 }
 
 export function hasFilters(f: OrderFilters): boolean {
-  return Boolean(f.q || f.status || f.payment || f.from || f.to || f.needsAction);
+  return Boolean(f.q || f.status || f.payment || f.from || f.to || f.needsAction || f.flagged);
 }
 
 export function filtersUrl(f: OrderFilters, page = 1): string {
@@ -61,6 +64,7 @@ export function filtersUrl(f: OrderFilters, page = 1): string {
   if (f.from) params.set("from", f.from);
   if (f.to) params.set("to", f.to);
   if (f.needsAction) params.set("needs_action", "1");
+  if (f.flagged) params.set("risk", "flagged");
   if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return query ? `/orders?${query}` : "/orders";
@@ -88,5 +92,6 @@ export function ordersApiQuery(f: OrderFilters, page: number, pageSize: number):
   if (f.from) params.set("from", localDayBoundary(f.from, false));
   if (f.to) params.set("to", localDayBoundary(f.to, true));
   if (f.needsAction) params.set("needs_action", "true");
+  if (f.flagged) params.set("risk", "flagged");
   return params.toString();
 }

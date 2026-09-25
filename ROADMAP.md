@@ -67,4 +67,6 @@ listed at the end.
   High risk is a hold the model can't overrule; medium risk is a hold unless
   the seller's notes say otherwise. A pending check is waited for, recent open
   orders are checked again at each sync, and a risk that rises after the agent
-  decided is alerted. In the orders API (`?risk=flagged`) and the MCP tools.
+  decided is alerted. On the Orders page (a risk badge and a "Flagged for
+  fraud" filter), each order's page, the orders API (`?risk=flagged`) and the
+  MCP tools.

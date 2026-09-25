@@ -48,7 +48,7 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   when a paid order still isn't shipped after 12-72 hours, once per order.
   Queued as jobs with keys, so each is sent exactly once.
 - **Dashboard.** An overview of the last 7 days against the 7 before (orders,
-  sales, what needs action, what runs out soon, the agent's decisions), orders with the agent's verdict (searchable, filterable, paginated, each with its own page of line items and decisions), the decision history with
+  sales, what needs action, what runs out soon, the agent's decisions), orders with the agent's verdict and fraud risk (searchable, filterable, paginated, each with its own page of fraud check, line items and decisions), the decision history with
   its reasoning, stock with editable levels and restock forecasts, settings,
   and a setup checklist for new accounts.
 - **Is the agent right?** The seller rates each decision thumbs up or down,
