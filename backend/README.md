@@ -10,9 +10,9 @@ and the endpoints the dashboard and the MCP server use.
 - `src/app.js`, `src/server.js` — the Express app, and the entrypoint that starts it with the scheduler and Telegram polling
 - `src/routes/`, `src/controllers/` — endpoints: auth, orders, inventory, store, Shopify OAuth, webhooks, settings, alerts, decisions
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
-- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`), restock forecasts (`restockForecast`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
+- `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`, `riskCheck`), restock forecasts (`restockForecast`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-risk`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -135,7 +135,7 @@ the app's configuration, set the **compliance webhooks** URL to
 | Topic | What happens |
 | --- | --- |
 | `customers/data_request` | logged; `GET /api/settings/privacy-requests` lists each request with the data we hold for those orders, for the seller to pass on |
-| `customers/redact` | the buyer's name on those orders becomes "Redacted", and is scrubbed from decision text |
+| `customers/redact` | the buyer's name on those orders becomes "Redacted", and is scrubbed from decision text; the fraud check's reasons on those orders are removed (they can describe the buyer) |
 | `shop/redact` | (48 h after uninstall) deletes the store's orders, stock, decisions and messages; skipped if the store was connected again. The seller's login stays |
 
 Each request is logged in `privacy_requests` with ids and outcomes only,
@@ -158,6 +158,40 @@ The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
 10-minute JWT for the seller in question. The decision is saved, then sent to
 every alert channel the seller turned on (Slack, email, Telegram), or to the
 server console if none is.
+
+**Fraud risk.** An order's run starts by reading Shopify's fraud analysis
+(`src/services/riskCheck.js`), from the GraphQL Admin API with the
+`read_orders` scope the app already has (the REST OrderRisk resource is
+deprecated). It's worked out in code, like the stock check:
+- `level`: the worst finished assessment, Shopify's own or a fraud app's
+  (`high`, `medium`, `low`); `none` if nothing rated it; `pending` while one
+  is still running and nothing worse than low is in.
+- `recommendation`: Shopify's advice (`accept`, `investigate`, `cancel`, `none`).
+- `reasons`: the facts that raised the risk (at most 5), as Shopify words them.
+- `billing_matches_shipping`: `false` also when an address is missing (that's
+  how Shopify reports it); `null` when nothing ships. Addresses aren't stored.
+
+High risk or a `cancel` recommendation makes the verdict HOLD: the prompt says
+so, and if the model still says FULFILL the decision is recorded as HOLD with
+the reasons (like the stock check). Medium risk or `investigate` is a HOLD
+unless the seller's notes say how they treat such orders, and addresses that
+don't match are only a bullet on their own (gifts). The check is saved on the
+order (`orders.risk_*`, migration 008).
+
+Shopify's own analysis takes seconds and a fraud app's can take longer, so:
+- while it's `pending`, a run for an order placed under 10 minutes ago goes
+  back on the job queue for a minute (without using one of its tries or
+  counting as an agent run); after that the agent decides without it and says so.
+- each order sync reads it again for open orders from the last 7 days (at
+  most 250, 50 per query). When an order's risk goes up to flagged (high or
+  medium, `cancel` or `investigate`) after the agent had decided on it, the
+  seller gets an alert saying what changed and what the agent had said, once
+  per order (`orders.risk_alerted_at`). An order the agent hasn't run on yet
+  gets none: its run reads the risk itself.
+- an order that never had a check gets one from Shopify when its page is opened.
+
+If Shopify can't be asked, the agent decides without the check and says so.
+`npm run test:risk` checks all of it against a fake Shopify and a fake DeepSeek.
 
 **Learning from the seller's ratings.** Before each run the agent also gets
 the seller's recent ratings of its calls on the same kind of event (orders,
@@ -328,7 +362,8 @@ Run the script again whenever the tunnel URL changes.
 **Scheduled sync.** In case a webhook is missed, every connected store is
 re-synced every `SYNC_INTERVAL_MINUTES` (default 15, `0` = off). Orders
 sync incrementally (only what changed since the last sync), products in full.
-Manual syncs, scheduled syncs and webhooks for one seller run one at a
+Each order sync also reads the fraud check again for recent open orders (see
+"Fraud risk" above). Manual syncs, scheduled syncs and webhooks for one seller run one at a
 time, so an item that goes low is only alerted once.
 
 ## Background jobs
@@ -425,15 +460,20 @@ they're included in data requests.
 
 Endpoints for the dashboard (all need the seller's JWT):
 - `GET /api/orders` - synced orders, newest first, a page at a time: `{ orders, total, limit, offset }`.
-  Each order has `status` (fulfillment), `financial_status` and `latest_decision` (the agent's most
-  recent verdict and reasoning, or null). Query: `limit` (1-200, default 50), `offset`, `status`
+  Each order has `status` (fulfillment), `financial_status`, `latest_decision` (the agent's most
+  recent verdict and reasoning, or null) and `risk` (Shopify's fraud check: `level`,
+  `recommendation`, `reasons`, `billing_matches_shipping`, `checked_at` and `flagged`; null until
+  it's been read). Query: `limit` (1-200, default 50), `offset`, `status`
   (unfulfilled, partial, fulfilled, restocked), `financial_status` (paid, pending, refunded, ...),
   `from` / `to` (a UTC day `YYYY-MM-DD`, whole day included, or an ISO date-time), `number`
   (`#1001` or `1001`, exact), `q` (part of an order number or customer name) and
-  `needs_action=true` (the same rule as the pending list). Filters combine. Bad values get a 400
+  `needs_action=true` (the same rule as the pending list) and `risk=flagged` (high or medium risk,
+  or Shopify advises cancelling or investigating). Filters combine. Bad values get a 400
   saying what's allowed; `total` counts every match.
 - `GET /api/orders/pending` - orders that need action, oldest first: `{ pending_orders, total, limit, offset }`
-- `GET /api/orders/:id` - one order: `{ order, line_items, line_items_note, decisions, shopify_admin_url }`.
+- `GET /api/orders/:id` - one order: `{ order, risk_note, line_items, line_items_note, decisions, shopify_admin_url }`.
+  An order that never had a fraud check gets one from Shopify on its first view; if that can't
+  happen, `order.risk` is null and `risk_note` says why.
   `decisions` is every agent decision about it, newest first, with its rating. Line items are saved from the order
   payloads the sync and webhooks already get (`order_line_items`; product details only, never the
   free-text `properties`). Orders saved before that are fetched from Shopify once, on their first

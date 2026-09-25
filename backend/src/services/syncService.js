@@ -4,6 +4,7 @@ const { MAX_LOOKBACK_DAYS } = require('./restockForecast');
 const { getStoreCredentials, getOrdersSyncedAt, setOrdersSyncedAt, getDefaultThreshold } = require('../models/sellerModel');
 const inventory = require('../models/inventoryModel');
 const { queueAgentRun } = require('./agentService');
+const { refreshRecentRisks } = require('./riskCheck');
 const { withLock } = require('../utils/lock');
 
 // Re-ask for orders changed a little before the last sync, in case our clock
@@ -70,6 +71,15 @@ function syncOrders(sellerId) {
       filled = await backfillLineItems(sellerId, creds);
     } catch (err) {
       console.warn(`[sync seller=${sellerId}] fetching older orders' items failed: ${err.response?.status || err.message}`);
+    }
+
+    // Fraud assessments can come in after the order: read them again for
+    // recent open orders (riskCheck.js). Only logged when it fails, like the above.
+    try {
+      const risks = await refreshRecentRisks(sellerId, creds);
+      if (risks.alerted) console.log(`[sync seller=${sellerId}] fraud risk went up on ${risks.alerted} order(s); the seller was alerted`);
+    } catch (err) {
+      console.warn(`[sync seller=${sellerId}] re-reading fraud risk failed: ${err.response?.status || err.message}`);
     }
 
     const synced = updatedAtMin ? `Synced ${orders.length} new or updated orders` : `Synced ${orders.length} orders`;

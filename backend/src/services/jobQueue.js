@@ -43,6 +43,11 @@ function retryDelaySeconds(attempt) {
   return base * 4 ** (attempt - 1);
 }
 
+// What a handler throws to run again in `seconds`, without it counting as a failed try.
+function runAgainLater(seconds, reason) {
+  return Object.assign(new Error(reason), { deferSeconds: seconds });
+}
+
 // Takes the oldest due job, marking it running, or returns null. SKIP LOCKED
 // lets several slots claim at once without ever getting the same job.
 async function claimNext() {
@@ -93,6 +98,16 @@ async function runJob(job) {
     await withTimeout(handler(job), JOB_TIMEOUT_MS);
     await pool.query("UPDATE jobs SET status = 'done', locked_at = NULL, finished_at = NOW() WHERE id = ?", [job.id]);
   } catch (err) {
+    // Not a failure: the handler asked to run again later (runAgainLater), e.g.
+    // while Shopify's fraud analysis is pending. It doesn't use up a try.
+    if (err.deferSeconds > 0) {
+      await pool.query(
+        "UPDATE jobs SET status = 'queued', attempts = attempts - 1, locked_at = NULL, run_after = NOW() + INTERVAL ? SECOND WHERE id = ?",
+        [err.deferSeconds, job.id]
+      );
+      console.log(`${tag} ${err.message}; running it again in ${err.deferSeconds}s`);
+      return;
+    }
     // An error marked retryable: false (e.g. no API key) won't get better by waiting.
     const giveUp = err.retryable === false || job.attempt >= job.maxAttempts;
     const message = String(err.message || err).slice(0, 1000);
@@ -200,4 +215,4 @@ async function stopWorker(timeoutMs = 25000) {
   return finished;
 }
 
-module.exports = { registerHandler, enqueue, startWorker, stopWorker, retryDelaySeconds, requeueInterrupted, pruneOldRows };
+module.exports = { registerHandler, enqueue, startWorker, stopWorker, retryDelaySeconds, runAgainLater, requeueInterrupted, pruneOldRows };

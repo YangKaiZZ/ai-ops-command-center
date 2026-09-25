@@ -80,4 +80,49 @@ async function ordersMissingLineItems(sellerId, days) {
   return rows.map((row) => row.shopify_order_id);
 }
 
-module.exports = { upsertOrder, lineItemRow, ordersMissingLineItems };
+// --- Fraud risk (services/riskCheck.js) ---
+
+const RISK_COLUMNS = 'risk_level, risk_recommendation, risk_reasons, billing_matches_shipping, risk_checked_at';
+
+// Not yet (fully) shipped, and not refunded or voided: it may still go out.
+const OPEN_WHERE = `status IN ('unfulfilled', 'partial') AND COALESCE(financial_status, '') NOT IN ('refunded', 'voided')`;
+
+// Saves an order's fraud analysis (riskCheck.summarizeRisk()).
+async function saveRisk(sellerId, shopifyOrderId, risk) {
+  await pool.query(
+    `UPDATE orders SET risk_level = ?, risk_recommendation = ?, risk_reasons = ?, billing_matches_shipping = ?, risk_checked_at = NOW()
+     WHERE seller_id = ? AND shopify_order_id = ?`,
+    [risk.level, risk.recommendation, JSON.stringify(risk.reasons), risk.billing_matches_shipping, sellerId, String(shopifyOrderId)]
+  );
+}
+
+// Open orders placed in the last `days`, newest first, with their stored risk
+// and the verdict of the agent's latest decision on each (null if none).
+async function openOrdersForRiskCheck(sellerId, days, limit) {
+  const [rows] = await pool.query(
+    `SELECT o.id, o.shopify_order_id, o.order_number, ${RISK_COLUMNS}, o.risk_alerted_at,
+       (SELECT d.action_taken FROM decisions d WHERE d.seller_id = o.seller_id AND d.order_id = o.id
+        ORDER BY d.created_at DESC, d.id DESC LIMIT 1) AS latest_verdict
+     FROM orders o
+     WHERE o.seller_id = ? AND ${OPEN_WHERE} AND o.order_placed_at >= NOW() - INTERVAL ? DAY
+     ORDER BY o.order_placed_at DESC, o.id DESC
+     LIMIT ?`,
+    [sellerId, days, limit]
+  );
+  return rows;
+}
+
+async function markRiskAlerted(orderId) {
+  await pool.query('UPDATE orders SET risk_alerted_at = NOW() WHERE id = ?', [orderId]);
+}
+
+module.exports = {
+  upsertOrder,
+  lineItemRow,
+  ordersMissingLineItems,
+  saveRisk,
+  openOrdersForRiskCheck,
+  markRiskAlerted,
+  RISK_COLUMNS,
+  OPEN_WHERE,
+};

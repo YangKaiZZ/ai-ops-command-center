@@ -7,8 +7,8 @@ REST API as tools, so an AI model can look at a seller's store and act on it:
 | --- | --- |
 | `get_pending_orders` | Orders that are unpaid or waiting to ship, oldest first (`limit`, `offset`) |
 | `check_low_stock` | Items at or below their low-stock level |
-| `get_all_orders` | Orders newest first, with the agent's verdict; filter by `status`, `financial_status`, `from`/`to` (UTC days); `limit`, `offset` |
-| `get_order` | One order by number (`#1001`), with the agent's latest reasoning |
+| `get_all_orders` | Orders newest first, with the agent's verdict and Shopify's fraud risk level; filter by `status`, `financial_status`, `from`/`to` (UTC days), `flagged_only` (orders the fraud check flagged); `limit`, `offset` |
+| `get_order` | One order by number (`#1001`), with the agent's latest reasoning and Shopify's fraud check (level, recommendation, reasons, whether the billing and shipping addresses match) |
 | `forecast_restock` | When items run out at their current pace and how many to reorder, with the order history that's based on; items needing a reorder by default, or by name (`item`), or `all_items`; `days`, `cover_days`, `limit` |
 | `sync_latest_data` | Pulls the latest orders and stock from Shopify |
 

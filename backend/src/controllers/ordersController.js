@@ -2,11 +2,20 @@ const pool = require('../config/db');
 const orderModel = require('../models/orderModel');
 const sellerModel = require('../models/sellerModel');
 const shopifyService = require('../services/shopifyService');
+const riskCheck = require('../services/riskCheck');
 
 const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
 const FINANCIAL_STATUSES = ['pending', 'authorized', 'partially_paid', 'paid', 'partially_refunded', 'refunded', 'voided', 'expired'];
 const MAX_LIMIT = 200;
-const COLUMNS = 'id, shopify_order_id, order_number, status, financial_status, buyer_name, total_amount, order_placed_at, synced_at';
+const COLUMNS = `id, shopify_order_id, order_number, status, financial_status, buyer_name, total_amount, order_placed_at, synced_at,
+  ${orderModel.RISK_COLUMNS}`;
+
+// An order row as the API returns it: the fraud analysis columns become
+// `risk` (riskCheck.riskFromRow), null until it's been read.
+function withRisk(row) {
+  const { risk_level, risk_recommendation, risk_reasons, billing_matches_shipping, risk_checked_at, ...order } = row;
+  return { ...order, risk: riskCheck.riskFromRow(row) };
+}
 
 // "Needs action": not yet (fully) shipped, or not yet paid; refunded/voided orders are dead.
 const PENDING_WHERE = `(status IN ('unfulfilled', 'partial')
@@ -94,6 +103,10 @@ function parseOrderQuery(query = {}, { defaultLimit = 50, filters = true } = {})
       if (!['true', 'false'].includes(query.needs_action)) return { error: 'needs_action must be true or false' };
       if (query.needs_action === 'true') where.push(`(${PENDING_WHERE})`);
     }
+    if (query.risk !== undefined) {
+      if (query.risk !== 'flagged') return { error: 'risk must be flagged (orders the fraud check flagged)' };
+      where.push(riskCheck.FLAGGED_WHERE);
+    }
   }
   return { limit: limit.value, offset: offset.value, where, params };
 }
@@ -120,10 +133,10 @@ async function pageOfOrders(sellerId, parsed, extraWhere, orderBy) {
     parsed.limit,
     parsed.offset,
   ]);
-  return { orders: rows, total: Number(total) };
+  return { orders: rows.map(withRisk), total: Number(total) };
 }
 
-// GET /api/orders?limit=50&offset=0&status=&financial_status=&from=&to=&number=&q=&needs_action=
+// GET /api/orders?limit=50&offset=0&status=&financial_status=&from=&to=&number=&q=&needs_action=&risk=flagged
 // This seller's orders, newest first, a page at a time, each with the agent's
 // latest decision. `total` counts every order matching the filters.
 async function getOrders(req, res) {
@@ -175,8 +188,8 @@ async function backfillLineItems(sellerId, order) {
 }
 
 // GET /api/orders/:id
-// One order with its line items, every agent decision about it (newest
-// first) and a link to it in the Shopify admin.
+// One order with its fraud check, line items, every agent decision about it
+// (newest first) and a link to it in the Shopify admin.
 async function getOrder(req, res) {
   const id = Number(req.params.id);
   const findOrder = async () =>
@@ -188,6 +201,13 @@ async function getOrder(req, res) {
     if (!order.line_items_synced_at) {
       lineItemsNote = await backfillLineItems(req.sellerId, order);
       if (!lineItemsNote) order = await findOrder(); // statuses may have changed too
+    }
+    // Orders synced before fraud checks were kept get theirs from Shopify, once.
+    let riskNote = null;
+    if (!order.risk_checked_at) {
+      const risk = await riskCheck.checkOrderRisk(req.sellerId, order.shopify_order_id);
+      if (risk.error) riskNote = `No fraud check: ${risk.error}.`;
+      else order = await findOrder();
     }
 
     const [items] = await pool.query(
@@ -203,8 +223,10 @@ async function getOrder(req, res) {
     const [[seller]] = await pool.query('SELECT shopify_shop_domain FROM sellers WHERE id = ?', [req.sellerId]);
 
     const { line_items_synced_at, ...fields } = order;
+    const withRiskFields = withRisk(fields);
     res.json({
-      order: fields,
+      order: withRiskFields,
+      risk_note: withRiskFields.risk ? null : riskNote,
       line_items: line_items_synced_at ? items : null,
       line_items_note: line_items_synced_at ? null : lineItemsNote,
       decisions,

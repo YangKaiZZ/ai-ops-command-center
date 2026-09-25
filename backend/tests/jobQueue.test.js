@@ -23,6 +23,7 @@ test('a queued order keeps what the agent reads and no customer details', () => 
   const order = {
     id: 5550001,
     name: '#1001',
+    created_at: '2026-09-26T10:00:00+08:00',
     financial_status: 'paid',
     total_price: '42.00',
     email: 'buyer@example.com',
@@ -38,6 +39,7 @@ test('a queued order keeps what the agent reads and no customer details', () => 
     order: {
       id: 5550001,
       name: '#1001',
+      created_at: '2026-09-26T10:00:00+08:00',
       financial_status: 'paid',
       total_price: '42.00',
       line_items: [{ variant_id: 11, title: 'Mug', variant_title: 'Blue', quantity: 2 }],

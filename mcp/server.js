@@ -5,7 +5,7 @@ const api = require('./apiClient');
 
 const server = new McpServer({
   name: 'ai-ops-command-center',
-  version: '1.2.0',
+  version: '1.3.0',
 });
 
 const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
@@ -21,9 +21,13 @@ const offsetInput = z
   .describe('How many to skip, for the next page: pass next_offset from the previous result');
 
 // One order, without what a model doesn't need. A list keeps only the verdict
-// of the agent's latest decision; a single order keeps its reasoning too.
+// of the agent's latest decision and the fraud check's level; a single order
+// keeps the reasoning and the fraud check's reasons too.
 function slim(order, withReasoning) {
-  const { synced_at, latest_decision, ...rest } = order;
+  const { synced_at, latest_decision, risk, ...rest } = order;
+  if (risk !== undefined) {
+    rest.risk = risk && !withReasoning ? { level: risk.level, recommendation: risk.recommendation, flagged: risk.flagged } : risk;
+  }
   if (latest_decision === undefined) return rest;
   const decision = latest_decision && {
     verdict: latest_decision.action_taken,
@@ -89,8 +93,9 @@ server.registerTool(
   {
     title: 'Get Orders',
     description:
-      'Returns synced orders, newest first, one page at a time, each with the verdict of the agent\'s latest decision. ' +
-      'Filter by fulfillment status, payment status and date range (UTC days). `total` counts every order that matches, ' +
+      'Returns synced orders, newest first, one page at a time, each with the verdict of the agent\'s latest decision ' +
+      'and Shopify\'s fraud risk (level: high, medium, low, none or pending; null if not read yet). ' +
+      'Filter by fulfillment status, payment status, date range (UTC days) and fraud risk. `total` counts every order that matches, ' +
       'so to answer "how many" use total with limit 1 instead of reading every order. When next_offset is not null there are more.',
     inputSchema: {
       limit: limitInput,
@@ -99,10 +104,15 @@ server.registerTool(
       financial_status: z.enum(FINANCIAL_STATUSES).optional().describe('Only orders with this payment status'),
       from: z.string().regex(DATE, 'use YYYY-MM-DD').optional().describe('Only orders placed on or after this day, YYYY-MM-DD (UTC)'),
       to: z.string().regex(DATE, 'use YYYY-MM-DD').optional().describe('Only orders placed on or before this day, YYYY-MM-DD (UTC)'),
+      flagged_only: z
+        .boolean()
+        .optional()
+        .describe("Only orders Shopify's fraud check flagged: high or medium risk, or it advises cancelling or investigating"),
     },
   },
-  async ({ limit = 20, offset = 0, status, financial_status, from, to }) => {
-    const { data } = await api.get('/api/orders', { params: query({ limit, offset, status, financial_status, from, to }) });
+  async ({ limit = 20, offset = 0, status, financial_status, from, to, flagged_only }) => {
+    const risk = flagged_only ? 'flagged' : undefined;
+    const { data } = await api.get('/api/orders', { params: query({ limit, offset, status, financial_status, from, to, risk }) });
     return { content: [{ type: 'text', text: pageText(data.orders, data.total, offset) }] };
   }
 );
@@ -113,7 +123,9 @@ server.registerTool(
   'get_order',
   {
     title: 'Get Order',
-    description: 'Looks up one order by its number (e.g. "#1001"), with the agent\'s latest decision about it and the reasoning.',
+    description:
+      'Looks up one order by its number (e.g. "#1001"), with the agent\'s latest decision about it and the reasoning, ' +
+      "and Shopify's fraud check: risk level, recommendation, the reasons, and whether the billing and shipping addresses match.",
     inputSchema: {
       order_number: z.string().min(1).max(50).describe('The order number, e.g. "#1001" or "1001"'),
     },

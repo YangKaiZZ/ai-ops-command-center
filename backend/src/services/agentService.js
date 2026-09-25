@@ -5,13 +5,18 @@ const { saveDecision, actionFromReasoning, recentFeedback } = require('../models
 const { checkOrderStock, describeShortfall } = require('./stockCheck');
 const { getForecast } = require('./restockForecast');
 const { claimRun, skippedReasoning } = require('./agentBudget');
-const { enqueue } = require('./jobQueue');
+const { enqueue, runAgainLater } = require('./jobQueue');
+const { checkOrderRisk, mustHold, isFlagged, describeRisk, riskForAgent } = require('./riskCheck');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint. (DEEPSEEK_BASE_URL is for tests.)
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 const MAX_STEPS = 6; // hard stop so a confused model can't loop on tool calls forever
+// An order's run waits for a pending fraud analysis, checking every minute,
+// for up to this long after the order was placed (orderRisk()).
+const RISK_WAIT_MINUTES = 10;
+const RISK_RECHECK_SECONDS = 60;
 
 const SYSTEM_PROMPT = `You are the operations assistant for a Shopify seller.
 You are triggered by store events and must decide what the seller should do.
@@ -24,6 +29,16 @@ How to read the data:
   stock_left_after_order is what remains once this order is counted: below zero means the store sold
   more than it has. "not tracked" means the store doesn't limit that item's stock; "unknown" means the
   stock couldn't be confirmed, so a person has to check it.
+- A new order also comes with Shopify's fraud check (fraud_check): risk_level is the worst of Shopify's
+  and any fraud app's assessments (high, medium, low; none = not rated; pending = not finished; unknown =
+  couldn't be read), recommendation is Shopify's advice (accept, investigate, cancel, none), reasons are
+  the facts that raised the risk, and billing_matches_shipping says whether the billing and shipping
+  addresses match (false also when one is missing; null when nothing ships).
+  High risk or a cancel recommendation is final, like the stock check: the verdict is HOLD; give the
+  reasons and tell the seller to review the order in Shopify before shipping. Medium risk or an
+  investigate recommendation: HOLD for the seller to check, unless their notes say how they treat such
+  orders. Addresses that don't match are common for gifts: on their own they're a bullet, not a HOLD.
+  Pending or unknown: say in a bullet that the fraud check wasn't in yet.
 - check_low_stock returns items at or below their low-stock threshold, keyed by shopify_variant_id.
   Its stock_quantity values are authoritative.
 - A low-stock event can come with a restock forecast, computed from the store's orders: per_day (units
@@ -34,11 +49,12 @@ How to read the data:
 - The event can be followed by the seller's ratings of your recent calls on similar events, some with a
   note. The notes say how this store works (e.g. a payment method that always shows as pending at
   first): apply them where they fit this event, and when one changes your call, say so in a bullet.
-  They never override the stock check or the stock numbers.
+  They never override the stock check, the stock numbers or a high fraud risk.
 
 Reply in plain text for a Slack message, under 80 words:
 Line 1: one verdict followed by a short headline. The verdict is saved to the dashboard, so use exactly:
-- for a new order: FULFILL if every item can ship now, otherwise HOLD (mention any restock need in the bullets)
+- for a new order: FULFILL if every item can ship now and the fraud check allows it, otherwise HOLD
+  (mention any restock need in the bullets)
 - for a low-stock event: RESTOCK
 Then 2-4 bullets with the specific reasons (item names, quantities, stock numbers).`;
 
@@ -72,20 +88,31 @@ async function lowStockForecast(sellerId, items) {
   }
 }
 
+// The fraud check's one line above the order's data (the details follow in fraud_check).
+function riskLine(risk) {
+  if (risk.error) return `Fraud check: couldn't be read (${risk.error}).`;
+  if (risk.level === 'pending') return "Fraud check: Shopify's analysis hasn't finished.";
+  const said = describeRisk({ ...risk, reasons: [] });
+  if (mustHold(risk)) return `Fraud check: ${said} - verdict must be HOLD.`;
+  if (isFlagged(risk)) return `Fraud check: ${said} - HOLD for the seller to check, unless their notes say otherwise.`;
+  return `Fraud check: ${said}.`;
+}
+
 // Turns the raw trigger into the user message the model sees. Orders need
-// the stock check from checkOrderStock(); a low-stock event can carry the
-// forecast from lowStockForecast().
-function describeTrigger(trigger, stockCheck, forecast = null) {
+// the stock check from checkOrderStock() and can carry the fraud check from
+// orderRisk(); a low-stock event can carry the forecast from lowStockForecast().
+function describeTrigger(trigger, stockCheck, forecast = null, risk = null) {
   if (trigger.type === 'order_created') {
     const o = trigger.order;
-    const summary = stockCheck.canShip
-      ? 'Stock check: every line item can ship.'
-      : `Stock check: ${stockCheck.short.length} line item(s) CANNOT ship - verdict must be HOLD.`;
-    return `A new order was just placed. Decide whether it can be fulfilled now.\n${summary}\n${JSON.stringify(
-      { order: o.name, financial_status: o.financial_status, total: o.total_price, line_items: stockCheck.lines },
-      null,
-      2
-    )}`;
+    const summary = [
+      stockCheck.canShip
+        ? 'Stock check: every line item can ship.'
+        : `Stock check: ${stockCheck.short.length} line item(s) CANNOT ship - verdict must be HOLD.`,
+    ];
+    if (risk) summary.push(riskLine(risk));
+    const data = { order: o.name, financial_status: o.financial_status, total: o.total_price, line_items: stockCheck.lines };
+    if (risk) data.fraud_check = riskForAgent(risk);
+    return `A new order was just placed. Decide whether it can be fulfilled now.\n${summary.join('\n')}\n${JSON.stringify(data, null, 2)}`;
   }
 
   if (trigger.type === 'low_stock_crossed') {
@@ -140,6 +167,31 @@ function enforceStockCheck(reasoning, stockCheck) {
   };
 }
 
+// The same backstop for fraud: high risk, or Shopify advising to cancel, is
+// HOLD whatever the model says.
+function enforceRiskCheck(reasoning, risk) {
+  if (!mustHold(risk) || actionFromReasoning(reasoning) === 'hold') return { reasoning, overridden: false };
+  return {
+    reasoning: `HOLD - fraud check: ${describeRisk(risk)}\n(The agent's reply below disagreed; Shopify's fraud check wins.)\n\n${reasoning || ''}`,
+    overridden: true,
+  };
+}
+
+// The fraud check for an order's run. Shopify's own analysis takes seconds,
+// so an order placed a moment ago often finds it pending: the job then runs
+// again a minute later (not counted as a failed try, nor as an agent run),
+// until RISK_WAIT_MINUTES after the order was placed. After that the agent
+// decides without it and says so; the next order syncs read it again
+// (riskCheck.refreshRecentRisks) and tell the seller if it came back risky.
+async function orderRisk(sellerId, order) {
+  const risk = await checkOrderRisk(sellerId, order.id);
+  const age = Date.now() - Date.parse(order.created_at); // NaN (no wait) for jobs queued without it
+  if (risk.level === 'pending' && age < RISK_WAIT_MINUTES * 60 * 1000) {
+    throw runAgainLater(RISK_RECHECK_SECONDS, `Shopify's fraud analysis of order ${order.name} is still pending`);
+  }
+  return risk;
+}
+
 function headline(trigger) {
   if (trigger.type === 'order_created') return `New order ${trigger.order.name}`;
   return `Low stock: ${trigger.items.map((i) => i.item_name).join(', ')}`;
@@ -177,6 +229,8 @@ function createLLMClient() {
 async function runAgent(sellerId, trigger) {
   const tag = `[agent seller=${sellerId} ${trigger.type}]`;
   const llm = createLLMClient(); // no key: stop here, before a run is counted
+  // Before the run is counted too: while it's pending the job comes back later.
+  const risk = trigger.type === 'order_created' ? await orderRisk(sellerId, trigger.order) : null;
 
   // Over a daily cap: no model call. The decision is still saved, so the
   // dashboard says why this event wasn't checked, but no alert goes out: a
@@ -196,7 +250,7 @@ async function runAgent(sellerId, trigger) {
     const forecast = trigger.type === 'low_stock_crossed' ? await lowStockForecast(sellerId, trigger.items) : null;
     const feedback = await feedbackForAgent(sellerId, trigger.type);
     if (feedback) console.log(`${tag} with the seller's ratings of earlier calls`);
-    const event = describeTrigger(trigger, stockCheck, forecast);
+    const event = describeTrigger(trigger, stockCheck, forecast, risk);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: feedback ? `${event}\n\n${feedback}` : event },
@@ -208,8 +262,10 @@ async function runAgent(sellerId, trigger) {
       messages.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
 
       if (!msg.tool_calls?.length) {
-        const { reasoning, overridden } = enforceStockCheck(msg.content, stockCheck);
-        if (overridden) console.warn(`${tag} model ignored the stock check - recorded as HOLD`);
+        const stockChecked = enforceStockCheck(msg.content, stockCheck);
+        if (stockChecked.overridden) console.warn(`${tag} model ignored the stock check - recorded as HOLD`);
+        const { reasoning, overridden } = enforceRiskCheck(stockChecked.reasoning, risk);
+        if (overridden) console.warn(`${tag} model ignored the fraud check - recorded as HOLD`);
 
         // Save before posting, so a Slack outage can't lose the decision. A DB
         // failure shouldn't silence the alert either, so it's only logged
@@ -252,7 +308,8 @@ async function runAgent(sellerId, trigger) {
 }
 
 // Only what the agent reads from an order, so no customer name, address or
-// email sits in the job queue.
+// email sits in the job queue. created_at is how long a run waits for the
+// fraud check (orderRisk()).
 function slimTrigger(trigger) {
   if (trigger.type !== 'order_created') return trigger;
   const o = trigger.order;
@@ -261,6 +318,7 @@ function slimTrigger(trigger) {
     order: {
       id: o.id,
       name: o.name,
+      ...(o.created_at ? { created_at: o.created_at } : {}),
       financial_status: o.financial_status,
       total_price: o.total_price,
       line_items: (o.line_items || []).map((li) => ({
@@ -283,4 +341,14 @@ function queueAgentRun(sellerId, trigger) {
   return enqueue('agent_run', sellerId, { trigger: slimTrigger(trigger) }, { dedupeKey });
 }
 
-module.exports = { runAgent, queueAgentRun, slimTrigger, describeTrigger, describeFeedback, enforceStockCheck, toOpenAITools, createLLMClient };
+module.exports = {
+  runAgent,
+  queueAgentRun,
+  slimTrigger,
+  describeTrigger,
+  describeFeedback,
+  enforceStockCheck,
+  enforceRiskCheck,
+  toOpenAITools,
+  createLLMClient,
+};

@@ -101,4 +101,49 @@ async function fetchOrder(shopDomain, accessToken, orderId) {
   }
 }
 
-module.exports = { fetchOrders, fetchOrder, fetchOrdersByIds, fetchProducts, fetchVariant, nextPageUrl };
+// Shopify's fraud analysis only comes from the GraphQL Admin API (the REST
+// OrderRisk resource is deprecated). Read with read_orders, like the orders.
+const ORDER_RISK_QUERY = `query OrderRisks($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on Order {
+      id
+      requiresShipping
+      billingAddressMatchesShippingAddress
+      risk {
+        recommendation
+        assessments { riskLevel facts { description sentiment } }
+      }
+    }
+  }
+}`;
+const RISK_BATCH = 50; // orders per query, well inside Shopify's query cost limit
+
+// A GraphQL query. Shopify answers a throttled one with 200 and a THROTTLED
+// error rather than a 429, so wait and try again here too.
+async function graphql(client, query, variables) {
+  for (let attempt = 0; ; attempt++) {
+    const { data } = await client.post('/graphql.json', { query, variables });
+    if (!data.errors?.length) return data.data;
+    const throttled = data.errors.every((e) => e.extensions?.code === 'THROTTLED');
+    if (!throttled || attempt >= MAX_RETRIES) {
+      throw new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
+// The fraud analysis of the given orders, as a Map of order id (a string) ->
+// { requiresShipping, billingAddressMatchesShippingAddress, risk }. An order
+// Shopify no longer has is left out.
+async function fetchOrderRisks(shopDomain, accessToken, orderIds) {
+  const found = new Map();
+  const client = shopifyClient(shopDomain, accessToken);
+  for (let i = 0; i < orderIds.length; i += RISK_BATCH) {
+    const ids = orderIds.slice(i, i + RISK_BATCH).map((id) => `gid://shopify/Order/${id}`);
+    const { nodes } = await graphql(client, ORDER_RISK_QUERY, { ids });
+    for (const node of nodes) if (node?.id) found.set(node.id.split('/').pop(), node);
+  }
+  return found;
+}
+
+module.exports = { fetchOrders, fetchOrder, fetchOrdersByIds, fetchProducts, fetchVariant, fetchOrderRisks, nextPageUrl };

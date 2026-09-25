@@ -55,6 +55,7 @@ async function main() {
     fetched.push({ shopDomain, accessToken, orderId });
     return shopifyReply(orderId);
   };
+  shopifyService.fetchOrderRisks = async () => new Map(); // the fraud check is test:risk's; no call to Shopify here
 
   const addSeller = async (name, connected) => {
     const [r] = await pool.query(

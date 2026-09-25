@@ -98,6 +98,7 @@ async function main() {
   let shopifyHas = new Map();
   let byIdFails = false;
   shopifyService.fetchOrders = async () => [];
+  shopifyService.fetchOrderRisks = async () => new Map(); // the sync's fraud re-check is test:risk's
   shopifyService.fetchOrdersByIds = async (shopDomain, accessToken, ids) => {
     byIdCalls.push({ shopDomain, accessToken, ids });
     if (byIdFails) throw new Error('socket hang up');

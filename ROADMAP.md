@@ -9,8 +9,9 @@ listed at the end.
   in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
   and in Slack. Needs write scopes from Shopify, which the app doesn't request
   yet.
-- **Risk triage**: Shopify's fraud risk score and billing/shipping mismatch
-  as reasons to hold.
+- **Faster late fraud results**: subscribe to `orders/risk_assessment_changed`
+  (GraphQL-only; the webhooks are registered through REST today), so a risk
+  that rises after the agent decided is alerted at once, not at the next sync.
 - **In-dashboard chat** using the same tools. Host the MCP server remotely
   with OAuth, so power users paste a URL instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
@@ -61,3 +62,9 @@ listed at the end.
   hours, each named once.
 - Rating decisions from the alert itself: one tap (and a reply for the note)
   in Telegram; a signed, expiring rating page from Slack and email.
+- Risk triage: each order's run reads Shopify's fraud analysis (risk level,
+  recommendation, reasons, whether the billing and shipping addresses match).
+  High risk is a hold the model can't overrule; medium risk is a hold unless
+  the seller's notes say otherwise. A pending check is waited for, recent open
+  orders are checked again at each sync, and a risk that rises after the agent
+  decided is alerted. In the orders API (`?risk=flagged`) and the MCP tools.

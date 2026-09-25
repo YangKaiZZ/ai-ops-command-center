@@ -1,8 +1,8 @@
 const pool = require('../config/db');
 
 // Shopify's mandatory privacy (GDPR) webhooks. What we hold about a store's
-// customers: the buyer's name and totals on synced orders, and whatever the
-// agent wrote about those orders in its decisions.
+// customers: the buyer's name, totals and Shopify's fraud check on synced
+// orders, and whatever the agent wrote about those orders in its decisions.
 
 // A log of every privacy request, with ids only (no personal data), so
 // there's a record of what was asked and done.
@@ -21,7 +21,8 @@ async function customerData(sellerId, shopifyOrderIds) {
   const ids = shopifyOrderIds.map(String);
   if (!ids.length) return { orders: [], decisions: [] };
   const [orders] = await pool.query(
-    `SELECT id, shopify_order_id, order_number, buyer_name, total_amount, status, financial_status, order_placed_at
+    `SELECT id, shopify_order_id, order_number, buyer_name, total_amount, status, financial_status, order_placed_at,
+       risk_level, risk_recommendation, risk_reasons, billing_matches_shipping
      FROM orders WHERE seller_id = ? AND shopify_order_id IN (?)`,
     [sellerId, ids]
   );
@@ -35,8 +36,9 @@ async function customerData(sellerId, shopifyOrderIds) {
 }
 
 // customers/redact: removes the buyer's name from their orders and from any
-// decision text (the agent's or the seller's note) that mentions it. Returns
-// how many orders were redacted.
+// decision text (the agent's or the seller's note) that mentions it, and the
+// fraud check's reasons (they can describe the buyer, e.g. where they ordered
+// from). Returns how many orders were redacted.
 async function redactCustomer(sellerId, shopifyOrderIds) {
   const ids = shopifyOrderIds.map(String);
   if (!ids.length) return 0;
@@ -52,7 +54,7 @@ async function redactCustomer(sellerId, shopifyOrderIds) {
     );
   }
   const [result] = await pool.query(
-    "UPDATE orders SET buyer_name = 'Redacted' WHERE seller_id = ? AND shopify_order_id IN (?)",
+    "UPDATE orders SET buyer_name = 'Redacted', risk_reasons = NULL WHERE seller_id = ? AND shopify_order_id IN (?)",
     [sellerId, ids]
   );
   return result.affectedRows;
