@@ -32,8 +32,13 @@ async function main() {
   const base = `http://localhost:${server.address().port}`;
   const run = crypto.randomBytes(3).toString('hex');
   const used = []; // [limit, value] pairs, to remove their counters at the end
+  // A new address each time: two parts of the test sharing one would share its limits.
+  const handedOut = new Set();
   const ip = () => {
-    const address = `203.0.113.${crypto.randomInt(1, 255)}`;
+    let address;
+    do address = `203.0.113.${crypto.randomInt(1, 255)}`;
+    while (handedOut.has(address));
+    handedOut.add(address);
     for (const limit of Object.values(LIMITS)) used.push([limit, address]);
     return address;
   };
