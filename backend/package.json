@@ -25,7 +25,8 @@
     "test:decision-feedback": "node scripts/test-decision-feedback.js",
     "test:agent-feedback": "node scripts/test-agent-feedback.js",
     "test:reports": "node scripts/test-reports.js",
-    "test:risk": "node scripts/test-risk.js"
+    "test:risk": "node scripts/test-risk.js",
+    "test:actions": "node scripts/test-actions.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

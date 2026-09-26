@@ -137,7 +137,7 @@ async function getSettings(sellerId) {
   const [rows] = await pool.query(
     `SELECT business_name, email, shopify_shop_domain, shopify_scopes, default_low_stock_threshold,
        shopify_access_token IS NOT NULL AS store_connected, slack_webhook_url IS NOT NULL AS slack_connected,
-       alert_email, telegram_chat_id IS NOT NULL AS telegram_connected
+       alert_email, telegram_chat_id IS NOT NULL AS telegram_connected, auto_hold
      FROM sellers WHERE id = ?`,
     [sellerId]
   );
@@ -153,6 +153,12 @@ async function getSettings(sellerId) {
       missing_scopes: connected && seller.shopify_scopes ? oauth.missingScopes(seller.shopify_scopes) : [],
     },
     shopify: { oauth_available: oauth.isConfigured() },
+    // Holding and fulfilling from here (orderActions.js): allowed unless the
+    // store's grant is known to lack it; auto_hold puts the agent's HOLDs on hold.
+    shopify_actions: {
+      allowed: connected && oauth.actionsAllowed(seller.shopify_scopes) !== false,
+      auto_hold: Boolean(seller.auto_hold),
+    },
     inventory: { default_low_stock_threshold: seller.default_low_stock_threshold },
     slack: { connected: Boolean(seller.slack_connected) },
     alertEmail: seller.alert_email,
@@ -164,6 +170,10 @@ async function getSettings(sellerId) {
 async function getDefaultThreshold(sellerId) {
   const [rows] = await pool.query('SELECT default_low_stock_threshold FROM sellers WHERE id = ?', [sellerId]);
   return rows[0]?.default_low_stock_threshold ?? 5;
+}
+
+async function setAutoHold(sellerId, enabled) {
+  await pool.query('UPDATE sellers SET auto_hold = ? WHERE id = ?', [enabled, sellerId]);
 }
 
 async function setDefaultThreshold(sellerId, threshold) {
@@ -193,6 +203,7 @@ module.exports = {
   getSettings,
   getDefaultThreshold,
   setDefaultThreshold,
+  setAutoHold,
   getSlackWebhookUrl,
   setSlackWebhookUrl,
 };

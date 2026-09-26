@@ -1,4 +1,4 @@
-const { getSettings: loadSettings, setSlackWebhookUrl, setDefaultThreshold } = require('../models/sellerModel');
+const { getSettings: loadSettings, setSlackWebhookUrl, setDefaultThreshold, setAutoHold } = require('../models/sellerModel');
 const { setAllThresholds } = require('../models/inventoryModel');
 const { parseThreshold } = require('./inventoryController');
 const { isSlackWebhookUrl } = require('../services/notifier');
@@ -111,6 +111,20 @@ async function setInventoryDefaults(req, res) {
   }
 }
 
+// PUT /api/settings/auto-hold   Body: { enabled: true | false }
+// Whether an order the agent says HOLD is put on hold in Shopify by itself.
+async function setAutoHoldSetting(req, res) {
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be true or false' });
+  try {
+    await setAutoHold(req.sellerId, enabled);
+    res.json({ shopify_actions: { auto_hold: enabled } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not save the auto-hold setting' });
+  }
+}
+
 // GET /api/settings/privacy-requests
 // Customer data requests Shopify forwarded, each with the data we hold for
 // it now, for the seller to pass on to the customer.
@@ -123,4 +137,14 @@ async function privacyRequests(req, res) {
   }
 }
 
-module.exports = { getSettings, setSlack, clearSlack, listKeys, createKey, revokeKey, privacyRequests, setInventoryDefaults };
+module.exports = {
+  getSettings,
+  setSlack,
+  clearSlack,
+  listKeys,
+  createKey,
+  revokeKey,
+  privacyRequests,
+  setInventoryDefaults,
+  setAutoHoldSetting,
+};

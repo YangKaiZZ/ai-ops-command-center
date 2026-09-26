@@ -12,7 +12,7 @@ and the endpoints the dashboard and the MCP server use.
 - `src/middleware/` — JWT/API-key auth (`req.sellerId`), session-only routes, Shopify webhook HMAC check
 - `src/services/` — the agent (`agentService`, `mcpClient`, `stockCheck`, `riskCheck`), restock forecasts (`restockForecast`), Shopify (`shopifyService`, `shopifyOAuth`, `syncService`, `webhookSetup`, `storeConnection`), alerts (`notifier`, `email`, `telegram`), the job queue (`jobQueue`, `jobHandlers`) and the scheduled sync
 - `src/models/` — database access
-- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-risk`, `test-migrations`)
+- `scripts/` — `migrate`, `register-webhooks`, and the integration tests (`test-agent-flow`, `test-onboarding`, `test-alerts`, `test-agent-limit`, `test-jobs`, `test-rate-limits`, `test-password-reset`, `test-order-queries`, `test-order-detail`, `test-risk`, `test-actions`, `test-migrations`)
 - `tests/` — unit tests (`npm test`)
 
 ## Run it locally
@@ -96,7 +96,8 @@ It needs these in `.env`:
 - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`: client ID and secret of your app in the Shopify Dev Dashboard
 - `APP_URL`: this backend's public https URL (an ngrok tunnel while developing)
 - `DASHBOARD_URL`: where the dashboard runs (default `http://localhost:3005`); links in emails and alerts point here
-- `SHOPIFY_SCOPES` (optional): default `read_orders,read_products,read_inventory`
+- `SHOPIFY_SCOPES` (optional): default `read_orders,read_products,read_inventory,write_merchant_managed_fulfillment_orders`
+  (the last one is for holding and fulfilling orders from here; see "Holding and fulfilling in Shopify")
 
 and, in the app's configuration on Shopify:
 - **App URL**: `<APP_URL>/api/shopify/install`. A merchant who installs from Shopify's side lands
@@ -120,6 +121,8 @@ Either way:
 - `DELETE /api/store` disconnects: it uninstalls the app from the store and forgets the token.
   Uninstalling from Shopify's side (`app/uninstalled`) does the same.
 - Changing the store connection needs a signed-in session; API keys can't.
+- A store connected before a scope was added shows it under "Missing permissions" in Settings
+  until it's reconnected (for a pasted token: give the custom app that scope, then reconnect).
 
 Endpoints: `POST /api/shopify/connect` `{ "shop": "my-store" }` returns `{ authorize_url }`;
 `GET /api/shopify/install` and `GET /api/shopify/callback` are Shopify's redirects,
@@ -135,7 +138,7 @@ the app's configuration, set the **compliance webhooks** URL to
 | Topic | What happens |
 | --- | --- |
 | `customers/data_request` | logged; `GET /api/settings/privacy-requests` lists each request with the data we hold for those orders, for the seller to pass on |
-| `customers/redact` | the buyer's name on those orders becomes "Redacted", and is scrubbed from decision text; the fraud check's reasons on those orders are removed (they can describe the buyer) |
+| `customers/redact` | the buyer's name on those orders becomes "Redacted", and is scrubbed from decision text and hold notes; the fraud check's reasons on those orders are removed (they can describe the buyer) |
 | `shop/redact` | (48 h after uninstall) deletes the store's orders, stock, decisions and messages; skipped if the store was connected again. The seller's login stays |
 
 Each request is logged in `privacy_requests` with ids and outcomes only,
@@ -294,6 +297,41 @@ starts it the next day. Days are in the seller's time zone
 `npm run test:reports` checks all of it against a fake mail server and a
 fake Telegram: settings, the summary through the job queue, late orders,
 the rating links and page API, and Telegram's buttons and note replies.
+
+## Holding and fulfilling in Shopify
+The seller can act on an order from its page, and the agent can hold one
+(`src/services/orderActions.js`). Shopify ships an order through its
+fulfillment orders, one per location it ships from; each action is on one of
+them, and Shopify says which each allows right now (`supportedActions`), so
+only possible actions are offered. All of it uses the GraphQL Admin API with
+the `write_merchant_managed_fulfillment_orders` scope; a store connected
+before that scope was asked for gets "Reconnect to allow it" instead.
+- **Hold**: a real Shopify fulfillment hold with a reason (high risk of
+  fraud, out of stock, awaiting payment, incorrect address, other) and an
+  optional note. It shows as on hold in the Shopify admin, and nothing ships
+  until it's released.
+- **Release**: lifts only the holds this app placed (`heldByRequestingApp`);
+  a hold from another app or Shopify Flow stays and is shown as theirs.
+- **Fulfill** marks it shipped, with an optional tracking number, carrier and
+  link, and optionally emails the customer. The order's statuses are read
+  back from Shopify at once.
+- **Auto-hold** (a setting, off by default): when the agent says HOLD, the
+  order is put on hold in Shopify too, with the reason worked out in code
+  (fraud risk, then stock, then a pending payment, else other) and the
+  agent's headline as the note. A fraud risk that rises to high after the
+  agent said FULFILL is held the same way (see "Fraud risk"). The alert says
+  how it went, including why Shopify refused. The agent never fulfills.
+
+Every attempt, the seller's or the agent's, is logged in `order_actions` with
+Shopify's answer and shown on the order's page. Acting needs a dashboard
+sign-in: API keys (Claude Desktop) can read an order's Shopify status but
+not hold or ship. The endpoints are under "Dashboard API" below; settings:
+- `GET /api/settings` includes `shopify_actions: { allowed, auto_hold }`
+  (`allowed` is false when the store's grant is known to lack the scope).
+- `PUT /api/settings/auto-hold` with `{ "enabled": true }` switches auto-hold.
+
+`npm run test:actions` checks all of it against a fake Shopify and a fake
+DeepSeek.
 
 **API keys** let tools like the MCP server in Claude Desktop read a
 seller's data without a sign-in token that expires in 7 days. Keys look
@@ -478,6 +516,19 @@ Endpoints for the dashboard (all need the seller's JWT):
   payloads the sync and webhooks already get (`order_line_items`; product details only, never the
   free-text `properties`). Orders saved before that are fetched from Shopify once, on their first
   view; if that can't happen, `line_items` is null and `line_items_note` says why.
+- `GET /api/orders/:id/shopify` - the order live from Shopify (see "Holding and fulfilling in
+  Shopify"): `{ allowed, note, fulfillment_orders, actions }`. Each fulfillment order has `id`,
+  `status` (open, on_hold, closed, ...), `location`, `holds` (`reason`, `label`, `note`, `ours`),
+  `items` (with `remaining` to ship) and `can_hold` / `can_release` / `can_fulfill`. When nothing
+  can be done (store not connected, permission missing), `allowed` is false and `note` says why.
+  `actions` is what was done from here, newest first, with Shopify's answer.
+- `POST /api/orders/:id/hold` with `{ "fulfillment_order_id", "reason", "note"? }` (`reason`:
+  HIGH_RISK_OF_FRAUD, INVENTORY_OUT_OF_STOCK, AWAITING_PAYMENT, INCORRECT_ADDRESS or OTHER),
+  `POST /api/orders/:id/release` with `{ "fulfillment_order_id" }`, and
+  `POST /api/orders/:id/fulfill` with `{ "fulfillment_order_id", "notify_customer"?,
+  "tracking_number"?, "tracking_company"?, "tracking_url"? }`. Each answers with the state after
+  it; what Shopify won't do now is a 409, Shopify's own refusal a 422 in its words. Signed-in
+  sessions only.
 - `GET /api/overview?from=<ISO date-time>` - the dashboard's key numbers for a period (default the
   last 7 days; `from` at most 31 days back) next to the same length of time before it:
   `{ period, orders, stock, decisions }`. `orders`: `count` and `previous_count` (every order

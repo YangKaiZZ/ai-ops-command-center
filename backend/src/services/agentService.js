@@ -7,6 +7,7 @@ const { getForecast } = require('./restockForecast');
 const { claimRun, skippedReasoning } = require('./agentBudget');
 const { enqueue, runAgainLater } = require('./jobQueue');
 const { checkOrderRisk, mustHold, isFlagged, describeRisk, riskForAgent } = require('./riskCheck');
+const { autoHold } = require('./orderActions');
 
 // DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
 // as-is once it's pointed at their endpoint. (DEEPSEEK_BASE_URL is for tests.)
@@ -192,6 +193,21 @@ async function orderRisk(sellerId, order) {
   return risk;
 }
 
+// Why a HOLD goes on hold in Shopify (auto-hold), as Shopify's hold reason:
+// fraud first, then stock, then payment.
+function holdReason(risk, stockCheck, order) {
+  if (isFlagged(risk)) return 'HIGH_RISK_OF_FRAUD';
+  if (stockCheck && !stockCheck.canShip) return 'INVENTORY_OUT_OF_STOCK';
+  if (['pending', 'partially_paid'].includes(order.financial_status)) return 'AWAITING_PAYMENT';
+  return 'OTHER';
+}
+
+// The verdict line without the verdict, as the hold's note in Shopify.
+function holdNote(reasoning) {
+  const first = (reasoning || '').trim().split('\n')[0];
+  return first.replace(/^\**HOLD\**\s*[-–—:]*\s*/i, '').slice(0, 255) || null;
+}
+
 function headline(trigger) {
   if (trigger.type === 'order_created') return `New order ${trigger.order.name}`;
   return `Low stock: ${trigger.items.map((i) => i.item_name).join(', ')}`;
@@ -279,7 +295,15 @@ async function runAgent(sellerId, trigger) {
           console.error(`${tag} could not save decision: ${err.message}`);
         }
 
-        const decision = `*${headline(trigger)}*\n${reasoning}`;
+        // With the seller's auto-hold on, a HOLD is also put on hold in
+        // Shopify, and the alert says how that went (autoHold never throws).
+        const holdLine =
+          trigger.type === 'order_created' && actionFromReasoning(reasoning) === 'hold'
+            ? await autoHold(sellerId, trigger.order.id, { reason: holdReason(risk, stockCheck, trigger.order), note: holdNote(reasoning) })
+            : null;
+        if (holdLine) console.log(`${tag} ${holdLine}`);
+
+        const decision = `*${headline(trigger)}*\n${reasoning}${holdLine ? `\n\n${holdLine}` : ''}`;
         await postDecision(sellerId, decision, { decisionId });
         return decision;
       }
@@ -349,6 +373,8 @@ module.exports = {
   describeFeedback,
   enforceStockCheck,
   enforceRiskCheck,
+  holdReason,
+  holdNote,
   toOpenAITools,
   createLLMClient,
 };

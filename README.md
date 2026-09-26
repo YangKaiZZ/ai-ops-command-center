@@ -29,6 +29,12 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   unless the seller's notes say otherwise. A run waits up to 10 minutes for a
   pending analysis, and each sync reads it again for recent open orders: if
   an order's risk goes up after the agent decided, the seller gets an alert.
+- **Hold and fulfill in Shopify.** From an order's page the seller puts it on
+  a real Shopify hold (with a reason), releases it, or marks it shipped with
+  a tracking number and an email to the customer. With auto-hold switched on,
+  the agent's *hold* becomes a Shopify hold by itself (it never ships
+  anything). Only what Shopify allows right now is offered, only this app's
+  own holds are released, and every attempt is logged with Shopify's answer.
 - **Low-stock watch.** Every item has its own low-stock level. When stock
   drops to or below it (by webhook, scheduled sync or manual sync), the agent
   recommends what to restock and flags pending orders at risk.
@@ -95,7 +101,7 @@ from their own dashboard.
   URLs are encrypted with AES-256-GCM. The server won't start without a real
   `JWT_SECRET` and `ENCRYPTION_KEY`.
 - **API keys** are stored only as SHA-256 hashes, can be revoked, and can't
-  change settings or create more keys.
+  change settings, create more keys, or hold and ship orders.
 - **Shopify requests are verified**: webhooks by HMAC over the raw body;
   OAuth redirects by HMAC, a one-time `state` and a timestamp.
 - **Sign-up can be invite-only**: set `SIGNUP_INVITE_CODE` and creating an
@@ -147,7 +153,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 113 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, fraud risk, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links |
+| backend | `npm test` | 123 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
@@ -163,6 +169,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake DeepSeek: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
 | backend | `npm run test:reports` | the daily summary through the job queue, late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
+| backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 

@@ -5,10 +5,12 @@ listed at the end.
 
 ## Write actions
 
-- **Approve and Hold that act, not just advise.** Approve fulfills the order
-  in Shopify; Hold tags it and emails the customer. Buttons in the dashboard
-  and in Slack. Needs write scopes from Shopify, which the app doesn't request
-  yet.
+- **Hold and fulfill from the alert itself**: "Hold in Shopify" and "Fulfill"
+  in email, Slack and Telegram alerts, each opening a signed confirm page
+  like the rating page (Telegram: buttons in the chat).
+- **A current Shopify API version**: the app asks for `2024-10`, which
+  Shopify has retired, so it's answered by the oldest version still
+  supported. Pin a current one and re-test the sync against it.
 - **Faster late fraud results**: subscribe to `orders/risk_assessment_changed`
   (GraphQL-only; the webhooks are registered through REST today), so a risk
   that rises after the agent decided is alerted at once, not at the next sync.
@@ -70,3 +72,9 @@ listed at the end.
   decided is alerted. On the Orders page (a risk badge and a "Flagged for
   fraud" filter), each order's page, the orders API (`?risk=flagged`) and the
   MCP tools.
+- Hold and fulfill in Shopify: real Shopify holds with a reason, released
+  only when this app placed them, and fulfillments with tracking and an
+  optional email to the customer, offered only when Shopify allows them now.
+  Auto-hold (a setting, off by default) turns the agent's HOLD into a Shopify
+  hold, and holds a fraud risk that rises after a FULFILL; the alert says how
+  it went. Every attempt is logged with Shopify's answer; API keys can't act.

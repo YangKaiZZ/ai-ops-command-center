@@ -11,6 +11,7 @@ const {
   revokeKey,
   privacyRequests,
   setInventoryDefaults,
+  setAutoHoldSetting,
 } = require('../controllers/settingsController');
 const alerts = require('../controllers/alertsController');
 const reports = require('../controllers/reportsController');
@@ -24,6 +25,7 @@ router.post('/api-keys', createKey);
 router.delete('/api-keys/:id', revokeKey);
 router.get('/privacy-requests', privacyRequests);
 router.put('/inventory', setInventoryDefaults);
+router.put('/auto-hold', setAutoHoldSetting);
 router.put('/email', alerts.startEmail);
 router.post('/email/verify', alerts.verifyEmail);
 router.delete('/email', alerts.removeEmail);

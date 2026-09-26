@@ -119,17 +119,30 @@ const ORDER_RISK_QUERY = `query OrderRisks($ids: [ID!]!) {
 const RISK_BATCH = 50; // orders per query, well inside Shopify's query cost limit
 
 // A GraphQL query. Shopify answers a throttled one with 200 and a THROTTLED
-// error rather than a 429, so wait and try again here too.
+// error rather than a 429, so wait and try again here too. A missing scope
+// comes back as ACCESS_DENIED: the error then has accessDenied set.
 async function graphql(client, query, variables) {
   for (let attempt = 0; ; attempt++) {
     const { data } = await client.post('/graphql.json', { query, variables });
     if (!data.errors?.length) return data.data;
     const throttled = data.errors.every((e) => e.extensions?.code === 'THROTTLED');
     if (!throttled || attempt >= MAX_RETRIES) {
-      throw new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`);
+      throw Object.assign(new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`), {
+        accessDenied: data.errors.some((e) => e.extensions?.code === 'ACCESS_DENIED'),
+      });
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
+}
+
+// A mutation's answer, or throws with Shopify's own words when it refused
+// (userErrors, e.g. "The fulfillment order is on hold"): err.userError is set.
+async function mutate(client, mutation, variables, field) {
+  const result = (await graphql(client, mutation, variables))[field];
+  if (result.userErrors?.length) {
+    throw Object.assign(new Error(result.userErrors.map((e) => e.message).join('; ')), { userError: true });
+  }
+  return result;
 }
 
 // The fraud analysis of the given orders, as a Map of order id (a string) ->
@@ -146,4 +159,102 @@ async function fetchOrderRisks(shopDomain, accessToken, orderIds) {
   return found;
 }
 
-module.exports = { fetchOrders, fetchOrder, fetchOrdersByIds, fetchProducts, fetchVariant, fetchOrderRisks, nextPageUrl };
+// --- Holding and fulfilling (services/orderActions.js) ---
+// Shopify ships an order through its fulfillment orders: one per location the
+// items ship from. Each says what can be done with it now (supportedActions)
+// and carries its holds. These need write_merchant_managed_fulfillment_orders.
+
+const gid = (type, id) => `gid://shopify/${type}/${id}`;
+const numericId = (value) => String(value).split('/').pop();
+
+const FULFILLMENT_ORDERS_QUERY = `query FulfillmentOrders($id: ID!) {
+  order(id: $id) {
+    fulfillmentOrders(first: 20) {
+      nodes {
+        id
+        status
+        assignedLocation { name }
+        supportedActions { action }
+        fulfillmentHolds { id reason reasonNotes displayReason heldByRequestingApp }
+        lineItems(first: 50) {
+          nodes { remainingQuantity totalQuantity lineItem { title variantTitle sku } }
+        }
+      }
+    }
+  }
+}`;
+
+// The order's fulfillment orders as Shopify returns them (ids as numbers in
+// strings), or null if Shopify no longer has the order.
+async function fetchFulfillmentOrders(shopDomain, accessToken, orderId) {
+  const { order } = await graphql(shopifyClient(shopDomain, accessToken), FULFILLMENT_ORDERS_QUERY, { id: gid('Order', orderId) });
+  if (!order) return null;
+  return order.fulfillmentOrders.nodes.map((fo) => ({
+    ...fo,
+    id: numericId(fo.id),
+    fulfillmentHolds: fo.fulfillmentHolds.map((hold) => ({ ...hold, id: numericId(hold.id) })),
+  }));
+}
+
+const HOLD_MUTATION = `mutation Hold($id: ID!, $hold: FulfillmentOrderHoldInput!) {
+  fulfillmentOrderHold(id: $id, fulfillmentHold: $hold) {
+    fulfillmentHold { id }
+    userErrors { field message }
+  }
+}`;
+
+// Puts one fulfillment order on hold: { reason (FulfillmentHoldReason), reasonNotes, handle }.
+async function holdFulfillmentOrder(shopDomain, accessToken, fulfillmentOrderId, { reason, reasonNotes, handle }) {
+  const hold = { reason, reasonNotes, handle, notifyMerchant: false };
+  const result = await mutate(shopifyClient(shopDomain, accessToken), HOLD_MUTATION, { id: gid('FulfillmentOrder', fulfillmentOrderId), hold }, 'fulfillmentOrderHold');
+  return { holdId: result.fulfillmentHold ? numericId(result.fulfillmentHold.id) : null };
+}
+
+const RELEASE_MUTATION = `mutation Release($id: ID!, $holdIds: [ID!]) {
+  fulfillmentOrderReleaseHold(id: $id, holdIds: $holdIds) {
+    fulfillmentOrder { id status }
+    userErrors { field message }
+  }
+}`;
+
+// Releases the given holds (only these: other apps' holds stay).
+async function releaseFulfillmentHolds(shopDomain, accessToken, fulfillmentOrderId, holdIds) {
+  const variables = { id: gid('FulfillmentOrder', fulfillmentOrderId), holdIds: holdIds.map((id) => gid('FulfillmentHold', id)) };
+  const result = await mutate(shopifyClient(shopDomain, accessToken), RELEASE_MUTATION, variables, 'fulfillmentOrderReleaseHold');
+  return { status: result.fulfillmentOrder?.status ?? null };
+}
+
+// fulfillmentCreate, not fulfillmentCreateV2: Shopify deprecated V2, and a
+// request for a retired API version is answered by a newer one anyway.
+const FULFILL_MUTATION = `mutation Fulfill($fulfillment: FulfillmentInput!) {
+  fulfillmentCreate(fulfillment: $fulfillment) {
+    fulfillment { id status }
+    userErrors { field message }
+  }
+}`;
+
+// Ships everything still to ship in one fulfillment order:
+// { notifyCustomer, tracking: { number, company, url } | null }.
+async function createFulfillment(shopDomain, accessToken, fulfillmentOrderId, { notifyCustomer, tracking }) {
+  const fulfillment = {
+    lineItemsByFulfillmentOrder: [{ fulfillmentOrderId: gid('FulfillmentOrder', fulfillmentOrderId) }],
+    notifyCustomer,
+    ...(tracking ? { trackingInfo: tracking } : {}),
+  };
+  const result = await mutate(shopifyClient(shopDomain, accessToken), FULFILL_MUTATION, { fulfillment }, 'fulfillmentCreate');
+  return { fulfillmentId: result.fulfillment ? numericId(result.fulfillment.id) : null };
+}
+
+module.exports = {
+  fetchOrders,
+  fetchOrder,
+  fetchOrdersByIds,
+  fetchProducts,
+  fetchVariant,
+  fetchOrderRisks,
+  fetchFulfillmentOrders,
+  holdFulfillmentOrder,
+  releaseFulfillmentHolds,
+  createFulfillment,
+  nextPageUrl,
+};

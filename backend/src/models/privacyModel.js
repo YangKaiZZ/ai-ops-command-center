@@ -19,26 +19,32 @@ async function recordPrivacyRequest(sellerId, topic, shopDomain, details) {
 // to pass on. Computed when asked, so it's never a stale copy.
 async function customerData(sellerId, shopifyOrderIds) {
   const ids = shopifyOrderIds.map(String);
-  if (!ids.length) return { orders: [], decisions: [] };
+  if (!ids.length) return { orders: [], decisions: [], shopify_actions: [] };
   const [orders] = await pool.query(
     `SELECT id, shopify_order_id, order_number, buyer_name, total_amount, status, financial_status, order_placed_at,
        risk_level, risk_recommendation, risk_reasons, billing_matches_shipping
      FROM orders WHERE seller_id = ? AND shopify_order_id IN (?)`,
     [sellerId, ids]
   );
-  const [decisions] = orders.length
-    ? await pool.query(
-        'SELECT order_number, action_taken, reasoning, created_at, feedback_note FROM decisions WHERE seller_id = ? AND order_id IN (?)',
-        [sellerId, orders.map((o) => o.id)]
-      )
-    : [[]];
-  return { orders: orders.map(({ id, ...o }) => o), decisions };
+  if (!orders.length) return { orders: [], decisions: [], shopify_actions: [] };
+  const orderIds = orders.map((o) => o.id);
+  const [decisions] = await pool.query(
+    'SELECT order_number, action_taken, reasoning, created_at, feedback_note FROM decisions WHERE seller_id = ? AND order_id IN (?)',
+    [sellerId, orderIds]
+  );
+  // Holds and fulfillments done from here: a hold's note, a tracking number.
+  const [actions] = await pool.query(
+    `SELECT o.order_number, a.action, a.reason, a.note, a.created_at FROM order_actions a JOIN orders o ON o.id = a.order_id
+     WHERE a.seller_id = ? AND a.order_id IN (?) AND a.ok`,
+    [sellerId, orderIds]
+  );
+  return { orders: orders.map(({ id, ...o }) => o), decisions, shopify_actions: actions };
 }
 
 // customers/redact: removes the buyer's name from their orders and from any
-// decision text (the agent's or the seller's note) that mentions it, and the
-// fraud check's reasons (they can describe the buyer, e.g. where they ordered
-// from). Returns how many orders were redacted.
+// text that mentions it (the agent's decisions, the seller's notes, hold
+// notes), and the fraud check's reasons (they can describe the buyer, e.g.
+// where they ordered from). Returns how many orders were redacted.
 async function redactCustomer(sellerId, shopifyOrderIds) {
   const ids = shopifyOrderIds.map(String);
   if (!ids.length) return 0;
@@ -52,6 +58,7 @@ async function redactCustomer(sellerId, shopifyOrderIds) {
       "UPDATE decisions SET reasoning = REPLACE(reasoning, ?, '[redacted]'), feedback_note = REPLACE(feedback_note, ?, '[redacted]') WHERE seller_id = ?",
       [name, name, sellerId]
     );
+    await pool.query("UPDATE order_actions SET note = REPLACE(note, ?, '[redacted]') WHERE seller_id = ?", [name, sellerId]);
   }
   const [result] = await pool.query(
     "UPDATE orders SET buyer_name = 'Redacted', risk_reasons = NULL WHERE seller_id = ? AND shopify_order_id IN (?)",

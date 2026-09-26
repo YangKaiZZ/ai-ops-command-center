@@ -4,7 +4,10 @@ const axios = require('axios');
 // Shopify's OAuth (authorization code grant) for "Connect with Shopify".
 // https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant
 
-const DEFAULT_SCOPES = 'read_orders,read_products,read_inventory';
+// write_merchant_managed_fulfillment_orders: holding and fulfilling orders
+// from here (orderActions.js). A store connected before it was asked for
+// shows it as missing in Settings until it's reconnected.
+const DEFAULT_SCOPES = 'read_orders,read_products,read_inventory,write_merchant_managed_fulfillment_orders';
 const MAX_REQUEST_AGE_S = 60 * 60; // install/callback links older than this are refused
 
 function config() {
@@ -126,6 +129,16 @@ function missingScopes(granted, required = config().scopes) {
     .filter((scope) => !have.has(scope) && !(scope.startsWith('read_') && have.has(`write_${scope.slice(5)}`)));
 }
 
+// What holding and fulfilling orders from here needs (orderActions.js).
+const ACTION_SCOPE = 'write_merchant_managed_fulfillment_orders';
+
+// Whether a grant allows those actions: null when we don't know what the
+// store granted (Shopify then says so, if it doesn't).
+function actionsAllowed(granted) {
+  if (!granted) return null;
+  return missingScopes(granted, ACTION_SCOPE).length === 0;
+}
+
 // Uninstalls the app from the store (Shopify then sends app/uninstalled).
 async function revokeAccess(shop, accessToken) {
   await axios.delete(`https://${shop}/admin/api_permissions/current.json`, {
@@ -146,5 +159,7 @@ module.exports = {
   refreshAccessToken,
   fetchGrantedScopes,
   missingScopes,
+  ACTION_SCOPE,
+  actionsAllowed,
   revokeAccess,
 };

@@ -3,6 +3,7 @@ const sellerModel = require('../models/sellerModel');
 const shopifyService = require('./shopifyService');
 const { postDecision } = require('./notifier');
 const { dashboardUrl } = require('./ratingLinks');
+const { autoHold } = require('./orderActions');
 
 // Shopify's fraud analysis of an order, read in code like the stock check
 // (stockCheck.js) so the agent gets it as facts, and kept on the order for
@@ -145,8 +146,9 @@ const VERDICT_NOTE = {
   hold: 'The agent already said HOLD for other reasons: check this too before you ship it.',
 };
 
-// The alert for an order whose risk went up after the agent decided.
-function formatRiskAlert(order, risk) {
+// The alert for an order whose risk went up after the agent decided, with
+// how auto-hold went when it held the order (orderActions.autoHold).
+function formatRiskAlert(order, risk, holdLine = null) {
   const lines = [
     `*Fraud risk: order ${order.order_number ?? order.shopify_order_id}*`,
     `Shopify now ${riskPhrase(risk)}.`,
@@ -154,6 +156,7 @@ function formatRiskAlert(order, risk) {
     ...risk.reasons.map((reason) => `- ${reason}`),
   ];
   if (risk.billing_matches_shipping === false) lines.push("- The billing address doesn't match the shipping address (or one is missing)");
+  if (holdLine) lines.push(holdLine);
   lines.push(`Review it: ${dashboardUrl()}/orders/${order.id}`);
   return lines.join('\n');
 }
@@ -180,7 +183,12 @@ async function refreshRecentRisks(sellerId, creds) {
     await orderModel.saveRisk(sellerId, row.shopify_order_id, risk);
     checked++;
     if (row.latest_verdict && !row.risk_alerted_at && isFlagged(risk) && !isFlagged(riskFromRow(row))) {
-      await postDecision(sellerId, formatRiskAlert(row, risk));
+      // High risk (or "cancel") is a HOLD the agent would have made: with
+      // auto-hold on, it's put on hold in Shopify too.
+      const holdLine = mustHold(risk)
+        ? await autoHold(sellerId, row.shopify_order_id, { reason: 'HIGH_RISK_OF_FRAUD', note: describeRisk(risk).slice(0, 255) })
+        : null;
+      await postDecision(sellerId, formatRiskAlert(row, risk, holdLine));
       await orderModel.markRiskAlerted(row.id);
       alerted++;
     }

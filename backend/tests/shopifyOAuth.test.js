@@ -66,6 +66,24 @@ test('reports missing scopes; write_x covers read_x', () => {
   assert.deepEqual(oauth.missingScopes(''), ['read_orders', 'read_products', 'read_inventory']);
 });
 
+test('by default the app asks to read orders, products and stock, and to hold and fulfill orders', () => {
+  const configured = process.env.SHOPIFY_SCOPES;
+  delete process.env.SHOPIFY_SCOPES;
+  try {
+    assert.equal(oauth.config().scopes, 'read_orders,read_products,read_inventory,write_merchant_managed_fulfillment_orders');
+  } finally {
+    process.env.SHOPIFY_SCOPES = configured;
+  }
+});
+
+test('holding and fulfilling need write_merchant_managed_fulfillment_orders; unknown grants are left to Shopify', () => {
+  assert.equal(oauth.actionsAllowed('read_orders,write_merchant_managed_fulfillment_orders'), true);
+  assert.equal(oauth.actionsAllowed('read_orders,read_merchant_managed_fulfillment_orders'), false);
+  assert.equal(oauth.actionsAllowed('read_orders,read_products,read_inventory'), false);
+  assert.equal(oauth.actionsAllowed(null), null);
+  assert.equal(oauth.actionsAllowed(''), null);
+});
+
 test('token responses become stored tokens with an absolute expiry', () => {
   const now = Date.parse('2026-09-25T12:00:00Z');
   const token = oauth.tokenFromResponse(
