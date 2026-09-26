@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "eslint",
-    "test": "node --test tests/format.test.mjs tests/orderFilters.test.mjs tests/overview.test.mjs tests/feedback.test.mjs tests/reports.test.mjs tests/risk.test.mjs"
+    "test": "node --test tests/format.test.mjs tests/orderFilters.test.mjs tests/overview.test.mjs tests/feedback.test.mjs tests/reports.test.mjs tests/risk.test.mjs tests/shopifyActions.test.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

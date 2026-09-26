@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { DecisionFeedback } from "@/components/DecisionFeedback";
 import { canRate } from "@/lib/feedback";
@@ -6,11 +7,20 @@ import type { Decision, SavedFeedback } from "@/lib/types";
 
 type CardDecision = Pick<Decision, "id" | "action_taken" | "reasoning" | "created_at" | "feedback" | "feedback_note" | "feedback_at"> & {
   order_number?: string | null;
+  order_id?: number | null;
+};
+
+// What to do about a verdict in Shopify, from the order's page.
+const ACT_IN_SHOPIFY: Partial<Record<Decision["action_taken"], string>> = {
+  fulfill: "Mark fulfilled in Shopify",
+  hold: "Put on hold in Shopify",
 };
 
 // One agent decision: verdict, what it was about, when, the reasoning, and
-// the seller's rating of it (a skipped run has nothing to rate).
-// On an order's own page the order is already known, so `title` can say something else.
+// the seller's rating of it (a skipped run has nothing to rate). With the
+// order's id, the heading links to the order and a HOLD or FULFILL links to
+// acting on it there. On an order's own page the order is already known, so
+// `title` can say something else.
 export function DecisionCard({
   decision,
   title,
@@ -24,12 +34,21 @@ export function DecisionCard({
   const { headline, blocks } = parseReasoning(decision.reasoning);
   const created = new Date(decision.created_at);
   const heading = title ?? (decision.order_number ? `Order ${decision.order_number}` : "Low-stock alert");
+  const orderHref = !title && decision.order_id ? `/orders/${decision.order_id}` : null;
+  const act = orderHref ? ACT_IN_SHOPIFY[decision.action_taken] : undefined;
 
   return (
     <li className="grid gap-1.5 rounded-lg border border-hairline px-3.5 py-3" data-decision={decision.id}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge label={action.label} tone={action.tone} icon={action.icon} />
-        {heading && <span className="font-semibold">{heading}</span>}
+        {heading &&
+          (orderHref ? (
+            <Link href={orderHref} className="font-semibold text-accent hover:underline focus-visible:underline">
+              {heading}
+            </Link>
+          ) : (
+            <span className="font-semibold">{heading}</span>
+          ))}
         <time className="ml-auto text-sm text-ink-2" dateTime={created.toISOString()} title={created.toLocaleString()}>
           {timeAgo(decision.created_at)}
         </time>
@@ -48,6 +67,11 @@ export function DecisionCard({
           )
         )}
       </div>
+      {act && (
+        <Link href={`${orderHref}#in-shopify`} className="w-fit text-sm font-medium text-accent hover:underline focus-visible:underline">
+          {act} →
+        </Link>
+      )}
       {canRate(decision.action_taken) && <DecisionFeedback decision={decision} onSaved={onFeedbackSaved} />}
     </li>
   );

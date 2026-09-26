@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Panel } from "@/components/Panel";
-import { inputClass, Note, primaryButton, secondaryButton, type Message } from "@/components/ui";
+import { inputClass, Note, primaryButton, secondaryButton, Subhead, type Message } from "@/components/ui";
+import { scopeUses } from "@/lib/shopifyActions";
 import { jsonBody, useApi } from "@/lib/useApi";
 import type { Settings } from "@/lib/types";
 
 // Connect with Shopify (approve on Shopify, come back here), or paste an Admin
-// API token from a custom app. Also shows missing permissions and disconnects.
+// API token from a custom app. Also shows missing permissions, the auto-hold
+// switch, and disconnects.
 export function StoreSection({
   settings,
   onChange,
@@ -26,6 +28,25 @@ export function StoreSection({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(flash);
+  const [holdMessage, setHoldMessage] = useState<Message>(null);
+
+  // Saved as soon as it's switched.
+  async function setAutoHold(enabled: boolean) {
+    setBusy(true);
+    setHoldMessage(null);
+    try {
+      await call("/api/settings/auto-hold", { method: "PUT", ...jsonBody({ enabled }) });
+      setHoldMessage({
+        text: enabled ? "On: the agent's HOLD now puts the order on hold in Shopify." : "Off: the agent's HOLD is advice only.",
+        isError: false,
+      });
+      await onChange();
+    } catch (err) {
+      setHoldMessage({ text: (err as Error).message, isError: true });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Off to Shopify's approval page; Shopify sends the seller back to Settings.
   async function connectWithShopify(shopAddress: string) {
@@ -93,8 +114,10 @@ export function StoreSection({
                 <span className="font-mono text-xs">{store.missing_scopes.join(", ")}</span>
               </div>
               <p className="text-ink-2">
-                Without these, some data (like stock levels) can&rsquo;t be read.
-                {shopify.oauth_available ? " Reconnect to grant them." : " Give the app these permissions in Shopify, then reconnect."}
+                Without {store.missing_scopes.length === 1 ? "it" : "these"}, {scopeUses(store.missing_scopes)} can&rsquo;t work.
+                {shopify.oauth_available
+                  ? ` Reconnect to grant ${store.missing_scopes.length === 1 ? "it" : "them"}.`
+                  : ` Give the app ${store.missing_scopes.length === 1 ? "this permission" : "these permissions"} in Shopify, then reconnect.`}
               </p>
               {shopify.oauth_available && (
                 <div>
@@ -105,6 +128,30 @@ export function StoreSection({
               )}
             </div>
           )}
+          <div className="grid gap-2 border-t border-hairline pt-3 text-sm">
+            <Subhead>Holding and fulfilling</Subhead>
+            <p className="text-ink-2">
+              Each order&rsquo;s page can put it on hold in Shopify, release that hold, or mark it fulfilled.
+              {settings.shopify_actions.allowed ? "" : " Your store hasn't allowed this yet: reconnect it (above) to allow it."}
+            </p>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={settings.shopify_actions.auto_hold}
+                onChange={(e) => setAutoHold(e.target.checked)}
+                disabled={busy || !settings.shopify_actions.allowed}
+                className="mt-0.5 size-4 accent-accent"
+              />
+              <span>
+                When the agent says HOLD, put the order on hold in Shopify
+                <span className="block text-xs text-ink-2">
+                  With the reason (fraud risk, out of stock, awaiting payment). The alert says it did. The agent never marks anything
+                  fulfilled.
+                </span>
+              </span>
+            </label>
+            <Note message={holdMessage} />
+          </div>
           <div>
             <button type="button" onClick={disconnect} disabled={busy} className={secondaryButton}>
               Disconnect store
@@ -149,7 +196,10 @@ export function StoreSection({
                 {busy ? "Opening Shopify…" : "Connect with Shopify"}
               </button>
             </div>
-            <p className="text-xs text-ink-2">You&rsquo;ll approve read-only access to orders, products and stock on Shopify.</p>
+            <p className="text-xs text-ink-2">
+              You&rsquo;ll approve access on Shopify to read orders, products and stock, and to hold and fulfill orders when you ask
+              (or the agent holds one, if you switch that on).
+            </p>
           </form>
         ) : (
           <p className="text-sm text-ink-2">
@@ -162,7 +212,8 @@ export function StoreSection({
           <form onSubmit={connectWithToken} className="mt-3 grid gap-2">
             <p className="text-xs text-ink-2">
               For a custom app made in your store&rsquo;s admin (Settings › Apps › Develop apps) with read access to
-              orders, products and inventory.
+              orders, products and inventory. To hold and fulfill orders from here, also give it write access to
+              merchant-managed fulfillment orders.
             </p>
             <label className="grid gap-1 text-sm font-medium">
               Store address

@@ -78,3 +78,5 @@ listed at the end.
   Auto-hold (a setting, off by default) turns the agent's HOLD into a Shopify
   hold, and holds a fraud risk that rises after a FULFILL; the alert says how
   it went. Every attempt is logged with Shopify's answer; API keys can't act.
+  In the dashboard: an "In Shopify" panel on each order's page, links from
+  HOLD and FULFILL decision cards, and the auto-hold switch in Settings.

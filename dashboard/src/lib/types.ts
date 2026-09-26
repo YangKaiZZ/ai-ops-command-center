@@ -44,6 +44,41 @@ export type OrderDetail = {
   shopify_admin_url: string | null;
 };
 
+// Shopify's reasons for a fulfillment hold, as the API takes them.
+export type HoldReason = "HIGH_RISK_OF_FRAUD" | "INVENTORY_OUT_OF_STOCK" | "AWAITING_PAYMENT" | "INCORRECT_ADDRESS" | "OTHER";
+
+// GET /api/orders/:id/shopify: one of the order's fulfillment orders (one per
+// location it ships from), live from Shopify, with what Shopify allows now.
+export type FulfillmentOrderView = {
+  id: string;
+  status: string; // open, scheduled, on_hold, in_progress, closed, cancelled, incomplete
+  location: string | null;
+  holds: { reason: string; label: string; note: string | null; ours: boolean }[]; // ours: placed from here
+  items: { title: string; variant_title: string | null; sku: string | null; quantity: number; remaining: number }[];
+  can_hold: boolean;
+  can_release: boolean;
+  can_fulfill: boolean;
+};
+
+// A hold, release or fulfillment tried from here, and whether Shopify took it.
+export type OrderAction = {
+  action: "hold" | "release" | "fulfill";
+  source: "seller" | "agent";
+  fulfillment_order_id: string | null;
+  reason: string | null;
+  note: string | null; // a hold's note, or a fulfillment's tracking number
+  ok: boolean;
+  error: string | null;
+  created_at: string;
+};
+
+export type ShopifyState = {
+  allowed: boolean; // false: nothing can be done from here, and `note` says why
+  note: string | null;
+  fulfillment_orders: FulfillmentOrderView[] | null;
+  actions: OrderAction[]; // newest first
+};
+
 // GET /api/orders: one page, and how many orders there are in all.
 export type OrdersPage = { orders: Order[]; total: number; limit: number; offset: number };
 
@@ -141,6 +176,7 @@ export type Settings = {
   email: string; // the account's sign-in address
   store: { connected: boolean; shop_domain: string | null; missing_scopes: string[] };
   shopify: { oauth_available: boolean }; // "Connect with Shopify" is set up on the server
+  shopify_actions: { allowed: boolean; auto_hold: boolean }; // holding and fulfilling from here
   inventory: { default_low_stock_threshold: number };
   slack: { connected: boolean };
   email_alerts: { available: boolean; address: string | null; pending: string | null };

@@ -8,9 +8,10 @@ import { DecisionCard } from "@/components/DecisionCard";
 import { useDashboard } from "@/components/DashboardProvider";
 import { ArrowLeftIcon, ArrowSquareOutIcon } from "@/components/icons";
 import { Empty, Panel } from "@/components/Panel";
+import { ShopifyActions } from "@/components/ShopifyActions";
 import { addressMatchText, formatMoney, riskBadge, riskSummary, timeAgo } from "@/lib/format";
 import { backToList } from "@/lib/orderFilters";
-import type { OrderDetail } from "@/lib/types";
+import type { HoldReason, OrderDetail } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
 function Chip({ children }: { children: React.ReactNode }) {
@@ -95,6 +96,14 @@ function FraudCheck({ detail }: { detail: OrderDetail }) {
       </p>
     </div>
   );
+}
+
+// The hold reason to start the form with: fraud if the fraud check flagged
+// it, a pending payment, or "other".
+function suggestedHoldReason(order: OrderDetail["order"]): HoldReason {
+  if (order.risk?.flagged) return "HIGH_RISK_OF_FRAUD";
+  if (order.financial_status === "pending" || order.financial_status === "partially_paid") return "AWAITING_PAYMENT";
+  return "OTHER";
 }
 
 function OrderView() {
@@ -196,6 +205,7 @@ function OrderView() {
       <Panel title="Fraud check">
         <FraudCheck detail={detail} />
       </Panel>
+      <ShopifyActions orderId={order.id} suggestedReason={suggestedHoldReason(order)} />
       <Panel title="Items">
         <LineItems detail={detail} />
       </Panel>
