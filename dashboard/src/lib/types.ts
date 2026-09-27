@@ -63,7 +63,7 @@ export type FulfillmentOrderView = {
 // A hold, release or fulfillment tried from here, and whether Shopify took it.
 export type OrderAction = {
   action: "hold" | "release" | "fulfill";
-  source: "seller" | "agent";
+  source: "seller" | "agent" | "link" | "telegram"; // link: an alert's confirm page
   fulfillment_order_id: string | null;
   reason: string | null;
   note: string | null; // a hold's note, or a fulfillment's tracking number
@@ -198,6 +198,23 @@ export type ReportSettings = {
 export type RatingLink = {
   decision: Pick<Decision, "id" | "order_number" | "action_taken" | "created_at" | "feedback" | "feedback_note"> & { headline: string };
   business_name: string | null;
+};
+
+// GET /api/act/:token: the confirm page behind an alert's hold / fulfill link.
+export type ActionLink = {
+  action: "hold" | "fulfill";
+  order: {
+    id: number;
+    order_number: string | null;
+    total_amount: string | null;
+    financial_status: string | null;
+    status: string | null;
+    flagged: boolean; // Shopify's fraud check flagged it
+    suggested_reason: HoldReason;
+  };
+  business_name: string | null;
+  expires_at: string;
+  state: ShopifyState;
 };
 
 export type AlertResult = { channel: "slack" | "email" | "telegram"; ok: boolean; error?: string };

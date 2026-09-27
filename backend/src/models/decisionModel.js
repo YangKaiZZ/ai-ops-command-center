@@ -36,7 +36,7 @@ async function saveDecision(sellerId, trigger, reasoning) {
     'INSERT INTO decisions (seller_id, order_id, order_number, reasoning, action_taken) VALUES (?, ?, ?, ?, ?)',
     [sellerId, orderId, orderNumber, reasoning || '', actionTaken]
   );
-  return { id: result.insertId, actionTaken };
+  return { id: result.insertId, actionTaken, orderId };
 }
 
 const NOTE_MAX_LENGTH = 500; // the feedback_note column

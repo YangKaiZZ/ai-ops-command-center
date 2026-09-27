@@ -35,6 +35,9 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   the agent's *hold* becomes a Shopify hold by itself (it never ships
   anything). Only what Shopify allows right now is offered, only this app's
   own holds are released, and every attempt is logged with Shopify's answer.
+  The same works from the alert itself: order alerts in Slack and email link
+  to a page that shows the order as Shopify has it and confirms before
+  acting, and Telegram asks "Yes / Cancel" in the chat.
 - **Low-stock watch.** Every item has its own low-stock level. When stock
   drops to or below it (by webhook, scheduled sync or manual sync), the agent
   recommends what to restock and flags pending orders at risk.
@@ -103,6 +106,11 @@ from their own dashboard.
   `JWT_SECRET` and `ENCRYPTION_KEY`.
 - **API keys** are stored only as SHA-256 hashes, can be revoked, and can't
   change settings, create more keys, or hold and ship orders.
+- **Links in alerts act on one thing only**: a rating link rates one decision;
+  a hold or fulfill link is signed for one order and one action (its own
+  HMAC key), expires after 7 days, and never acts when opened, only when
+  confirmed on the page (mail scanners open links by themselves). Telegram's
+  buttons only work from the chat linked to the order's account.
 - **Shopify requests are verified**: webhooks by HMAC over the raw body;
   OAuth redirects by HMAC, a one-time `state` and a timestamp.
 - **Sign-up can be invite-only**: set `SIGNUP_INVITE_CODE` and creating an
@@ -158,7 +166,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 123 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links |
+| backend | `npm test` | 129 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
@@ -175,6 +183,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
 | backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
+| backend | `npm run test:alert-actions` | holding and fulfilling from alerts: the links in email and buttons in Telegram (only when the seller can act), the confirm page's API (signed, one order and one action, expiring, reads until confirmed), Telegram's ask-first flow from the seller's own chat only, against a fake Shopify, mail server and Telegram |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |
 

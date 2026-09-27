@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
@@ -11,7 +11,8 @@ import { describeAction, fulfillmentStatus, HOLD_REASONS, itemsToShip } from "@/
 import type { FulfillmentOrderView, HoldReason, ShopifyState } from "@/lib/types";
 import { jsonBody, useApi } from "@/lib/useApi";
 
-type Kind = "hold" | "release" | "fulfill";
+export type Kind = "hold" | "release" | "fulfill";
+const ALL_KINDS: Kind[] = ["hold", "release", "fulfill"];
 const fieldClass = `${inputClass} w-full`;
 const selectClass =
   "w-full rounded-lg border border-border bg-page px-2.5 py-2 text-sm text-ink transition-colors hover:border-ink-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -24,43 +25,94 @@ const selectClass =
 export function ShopifyActions({ orderId, suggestedReason }: { orderId: number; suggestedReason: HoldReason }) {
   const api = useApi();
   const { refresh } = useDashboard();
+  const load = useCallback(() => api<ShopifyState>(`/api/orders/${orderId}/shopify`), [api, orderId]);
+  const act = useCallback(
+    (kind: Kind, body: Record<string, unknown>) => api<ShopifyState>(`/api/orders/${orderId}/${kind}`, { method: "POST", ...jsonBody(body) }),
+    [api, orderId]
+  );
+
+  return (
+    <Panel title="In Shopify">
+      <div id="in-shopify" className="grid scroll-mt-4 gap-3">
+        <ShopifyOrderPanel
+          load={load}
+          act={act}
+          suggestedReason={suggestedReason}
+          onChanged={refresh} // the order's statuses, here and in the lists
+          onLoaded={() => {
+            // A link to #in-shopify (from a decision card) lands before this panel has
+            // loaded, so the browser can't scroll to it: do that once it's here.
+            if (window.location.hash === "#in-shopify") document.getElementById("in-shopify")?.scrollIntoView({ block: "start" });
+          }}
+        />
+      </div>
+    </Panel>
+  );
+}
+
+// The panel's contents, for the order's page and for the confirm page behind
+// an alert's link (which reads and acts through the link instead of a
+// sign-in, offers only the link's action, and opens its form straight away).
+export function ShopifyOrderPanel({
+  load: loadState,
+  act,
+  suggestedReason,
+  kinds = ALL_KINDS,
+  openAtOnce = false,
+  onChanged,
+  onLoaded,
+}: {
+  load: () => Promise<ShopifyState>;
+  act: (kind: Kind, body: Record<string, unknown>) => Promise<ShopifyState>;
+  suggestedReason: HoldReason;
+  kinds?: Kind[];
+  openAtOnce?: boolean; // with one kind: open its form if exactly one shipment allows it
+  onChanged?: (kind: Kind) => unknown;
+  onLoaded?: () => void;
+}) {
   const [state, setState] = useState<ShopifyState | null>(null);
   const [loadError, setLoadError] = useState("");
   const [open, setOpen] = useState<{ kind: Kind; foId: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
+  // The confirm page's form opens as soon as the order first arrives.
+  const autoOpen = useRef<Kind | null>(openAtOnce && kinds.length === 1 ? kinds[0] : null);
 
   const load = useCallback(
     () =>
-      api<ShopifyState>(`/api/orders/${orderId}/shopify`).then(
+      loadState().then(
         (body) => {
           setState(body);
           setLoadError("");
+          const kind = autoOpen.current;
+          if (kind && body.fulfillment_orders) {
+            autoOpen.current = null;
+            const able = body.fulfillment_orders.filter((fo) => can(fo, kind));
+            if (able.length === 1) setOpen({ kind, foId: able[0].id });
+          }
         },
         (err: Error) => setLoadError(`Couldn't load this order from Shopify: ${err.message}`)
       ),
-    [api, orderId]
+    [loadState]
   );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // A link to #in-shopify (from a decision card) lands before this panel has
-  // loaded, so the browser can't scroll to it: do that once it's here.
   const loaded = state !== null || loadError !== "";
   useEffect(() => {
-    if (loaded && window.location.hash === "#in-shopify") document.getElementById("in-shopify")?.scrollIntoView({ block: "start" });
-  }, [loaded]);
+    if (loaded) onLoaded?.();
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- once, when it first loads
 
   async function run(kind: Kind, body: Record<string, unknown>, done: string) {
     setBusy(true);
     setMessage(null);
     try {
-      setState(await api<ShopifyState>(`/api/orders/${orderId}/${kind}`, { method: "POST", ...jsonBody(body) }));
+      setState(await act(kind, body));
       setOpen(null);
       setMessage({ text: done, isError: false });
-      await refresh(); // the order's statuses, here and in the lists
+      await onChanged?.(kind);
     } catch (err) {
       setMessage({ text: (err as Error).message, isError: true });
       await load(); // Shopify may have moved on (shipped, held elsewhere)
@@ -106,37 +158,41 @@ export function ShopifyActions({ orderId, suggestedReason }: { orderId: number; 
         }}
         busy={busy}
         suggestedReason={suggestedReason}
+        kinds={kinds}
         run={run}
       />
     ));
   }
 
   return (
-    <Panel title="In Shopify">
-      <div id="in-shopify" className="grid scroll-mt-4 gap-3">
-        {body}
-        <Note message={message} />
-        {state && state.actions.length > 0 && (
-          <div className="grid gap-1.5">
-            <Subhead>Done from here</Subhead>
-            <ul className="grid gap-1 text-sm">
-              {state.actions.map((action, i) => {
-                const { who, text } = describeAction(action);
-                return (
-                  <li key={i} className={action.ok ? "" : "text-error"}>
-                    <time className="text-ink-2" dateTime={action.created_at} title={new Date(action.created_at).toLocaleString()}>
-                      {timeAgo(action.created_at)}
-                    </time>
-                    : {who} {text}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-    </Panel>
+    <>
+      {body}
+      <Note message={message} />
+      {state && state.actions.length > 0 && (
+        <div className="grid gap-1.5">
+          <Subhead>Done from here</Subhead>
+          <ul className="grid gap-1 text-sm">
+            {state.actions.map((action, i) => {
+              const { who, text } = describeAction(action);
+              return (
+                <li key={i} className={action.ok ? "" : "text-error"}>
+                  <time className="text-ink-2" dateTime={action.created_at} title={new Date(action.created_at).toLocaleString()}>
+                    {timeAgo(action.created_at)}
+                  </time>
+                  : {who} {text}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </>
   );
+}
+
+// Whether Shopify allows this kind of action on the fulfillment order now.
+function can(fo: FulfillmentOrderView, kind: Kind): boolean {
+  return kind === "hold" ? fo.can_hold : kind === "release" ? fo.can_release : fo.can_fulfill;
 }
 
 function FulfillmentOrderCard({
@@ -145,6 +201,7 @@ function FulfillmentOrderCard({
   setOpen,
   busy,
   suggestedReason,
+  kinds,
   run,
 }: {
   fo: FulfillmentOrderView;
@@ -152,9 +209,11 @@ function FulfillmentOrderCard({
   setOpen: (kind: Kind | null) => void;
   busy: boolean;
   suggestedReason: HoldReason;
+  kinds: Kind[];
   run: (kind: Kind, body: Record<string, unknown>, done: string) => Promise<void>;
 }) {
-  const nothingToDo = !fo.can_hold && !fo.can_release && !fo.can_fulfill;
+  const offered = (kind: Kind) => kinds.includes(kind) && can(fo, kind);
+  const nothingToDo = !kinds.some(offered);
   return (
     <section aria-label={`Shipment${fo.location ? ` from ${fo.location}` : ""}`} className="grid gap-2.5 rounded-lg border border-hairline p-3.5">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -173,17 +232,17 @@ function FulfillmentOrderCard({
       ))}
       {!open && !nothingToDo && (
         <div className="flex flex-wrap gap-2">
-          {fo.can_fulfill && (
+          {offered("fulfill") && (
             <button type="button" onClick={() => setOpen("fulfill")} className={accentButton}>
               Mark as fulfilled…
             </button>
           )}
-          {fo.can_hold && (
+          {offered("hold") && (
             <button type="button" onClick={() => setOpen("hold")} className={secondaryButton}>
               Put on hold…
             </button>
           )}
-          {fo.can_release && (
+          {offered("release") && (
             <button type="button" onClick={() => setOpen("release")} className={secondaryButton}>
               Release hold…
             </button>

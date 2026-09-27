@@ -287,9 +287,11 @@ async function runAgent(sellerId, trigger) {
         // failure shouldn't silence the alert either, so it's only logged
         // (and the alert goes without its rating buttons).
         let decisionId = null;
+        let orderId = null; // ours, for the alert's hold and fulfill buttons
         try {
           const saved = await saveDecision(sellerId, trigger, reasoning);
           decisionId = saved.id;
+          orderId = saved.orderId;
           console.log(`${tag} decision #${saved.id} saved (${saved.actionTaken})`);
         } catch (err) {
           console.error(`${tag} could not save decision: ${err.message}`);
@@ -304,7 +306,7 @@ async function runAgent(sellerId, trigger) {
         if (holdLine) console.log(`${tag} ${holdLine}`);
 
         const decision = `*${headline(trigger)}*\n${reasoning}${holdLine ? `\n\n${holdLine}` : ''}`;
-        await postDecision(sellerId, decision, { decisionId });
+        await postDecision(sellerId, decision, { decisionId, orderId });
         return decision;
       }
 

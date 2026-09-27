@@ -5,10 +5,12 @@ const shopifyService = require('./shopifyService');
 const oauth = require('./shopifyOAuth');
 
 // Holding, releasing and fulfilling orders in Shopify from here: the buttons
-// on an order's page (the seller), and the agent's HOLD when the seller
-// turned auto-hold on. Shopify ships an order through its fulfillment orders
-// (one per location it ships from); each action is on one of them, and
-// Shopify says which actions each allows right now (supportedActions).
+// on an order's page (the seller), the hold and fulfill links and buttons in
+// alerts (the seller, from the confirm page or Telegram), and the agent's
+// HOLD when the seller turned auto-hold on. Shopify ships an order through
+// its fulfillment orders (one per location it ships from); each action is on
+// one of them, and Shopify says which actions each allows right now
+// (supportedActions).
 //
 // Only holds this app placed are released: another app's hold (or Shopify
 // Flow's) is theirs to lift. The agent only ever holds, never fulfills.
@@ -131,7 +133,9 @@ async function orderState(sellerId, orderId) {
 // Runs one action on one of the order's fulfillment orders, if Shopify says
 // it's possible now (`can` names the flag from describeFulfillmentOrder),
 // logs it either way, and returns the order's state after it.
-async function act(sellerId, orderId, fulfillmentOrderId, { action, can, cannot, reason = null, note = null }, run) {
+// `source` is who asked: the seller on the dashboard ('seller'), from an
+// alert's confirm page ('link') or from Telegram's buttons ('telegram').
+async function act(sellerId, orderId, fulfillmentOrderId, { action, can, cannot, reason = null, note = null, source = 'seller' }, run) {
   const order = await findOrder(sellerId, orderId);
   const creds = await storeFor(sellerId);
   const raw = (await fulfillmentOrdersOf(creds, order)).find((fo) => fo.id === String(fulfillmentOrderId));
@@ -139,7 +143,7 @@ async function act(sellerId, orderId, fulfillmentOrderId, { action, can, cannot,
   const fo = describeFulfillmentOrder(raw);
   if (!fo[can]) throw new ActionError(cannot, 409);
 
-  const entry = { action, source: 'seller', fulfillmentOrderId: fo.id, reason, note };
+  const entry = { action, source, fulfillmentOrderId: fo.id, reason, note };
   try {
     await run(creds, raw);
   } catch (err) {
@@ -152,12 +156,12 @@ async function act(sellerId, orderId, fulfillmentOrderId, { action, can, cannot,
   return orderState(sellerId, order.id);
 }
 
-function holdOrder(sellerId, orderId, { fulfillmentOrderId, reason, note }) {
+function holdOrder(sellerId, orderId, { fulfillmentOrderId, reason, note, source }) {
   return act(
     sellerId,
     orderId,
     fulfillmentOrderId,
-    { action: 'hold', can: 'can_hold', cannot: "Shopify won't hold this now (it may be shipped already, or already on hold from here).", reason, note },
+    { action: 'hold', can: 'can_hold', cannot: "Shopify won't hold this now (it may be shipped already, or already on hold from here).", reason, note, source },
     (creds, fo) => shopifyService.holdFulfillmentOrder(creds.shopDomain, creds.accessToken, fo.id, { reason, reasonNotes: note || undefined, handle: HOLD_HANDLE })
   );
 }
@@ -178,12 +182,12 @@ function releaseHold(sellerId, orderId, { fulfillmentOrderId }) {
   );
 }
 
-async function fulfillOrder(sellerId, orderId, { fulfillmentOrderId, notifyCustomer, tracking }) {
+async function fulfillOrder(sellerId, orderId, { fulfillmentOrderId, notifyCustomer, tracking, source }) {
   const state = await act(
     sellerId,
     orderId,
     fulfillmentOrderId,
-    { action: 'fulfill', can: 'can_fulfill', cannot: "Shopify won't fulfill this now (it may be on hold or shipped already).", note: tracking?.number ?? null },
+    { action: 'fulfill', can: 'can_fulfill', cannot: "Shopify won't fulfill this now (it may be on hold or shipped already).", note: tracking?.number ?? null, source },
     (creds, fo) => shopifyService.createFulfillment(creds.shopDomain, creds.accessToken, fo.id, { notifyCustomer, tracking })
   );
   await refreshOrder(sellerId, orderId);
@@ -246,6 +250,62 @@ async function autoHold(sellerId, shopifyOrderId, { reason, note }) {
   }
 }
 
+// --- From alerts: the confirm page behind their links (actionLinks.js) and
+// Telegram's buttons ---
+
+// Whether alerts should offer holding and fulfilling: the seller has a store
+// connected and hasn't been refused the permission. Shopify still has the
+// final word when a link or button is used.
+async function actionsOffered(sellerId) {
+  const [[seller]] = await pool.query('SELECT shopify_access_token IS NOT NULL AS connected, shopify_scopes FROM sellers WHERE id = ?', [sellerId]);
+  return Boolean(seller?.connected) && oauth.actionsAllowed(seller.shopify_scopes) !== false;
+}
+
+// The order as a confirm step shows it, with the hold reason to start from:
+// fraud if Shopify's check flagged it, then a pending payment, else "other"
+// (as on the order's page). Null if it's not this seller's.
+async function orderForAlert(sellerId, orderId) {
+  const { FLAGGED_WHERE } = require('./riskCheck'); // required here: riskCheck requires this module
+  const [[order]] = await pool.query(
+    `SELECT id, order_number, total_amount, financial_status, status, ${FLAGGED_WHERE} AS flagged FROM orders WHERE id = ? AND seller_id = ?`,
+    [orderId, sellerId]
+  );
+  if (!order) return null;
+  const flagged = Boolean(order.flagged);
+  const pendingPayment = ['pending', 'partially_paid'].includes(order.financial_status);
+  return { ...order, flagged, suggested_reason: flagged ? 'HIGH_RISK_OF_FRAUD' : pendingPayment ? 'AWAITING_PAYMENT' : 'OTHER' };
+}
+
+const CANNOT = {
+  hold: "Shopify won't hold this now (it may be shipped already, or already on hold from here).",
+  fulfill: "Shopify won't fulfill this now (it may be on hold or shipped already).",
+};
+
+// Telegram's "Yes": holds every part of the order Shopify lets us hold, or
+// marks every part it lets us ship as fulfilled (no tracking; Shopify emails
+// the customer). Returns { done, total, failure } where failure is the first
+// refusal when only some parts went through; throws an ActionError when none did.
+async function actOnWholeOrder(sellerId, orderId, action, { reason = 'OTHER', source }) {
+  const state = await orderState(sellerId, orderId);
+  if (!state.fulfillment_orders) throw new ActionError(state.note, 409);
+  const targets = state.fulfillment_orders.filter((fo) => (action === 'hold' ? fo.can_hold : fo.can_fulfill));
+  if (!targets.length) throw new ActionError(CANNOT[action], 409);
+  let done = 0;
+  let failure = null;
+  for (const fo of targets) {
+    try {
+      if (action === 'hold') await holdOrder(sellerId, orderId, { fulfillmentOrderId: fo.id, reason, note: null, source });
+      else await fulfillOrder(sellerId, orderId, { fulfillmentOrderId: fo.id, notifyCustomer: true, tracking: null, source });
+      done++;
+    } catch (err) {
+      if (!(err instanceof ActionError)) throw err;
+      failure = failure || err;
+    }
+  }
+  if (!done) throw failure;
+  return { done, total: targets.length, failure: failure?.message ?? null };
+}
+
 // --- request bodies ---
 
 const FULFILLMENT_ORDER_ID = /^\d{1,20}$/;
@@ -299,6 +359,9 @@ module.exports = {
   releaseHold,
   fulfillOrder,
   autoHold,
+  actionsOffered,
+  orderForAlert,
+  actOnWholeOrder,
   parseHold,
   parseRelease,
   parseFulfill,

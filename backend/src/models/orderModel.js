@@ -125,6 +125,17 @@ async function markRiskAlerted(orderId) {
   await pool.query('UPDATE orders SET risk_alerted_at = NOW() WHERE id = ?', [orderId]);
 }
 
+// The seller whose order a Telegram button names, if that chat is the one
+// linked to their account; null otherwise.
+async function orderSellerForTelegramChat(orderId, chatId) {
+  const [[row]] = await pool.query(
+    `SELECT o.seller_id FROM orders o JOIN sellers s ON s.id = o.seller_id
+     WHERE o.id = ? AND s.telegram_chat_id = ?`,
+    [orderId, String(chatId)]
+  );
+  return row?.seller_id ?? null;
+}
+
 module.exports = {
   upsertOrder,
   lineItemRow,
@@ -132,6 +143,7 @@ module.exports = {
   saveRisk,
   openOrdersForRiskCheck,
   markRiskAlerted,
+  orderSellerForTelegramChat,
   RISK_COLUMNS,
   OPEN_WHERE,
 };

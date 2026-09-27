@@ -188,7 +188,7 @@ async function refreshRecentRisks(sellerId, creds) {
       const holdLine = mustHold(risk)
         ? await autoHold(sellerId, row.shopify_order_id, { reason: 'HIGH_RISK_OF_FRAUD', note: describeRisk(risk).slice(0, 255) })
         : null;
-      await postDecision(sellerId, formatRiskAlert(row, risk, holdLine));
+      await postDecision(sellerId, formatRiskAlert(row, risk, holdLine), { orderId: row.id });
       await orderModel.markRiskAlerted(row.id);
       alerted++;
     }

@@ -199,6 +199,7 @@ async function main() {
     check(/FULFILL - looks fine/.test(decision?.reasoning), "the model's reply is kept below");
     check(alerts.at(-1)?.decisionId && /\*New order #7001\*\nHOLD - fraud check/.test(alerts.at(-1).text), 'the alert says HOLD, with rating buttons');
     let row = await orderRow(seller, 7001);
+    check(alerts.at(-1)?.orderId === row?.id, 'and names the order, for its hold / fulfill buttons', `${alerts.at(-1)?.orderId} / ${row?.id}`);
     check(
       row?.risk_level === 'high' && row.risk_recommendation === 'cancel' && row.billing_matches_shipping === 0 && row.risk_checked_at && row.risk_reasons?.length === 2,
       'saved on the order',
@@ -333,6 +334,8 @@ async function main() {
       'alerts only where risk went up after a decision (not: already high, no decision yet, alerted before, came back low)',
       JSON.stringify(alertedOn)
     );
+    const riskAlertOrder = alerts.find((a) => a.text.startsWith('*Fraud risk: order #8001*'))?.orderId;
+    check(riskAlertOrder === (await orderRow(store, 8001))?.id, 'a fraud risk alert names the order too, for its hold / fulfill buttons', String(riskAlertOrder));
     const alertA = alerts.find((a) => a.text.startsWith('*Fraud risk: order #8001*'))?.text || '';
     check(
       alertA ===

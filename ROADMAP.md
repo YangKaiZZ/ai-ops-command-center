@@ -5,9 +5,6 @@ listed at the end.
 
 ## Write actions
 
-- **Hold and fulfill from the alert itself**: "Hold in Shopify" and "Fulfill"
-  in email, Slack and Telegram alerts, each opening a signed confirm page
-  like the rating page (Telegram: buttons in the chat).
 - **Faster late fraud results**: subscribe to `orders/risk_assessment_changed`
   (GraphQL-only; the webhooks are registered through REST today), so a risk
   that rises after the agent decided is alerted at once, not at the next sync.
@@ -108,3 +105,9 @@ Separate from the code, and needed before anyone but the owner connects:
   hold and fulfill inputs in the GraphQL schema.
 - "Flagged for fraud" on the Overview (a tile: this period, the one before,
   and any still needing action) and a fraud line in the daily summary.
+- Hold and fulfill from the alert itself: "Hold in Shopify" and "Mark
+  fulfilled" on order and fraud-risk alerts. Slack and email open a signed
+  confirm page (one order, one action, 7 days) with the same form as the
+  order's page; Telegram asks Yes / Cancel in the chat, with the hold reason
+  picked from the fraud check or payment. Logged as done from an alert or
+  from Telegram. Only offered when the store allows it.

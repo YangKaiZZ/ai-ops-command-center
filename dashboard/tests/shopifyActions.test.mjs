@@ -40,6 +40,16 @@ test('the log in words: who did what, and why it failed', () => {
   );
 });
 
+test('the log says when it was done from an alert or Telegram', () => {
+  const at = { fulfillment_order_id: '1', ok: true, error: null, created_at: '2026-09-27T00:00:00Z' };
+  assert.deepEqual(describeAction({ ...at, action: 'hold', source: 'link', reason: 'HIGH_RISK_OF_FRAUD', note: null }), {
+    who: 'You',
+    text: 'put it on hold (high risk of fraud), from an alert',
+  });
+  assert.equal(describeAction({ ...at, action: 'fulfill', source: 'telegram', reason: null, note: null }).text, 'marked it fulfilled, from Telegram');
+  assert.equal(describeAction({ ...at, action: 'fulfill', source: 'seller', reason: null, note: null }).text, 'marked it fulfilled');
+});
+
 test('what missing permissions stop', () => {
   assert.equal(scopeUses(['write_merchant_managed_fulfillment_orders']), 'holding and fulfilling orders from here');
   assert.equal(scopeUses(['read_inventory', 'write_merchant_managed_fulfillment_orders']), 'stock levels and holding and fulfilling orders from here');

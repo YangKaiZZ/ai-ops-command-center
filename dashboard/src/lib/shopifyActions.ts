@@ -47,6 +47,9 @@ export function itemsToShip(fo: Pick<FulfillmentOrderView, "items">): string {
   return `${remaining} of ${plural(total, "item")} still to ship`;
 }
 
+// Where the seller did it from, when not the order's page.
+const VIA: Partial<Record<OrderAction["source"], string>> = { link: ", from an alert", telegram: ", from Telegram" };
+
 // One line of the log: who did what, and how it went.
 export function describeAction(a: OrderAction): { who: string; text: string } {
   const who = a.source === "agent" ? "The agent" : "You";
@@ -58,7 +61,7 @@ export function describeAction(a: OrderAction): { who: string; text: string } {
     const tried = a.action === "hold" ? "tried to put it on hold" : a.action === "release" ? "tried to release the hold" : "tried to mark it fulfilled";
     text = `${tried}, but it didn't work: ${a.error ?? "no reason given"}`;
   }
-  return { who, text };
+  return { who, text: `${text}${VIA[a.source] ?? ""}` };
 }
 
 // What each Shopify permission is for, so "Missing permissions" says what
