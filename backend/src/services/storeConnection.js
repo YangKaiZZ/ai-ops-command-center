@@ -50,10 +50,11 @@ async function setUpWebhooks(creds) {
 // topic added in a new version (e.g. orders/risk_assessment_changed) reaches
 // stores connected before it, and a changed APP_URL moves them. Topics already
 // right are left alone. Never throws; a store that fails is only logged.
-async function refreshAllWebhooks() {
+// `sellerIds` limits it to those sellers (tests); default: every connected one.
+async function refreshAllWebhooks({ sellerIds } = {}) {
   const { appUrl } = oauth.config();
   if (!webhookSetup.isPublicHttpsUrl(appUrl)) return;
-  for (const sellerId of await sellers.getConnectedSellerIds()) {
+  for (const sellerId of sellerIds ?? (await sellers.getConnectedSellerIds())) {
     try {
       const creds = await sellers.getStoreCredentials(sellerId);
       if (!creds) continue;

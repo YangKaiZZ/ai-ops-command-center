@@ -383,7 +383,9 @@ async function main() {
       [SHOP_3, require('../src/config/secrets').encryptSecret('shpat_startup'), a.id]
     );
     const registeredBefore = called('registerWebhooks').length;
-    await require('../src/services/storeConnection').refreshAllWebhooks();
+    // Only this test's seller: the fakes above would answer for any real
+    // local store too (a fake refresh rejection would disconnect it).
+    await require('../src/services/storeConnection').refreshAllWebhooks({ sellerIds: [a.id] });
     const refreshed = called('registerWebhooks').slice(registeredBefore);
     check(
       refreshed.some((c) => c[1] === SHOP_3 && c[2] === 'https://ops.example.test'),
