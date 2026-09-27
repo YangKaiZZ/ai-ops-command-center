@@ -145,7 +145,12 @@ export function ShopifyOrderPanel({
       </Empty>
     );
   } else if (state.fulfillment_orders.length === 0) {
-    body = <Empty>Shopify has nothing to ship for this order.</Empty>;
+    body = (
+      <Empty>
+        Shopify lists nothing to ship for this order, so there&rsquo;s nothing to hold or fulfill from here. Its items may not need shipping, or
+        they ship from a location this app can&rsquo;t manage (such as a fulfillment app&rsquo;s).
+      </Empty>
+    );
   } else {
     body = state.fulfillment_orders.map((fo) => (
       <FulfillmentOrderCard

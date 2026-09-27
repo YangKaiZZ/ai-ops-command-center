@@ -112,7 +112,8 @@ function ActForm() {
         {order.flagged && <Badge label="Flagged for fraud" tone="critical" icon="risk" />}
       </div>
 
-      {!done && state.fulfillment_orders && !can(state.fulfillment_orders) && <p className="text-sm">{CANNOT[link.action]}</p>}
+      {/* With no shipments at all, the panel below says why on its own. */}
+      {!done && state.fulfillment_orders?.length ? !can(state.fulfillment_orders) && <p className="text-sm">{CANNOT[link.action]}</p> : null}
 
       <div className="grid gap-3">
         <ShopifyOrderPanel
