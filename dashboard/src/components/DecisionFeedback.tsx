@@ -87,17 +87,17 @@ export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSav
 
   const thumbClass = (value: Feedback) => {
     const pressed = saved.feedback === value;
-    const tone = value === "up" ? "border-good/30 bg-good/10" : "border-critical/30 bg-critical/10";
-    return `inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-medium transition-colors disabled:cursor-progress ${focusRing} ${
-      pressed ? `${tone} text-ink` : "border-border text-ink-2 hover:border-ink-2/40 hover:text-ink"
+    const tone = value === "up" ? "border-good/40 bg-good/10 text-good" : "border-critical/40 bg-critical/10 text-critical";
+    return `inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-semibold transition-colors disabled:cursor-progress ${focusRing} ${
+      pressed ? tone : "border-border bg-field text-ink hover:border-ink-2/40"
     }`;
   };
 
   return (
-    <div className="grid gap-2 border-t border-hairline pt-2.5">
+    <div className="grid gap-2 border-t border-hairline pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span id={labelId} className="text-sm text-ink-2">
-          Right call?
+        <span id={labelId} className="text-[13px] text-ink-soft">
+          Was this the right call?
         </span>
         <div role="group" aria-labelledby={labelId} className="flex gap-1.5">
           <button type="button" aria-pressed={saved.feedback === "up"} disabled={busy} onClick={() => rate("up")} className={thumbClass("up")}>
@@ -117,8 +117,8 @@ export function DecisionFeedback({ decision, onSaved }: { decision: Rated; onSav
       </div>
 
       {saved.note && !editing && (
-        <p className="text-sm">
-          <span className="text-ink-2">Your note: </span>
+        <p className="rounded-lg border border-hairline bg-well px-3 py-2.5 text-[12.5px] leading-[1.45] text-ink-soft">
+          <b className="font-semibold text-ink">Your note: </b>
           <span className="whitespace-pre-line">{saved.note}</span>{" "}
           <button type="button" className={linkButton} onClick={() => openNote(saved.note ?? "")}>
             Edit

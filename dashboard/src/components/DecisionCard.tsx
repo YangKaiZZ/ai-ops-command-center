@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { DecisionFeedback } from "@/components/DecisionFeedback";
+import { card } from "@/components/Panel";
+import { focusRing } from "@/components/ui";
 import { canRate } from "@/lib/feedback";
 import { actionInfo, parseReasoning, timeAgo } from "@/lib/format";
 import type { Decision, SavedFeedback } from "@/lib/types";
@@ -16,59 +18,61 @@ const ACT_IN_SHOPIFY: Partial<Record<Decision["action_taken"], string>> = {
   hold: "Put on hold in Shopify",
 };
 
-// One agent decision: verdict, what it was about, when, the reasoning, and
-// the seller's rating of it (a skipped run has nothing to rate). With the
-// order's id, the heading links to the order and a HOLD or FULFILL links to
-// acting on it there. On an order's own page the order is already known, so
-// `title` can say something else.
-export function DecisionCard({
-  decision,
-  title,
-  onFeedbackSaved,
-}: {
-  decision: CardDecision;
-  title?: string;
-  onFeedbackSaved?: (saved: SavedFeedback) => void;
-}) {
+// One agent decision as a card: verdict, what it was about, when, the
+// reasoning, and the seller's rating of it (a skipped run has nothing to
+// rate). With the order's id, the heading links to the order and a HOLD or
+// FULFILL links to acting on it there.
+export function DecisionCard({ decision, onFeedbackSaved }: { decision: CardDecision; onFeedbackSaved?: (saved: SavedFeedback) => void }) {
   const action = actionInfo(decision.action_taken);
   const { headline, blocks } = parseReasoning(decision.reasoning);
   const created = new Date(decision.created_at);
-  const heading = title ?? (decision.order_number ? `Order ${decision.order_number}` : "Low-stock alert");
-  const orderHref = !title && decision.order_id ? `/orders/${decision.order_id}` : null;
+  const orderHref = decision.order_id ? `/orders/${decision.order_id}` : null;
+  const kind = decision.order_number || decision.order_id ? "New order" : decision.action_taken === "low_stock_alert" ? "Low stock" : "Store event";
   const act = orderHref ? ACT_IN_SHOPIFY[decision.action_taken] : undefined;
 
   return (
-    <li className="grid gap-1.5 rounded-lg border border-hairline px-3.5 py-3" data-decision={decision.id}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge label={action.label} tone={action.tone} icon={action.icon} />
-        {heading &&
-          (orderHref ? (
-            <Link href={orderHref} className="font-semibold text-accent hover:underline focus-visible:underline">
-              {heading}
+    <li className={`${card} grid gap-2.5 px-[18px] py-4`} data-decision={decision.id}>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <Badge label={action.label} tone={action.tone} />
+        {decision.order_number || orderHref ? (
+          orderHref ? (
+            <Link href={orderHref} className={`font-mono text-[13.5px] font-semibold hover:text-accent ${focusRing}`}>
+              {decision.order_number ?? `Order ${decision.order_id}`}
             </Link>
           ) : (
-            <span className="font-semibold">{heading}</span>
-          ))}
-        <time className="ml-auto text-sm text-ink-2" dateTime={created.toISOString()} title={created.toLocaleString()}>
-          {timeAgo(decision.created_at)}
-        </time>
-      </div>
-      {headline && <p className="font-medium">{headline}</p>}
-      <div className="grid gap-1 text-sm text-ink-2">
-        {blocks.map((block, i) =>
-          block.type === "bullets" ? (
-            <ul key={i} className="grid list-disc gap-0.5 pl-5">
-              {block.items.map((item, j) => (
-                <li key={j}>{item}</li>
-              ))}
-            </ul>
-          ) : (
-            <p key={i}>{block.text}</p>
+            <span className="font-mono text-[13.5px] font-semibold">{decision.order_number}</span>
           )
+        ) : null}
+        <span className="text-[12.5px] text-ink-2">
+          {kind} ·{" "}
+          <time dateTime={created.toISOString()} title={created.toLocaleString()}>
+            {timeAgo(decision.created_at)}
+          </time>
+        </span>
+        {decision.feedback && (
+          <span className="ml-auto">
+            <Badge label={decision.feedback === "up" ? "Marked right" : "Marked wrong"} tone={decision.feedback === "up" ? "good" : "critical"} />
+          </span>
         )}
       </div>
+      {headline && <p className="text-[13.5px] font-medium leading-normal">{headline}</p>}
+      {blocks.length > 0 && (
+        <div className="grid gap-1 text-[13px] leading-normal text-ink-soft">
+          {blocks.map((block, i) =>
+            block.type === "bullets" ? (
+              <ul key={i} className="grid list-disc gap-0.5 pl-5">
+                {block.items.map((item, j) => (
+                  <li key={j}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p key={i}>{block.text}</p>
+            )
+          )}
+        </div>
+      )}
       {act && (
-        <Link href={`${orderHref}#in-shopify`} className="w-fit text-sm font-medium text-accent hover:underline focus-visible:underline">
+        <Link href={`${orderHref}#in-shopify`} className={`w-fit text-[13px] font-medium text-accent hover:underline ${focusRing}`}>
           {act} →
         </Link>
       )}

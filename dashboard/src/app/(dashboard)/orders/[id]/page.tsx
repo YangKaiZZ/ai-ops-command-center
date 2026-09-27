@@ -5,68 +5,98 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { BuyerName } from "@/components/BuyerName";
-import { DecisionCard } from "@/components/DecisionCard";
+import { DecisionFeedback } from "@/components/DecisionFeedback";
 import { useDashboard } from "@/components/DashboardProvider";
-import { ArrowLeftIcon, ArrowSquareOutIcon } from "@/components/icons";
-import { Empty, Panel } from "@/components/Panel";
+import { ArrowSquareOutIcon, CaretLeftIcon, SparkleIcon } from "@/components/icons";
+import { card, Empty, Panel } from "@/components/Panel";
 import { ShopifyActions } from "@/components/ShopifyActions";
-import { addressMatchText, formatMoney, riskBadge, riskSummary, timeAgo } from "@/lib/format";
+import { focusRing, PageHeader, secondaryButton } from "@/components/ui";
+import { canRate } from "@/lib/feedback";
+import {
+  actionInfo,
+  addressMatchText,
+  formatMoney,
+  fulfillmentBadge,
+  parseReasoning,
+  paymentBadge,
+  riskBadge,
+  riskSummary,
+  timeAgo,
+  type Tone,
+} from "@/lib/format";
 import { backToList } from "@/lib/orderFilters";
 import type { HoldReason, OrderDetail } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block whitespace-nowrap rounded-full border border-border bg-ink/5 px-2 text-xs text-ink-2">{children}</span>
-  );
-}
+// Tailwind only sees class names written out in full.
+const TONE_DOT: Record<Tone, string> = {
+  good: "bg-good",
+  warning: "bg-warning",
+  serious: "bg-serious",
+  critical: "bg-critical",
+  neutral: "bg-ink-2/60",
+};
+const TONE_EDGE: Record<Tone, string> = {
+  good: "border-good/35",
+  warning: "border-warning/35",
+  serious: "border-serious/35",
+  critical: "border-critical/35",
+  neutral: "",
+};
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-0.5">
-      <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">{label}</dt>
-      <dd className="text-sm">{children}</dd>
-    </div>
-  );
-}
+const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 function LineItems({ detail }: { detail: OrderDetail }) {
-  if (!detail.line_items) return <Empty>{detail.line_items_note ?? "This order's items aren't available."}</Empty>;
-  if (detail.line_items.length === 0) return <Empty>Shopify lists no items on this order.</Empty>;
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-hairline text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">
-            <th scope="col" className="pb-2 pr-3">Item</th>
-            <th scope="col" className="whitespace-nowrap pb-2 pr-3">SKU</th>
-            <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">Qty</th>
-            <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">To ship</th>
-            <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">Price</th>
-            <th scope="col" className="whitespace-nowrap pb-2 text-right">Line total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {detail.line_items.map((item) => (
-            <tr key={item.shopify_line_item_id} className="border-b border-hairline last:border-0">
-              <td className="py-2.5 pr-3">
+  const { order } = detail;
+  let rows: React.ReactNode;
+  if (!detail.line_items) rows = <Empty>{detail.line_items_note ?? "This order's items aren't available."}</Empty>;
+  else if (detail.line_items.length === 0) rows = <Empty>Shopify lists no items on this order.</Empty>;
+  else {
+    rows = (
+      <ul>
+        {detail.line_items.map((item) => {
+          const variant = item.variant_title && item.variant_title !== "Default Title" ? item.variant_title : null;
+          const toShip = item.fulfillable_quantity;
+          const shipping = toShip === 0 ? "Shipped" : toShip != null && toShip < item.quantity ? `${toShip} still to ship` : null;
+          const details = [variant, item.sku && `SKU ${item.sku}`, shipping].filter(Boolean).join(" · ");
+          return (
+            <li
+              key={item.shopify_line_item_id}
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 gap-y-0.5 border-t border-hairline py-3 text-[13.5px] sm:grid-cols-[minmax(0,1fr)_60px_90px_90px]"
+            >
+              <span className="min-w-0">
                 <span className="font-medium">{item.title}</span>
-                {item.variant_title && item.variant_title !== "Default Title" && (
-                  <span className="block text-xs text-ink-2">{item.variant_title}</span>
-                )}
-              </td>
-              <td className="whitespace-nowrap py-2.5 pr-3 text-ink-2">{item.sku ?? "—"}</td>
-              <td className="py-2.5 pr-3 text-right tabular-nums">{item.quantity}</td>
-              <td className="py-2.5 pr-3 text-right tabular-nums">{item.fulfillable_quantity ?? "—"}</td>
-              <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(item.price)}</td>
-              <td className="py-2.5 text-right tabular-nums">
-                {item.price == null ? "—" : formatMoney(String(Number(item.price) * item.quantity))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                {details && <span className="block text-xs text-ink-2">{details}</span>}
+              </span>
+              <span className="font-mono text-[12.5px] text-ink-2">× {item.quantity}</span>
+              <span className="hidden text-right font-mono text-[12.5px] text-ink-2 sm:block">{formatMoney(item.price)}</span>
+              <span className="text-right font-mono">{item.price == null ? "—" : formatMoney(String(Number(item.price) * item.quantity))}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+  return (
+    <Panel title="Items">
+      {rows}
+      <div className="flex justify-between border-t border-hairline pt-3 text-sm font-bold">
+        <span>
+          Order total <span className="text-xs font-normal text-ink-2">(with shipping and tax)</span>
+        </span>
+        <span className="font-mono">{formatMoney(order.total_amount)}</span>
+      </div>
+    </Panel>
+  );
+}
+
+// A signal: a short tag and what it means.
+function Signal({ tag, tone, children }: { tag: string; tone: Tone; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5 text-[13px] leading-[1.45] text-ink-soft">
+      <Badge label={tag} tone={tone} className="w-[62px] shrink-0 justify-center" />
+      <span className="min-w-0">{children}</span>
+    </li>
   );
 }
 
@@ -74,28 +104,136 @@ function LineItems({ detail }: { detail: OrderDetail }) {
 // address check. The agent reads the same thing before deciding.
 function FraudCheck({ detail }: { detail: OrderDetail }) {
   const { risk } = detail.order;
-  if (!risk) return <Empty>{detail.risk_note ?? "Shopify's fraud check isn't available for this order."}</Empty>;
+  if (!risk) {
+    return (
+      <Panel title="Fraud check">
+        <Empty>{detail.risk_note ?? "Shopify's fraud check isn't available for this order."}</Empty>
+      </Panel>
+    );
+  }
+  const badge = riskBadge(risk);
+  const address = risk.billing_matches_shipping;
   return (
-    <div className="grid gap-3 text-sm">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Badge {...riskBadge(risk)} />
-        <p>{riskSummary(risk)}</p>
+    <Panel title="Fraud check" aside={<span title={new Date(risk.checked_at).toLocaleString()}>Checked {timeAgo(risk.checked_at)}</span>}>
+      <ul className="grid gap-2.5 rounded-[10px] border border-hairline bg-well p-3.5">
+        <Signal tag={risk.flagged ? "Risk" : risk.level === "pending" ? "Wait" : "OK"} tone={risk.flagged ? badge.tone : risk.level === "pending" ? "neutral" : "good"}>
+          {riskSummary(risk)}
+        </Signal>
+        {risk.reasons.map((reason) => (
+          <Signal key={reason} tag="Risk" tone="critical">
+            {reason}
+          </Signal>
+        ))}
+        <Signal tag={address === false ? "Note" : "OK"} tone={address === false ? "warning" : address === null ? "neutral" : "good"}>
+          {addressMatchText(address)}
+        </Signal>
+      </ul>
+    </Panel>
+  );
+}
+
+// What happened to the order, newest first: placed, Shopify's fraud check and the agent's calls.
+function Timeline({ detail }: { detail: OrderDetail }) {
+  const { order } = detail;
+  const events: { at: string; tone: Tone; text: React.ReactNode; sub?: string }[] = [];
+  if (order.order_placed_at) events.push({ at: order.order_placed_at, tone: "neutral", text: "Order placed" });
+  if (order.risk && order.risk.level !== "pending") {
+    events.push({
+      at: order.risk.checked_at,
+      tone: order.risk.flagged ? "critical" : "neutral",
+      text: order.risk.level === "none" ? "Shopify's fraud check gave no rating" : `Shopify rated it ${order.risk.level} risk`,
+    });
+  }
+  for (const decision of detail.decisions) {
+    const info = actionInfo(decision.action_taken);
+    events.push({
+      at: decision.created_at,
+      tone: info.tone,
+      text: decision.action_taken === "skipped" ? "The agent was skipped (daily limit)" : (
+        <>
+          Agent recommended <b className="font-semibold">{info.label}</b>
+        </>
+      ),
+      sub: parseReasoning(decision.reasoning).headline || undefined,
+    });
+  }
+  events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return (
+    <Panel title="Timeline">
+      {events.length === 0 ? (
+        <Empty>Nothing recorded yet.</Empty>
+      ) : (
+        <ol className="grid gap-3">
+          {events.map((event, i) => (
+            <li key={i} className="flex gap-3 text-[13px]">
+              <span aria-hidden="true" className={`mt-1 size-[9px] shrink-0 rounded-full ${TONE_DOT[event.tone]}`} />
+              <div className="min-w-0">
+                <div>{event.text}</div>
+                {event.sub && <div className="text-ink-soft">{event.sub}</div>}
+                <time className="text-[12.5px] text-ink-2" dateTime={event.at} title={new Date(event.at).toLocaleString()}>
+                  {when(event.at)}
+                </time>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Panel>
+  );
+}
+
+// The agent's latest call on the order, its reasons, and the seller's rating.
+function AgentCall({ detail }: { detail: OrderDetail }) {
+  const { refresh } = useDashboard();
+  const latest = detail.decisions[0];
+  if (!latest) {
+    return (
+      <section className={`${card} grid gap-2 px-5 py-[18px]`}>
+        <h2 className="flex items-center gap-2 text-[14.5px] font-semibold">
+          <SparkleIcon aria-hidden="true" weight="fill" className="size-4 text-accent" />
+          Agent&rsquo;s call
+        </h2>
+        <Empty>The agent hasn&rsquo;t looked at this order. It checks each new order as it comes in.</Empty>
+      </section>
+    );
+  }
+  const info = actionInfo(latest.action_taken);
+  const { headline, blocks } = parseReasoning(latest.reasoning);
+  const earlier = detail.decisions.length - 1;
+  return (
+    <section className={`${card} grid gap-3.5 px-5 py-[18px] ${TONE_EDGE[info.tone]}`} data-decision={latest.id}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-[14.5px] font-semibold">
+          <SparkleIcon aria-hidden="true" weight="fill" className="size-4 text-accent" />
+          Agent&rsquo;s call
+        </h2>
+        <Badge label={info.label} tone={info.tone} className="!px-3 !py-1 !text-[12.5px]" />
       </div>
-      {risk.reasons.length > 0 && (
-        <div>
-          <p className="mb-1 text-ink-2">What raised the risk:</p>
-          <ul className="grid list-disc gap-0.5 pl-5">
-            {risk.reasons.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
+      {headline && <p className="text-sm leading-[1.55]">{headline}</p>}
+      {blocks.length > 0 && (
+        <div className="grid gap-1.5 rounded-[10px] border border-hairline bg-well p-3.5 text-[13px] leading-[1.45] text-ink-soft">
+          <p className="text-[11.5px] uppercase tracking-[0.06em] text-ink-2">Why</p>
+          {blocks.map((block, i) =>
+            block.type === "bullets" ? (
+              <ul key={i} className="grid list-disc gap-1 pl-4">
+                {block.items.map((item, j) => (
+                  <li key={j}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p key={i}>{block.text}</p>
+            )
+          )}
         </div>
       )}
-      <p className={risk.billing_matches_shipping === false ? "" : "text-ink-2"}>{addressMatchText(risk.billing_matches_shipping)}</p>
-      <p className="text-xs text-ink-2" title={new Date(risk.checked_at).toLocaleString()}>
-        Checked {timeAgo(risk.checked_at)}
+      <p className="text-[12.5px] text-ink-2">
+        <time dateTime={latest.created_at} title={new Date(latest.created_at).toLocaleString()}>
+          {timeAgo(latest.created_at)}
+        </time>
+        {earlier > 0 && ` · ${earlier} earlier ${earlier === 1 ? "call" : "calls"} in the timeline`}
       </p>
-    </div>
+      {canRate(latest.action_taken) && <DecisionFeedback decision={latest} onSaved={() => refresh()} />}
+    </section>
   );
 }
 
@@ -138,90 +276,78 @@ function OrderView() {
   }, [api, id, validId, updatedAt]);
 
   const backLink = (
-    <Link href={back} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-accent hover:underline">
-      <ArrowLeftIcon aria-hidden="true" weight="bold" className="size-4" />
+    <Link href={back} className={`-mb-1.5 inline-flex w-fit items-center gap-1.5 text-[12.5px] text-ink-2 hover:text-ink ${focusRing}`}>
+      <CaretLeftIcon aria-hidden="true" weight="bold" className="size-3.5" />
       Back to orders
     </Link>
   );
 
   if (notFound || !validId) {
     return (
-      <div className="grid gap-3">
+      <>
         {backLink}
         <Panel title="Order not found">
           <Empty>There&rsquo;s no order with that id in your store.</Empty>
         </Panel>
-      </div>
+      </>
     );
   }
   if (!detail) {
     return (
-      <div className="grid gap-3">
+      <>
         {backLink}
         <Panel title="Order">
           <Empty>{error || "Loading the order…"}</Empty>
         </Panel>
-      </div>
+      </>
     );
   }
 
   const { order } = detail;
-  const placed = order.order_placed_at ? new Date(order.order_placed_at) : null;
+  const itemCount = detail.line_items?.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {backLink}
+    <>
+      {backLink}
+      <PageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2.5">
+            <span className="font-mono">{order.order_number ?? `Order ${order.id}`}</span>
+            <Badge {...paymentBadge(order.financial_status)} />
+            <Badge {...fulfillmentBadge(order.status)} />
+            {order.risk && (order.risk.flagged || order.risk.level === "pending") && <Badge label={riskBadge(order.risk).label} tone={riskBadge(order.risk).tone} />}
+          </span>
+        }
+        sub={
+          <>
+            {order.order_placed_at ? `Placed ${when(order.order_placed_at)}` : "Placed —"} · <BuyerName name={order.buyer_name} />
+            {itemCount != null && ` · ${itemCount} ${itemCount === 1 ? "item" : "items"}`}
+          </>
+        }
+      >
         {detail.shopify_admin_url && (
-          <a
-            href={detail.shopify_admin_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-medium transition-colors hover:border-ink-2/40 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
+          <a href={detail.shopify_admin_url} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
             Open in Shopify
             <ArrowSquareOutIcon aria-hidden="true" className="size-4" />
           </a>
         )}
-      </div>
+      </PageHeader>
       {error && (
         <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}
-      <Panel title={`Order ${order.order_number ?? order.id}`}>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Field label="Customer"><BuyerName name={order.buyer_name} /></Field>
-          <Field label="Total">
-            <span className="tabular-nums">{formatMoney(order.total_amount)}</span>
-          </Field>
-          <Field label="Shipping">
-            <Chip>{order.status || "—"}</Chip>
-          </Field>
-          <Field label="Payment">
-            <Chip>{order.financial_status || "—"}</Chip>
-          </Field>
-          <Field label="Placed">{placed ? placed.toLocaleString() : "—"}</Field>
-        </dl>
-      </Panel>
-      <Panel title="Fraud check">
-        <FraudCheck detail={detail} />
-      </Panel>
-      <ShopifyActions orderId={order.id} suggestedReason={suggestedHoldReason(order)} />
-      <Panel title="Items">
-        <LineItems detail={detail} />
-      </Panel>
-      <Panel title="Agent decisions">
-        {detail.decisions.length === 0 ? (
-          <Empty>The agent hasn&rsquo;t looked at this order. It checks each new order as it comes in.</Empty>
-        ) : (
-          <ol className="grid gap-2.5">
-            {detail.decisions.map((decision, i) => (
-              <DecisionCard key={decision.id} decision={decision} title={i === 0 ? "Latest" : "Earlier"} />
-            ))}
-          </ol>
-        )}
-      </Panel>
-    </div>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <div className="grid gap-4">
+          <LineItems detail={detail} />
+          <FraudCheck detail={detail} />
+          <Timeline detail={detail} />
+        </div>
+        <div className="grid gap-4 max-lg:row-start-1">
+          <AgentCall detail={detail} />
+          <ShopifyActions orderId={order.id} suggestedReason={suggestedHoldReason(order)} />
+        </div>
+      </div>
+    </>
   );
 }
 

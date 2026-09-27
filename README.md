@@ -62,9 +62,16 @@ for now).
   decisions. Separately, an alert when a paid order still isn't shipped
   after 12-72 hours, once per order.
   Queued as jobs with keys, so each is sent exactly once.
-- **Dashboard.** An overview of the last 7 days against the 7 before (orders,
-  sales, what needs action, orders flagged for fraud, what runs out soon, the agent's decisions), orders with the agent's verdict and fraud risk (searchable, filterable, paginated, each with its own page: fraud check, hold and fulfill in Shopify, line items and decisions), the decision history with
-  its reasoning, stock with editable levels and restock forecasts, settings,
+- **Dashboard.** A side navigation with live counts and a top bar with the
+  store, order search (Ctrl K) and Sync. An overview of the last 7, 14 or 30
+  days against the same stretch before (orders, sales, what needs action,
+  orders flagged for fraud, the orders waiting on you with the agent's call on
+  each, what runs out soon, the agent's accuracy), orders with the agent's
+  verdict and fraud risk (tabs with counts, searchable, filterable, paginated,
+  each with its own page: the agent's call and rating, fraud signals, hold and
+  fulfill in Shopify, line items and a timeline), the decision history with
+  its reasoning and the seller's notes it learns from, stock with days-left
+  bars, editable levels, restock forecasts and a CSV reorder list, settings,
   and a setup checklist for new accounts.
 - **Is the agent right?** The seller rates each decision thumbs up or down,
   with an optional note on what it should have done. The Decisions page shows

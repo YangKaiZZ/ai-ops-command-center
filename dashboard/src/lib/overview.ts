@@ -2,6 +2,23 @@
 // period before, and numbers short enough for a tile.
 
 export const PERIOD_DAYS = 7;
+// The lengths the Overview offers (?days=); the API allows up to 31 days back.
+export const PERIOD_CHOICES = [7, 14, 30] as const;
+
+// The ?days= value as one of the choices, or the default.
+export function readPeriod(value: string | null): number {
+  const days = Number(value);
+  return (PERIOD_CHOICES as readonly number[]).includes(days) ? days : PERIOD_DAYS;
+}
+
+// The change as a share of the period before, e.g. "+20%", or null when
+// there's nothing before to compare with (or no change).
+export function percentChange(current: number, previous: number): string | null {
+  if (!previous || current === previous) return null;
+  const percent = Math.round(((current - previous) / previous) * 100);
+  if (percent === 0) return null;
+  return `${percent > 0 ? "+" : "−"}${Math.abs(percent)}%`;
+}
 
 // A date as YYYY-MM-DD in the seller's own time zone (what the Orders page's
 // date filter takes).

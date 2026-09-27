@@ -66,6 +66,63 @@ export function stockTone(quantity: number, threshold: number): "critical" | "wa
   return "good";
 }
 
+// An item's status on the Stock page. Out of stock first, then running out
+// within `soonDays` at the current pace (from the forecast), then at or under
+// its own low-stock level.
+export function stockStatus(
+  quantity: number,
+  threshold: number,
+  daysLeft: number | null | undefined,
+  soonDays = 7
+): { label: string; tone: "critical" | "serious" | "warning" | "good" } {
+  if (quantity <= 0) return { label: "Out of stock", tone: "critical" };
+  if (daysLeft != null && daysLeft <= soonDays) return { label: "Out soon", tone: "serious" };
+  if (quantity <= threshold) return { label: "Low", tone: "warning" };
+  return { label: "OK", tone: "good" };
+}
+
+// How full the days-left bar is: days left as a share of the days a reorder
+// covers, clamped to 0-100. Null when it isn't selling (no run-out date).
+export function daysLeftPercent(daysLeft: number | null, coverDays: number): number | null {
+  if (daysLeft == null) return null;
+  return Math.min(100, Math.max(0, (daysLeft / Math.max(coverDays, 1)) * 100));
+}
+
+const FULFILLMENT: Record<string, { label: string; tone: Tone }> = {
+  unfulfilled: { label: "Unfulfilled", tone: "warning" },
+  partial: { label: "Partly shipped", tone: "warning" },
+  fulfilled: { label: "Fulfilled", tone: "good" },
+  restocked: { label: "Restocked", tone: "neutral" },
+};
+
+const PAYMENT: Record<string, { label: string; tone: Tone }> = {
+  paid: { label: "Paid", tone: "neutral" },
+  pending: { label: "Pending", tone: "warning" },
+  authorized: { label: "Authorized", tone: "neutral" },
+  partially_paid: { label: "Partly paid", tone: "warning" },
+  partially_refunded: { label: "Partly refunded", tone: "neutral" },
+  refunded: { label: "Refunded", tone: "neutral" },
+  voided: { label: "Voided", tone: "neutral" },
+  expired: { label: "Expired", tone: "warning" },
+};
+
+// "some_status" as "Some status", for values Shopify adds later.
+const sentence = (value: string) => {
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+// An order's shipping status as a pill. Shopify leaves it empty until something ships.
+export function fulfillmentBadge(status: string | null): { label: string; tone: Tone } {
+  return FULFILLMENT[status || "unfulfilled"] ?? { label: sentence(status!), tone: "neutral" };
+}
+
+// An order's payment status as a pill.
+export function paymentBadge(status: string | null): { label: string; tone: Tone } {
+  if (!status) return { label: "Unknown", tone: "neutral" };
+  return PAYMENT[status] ?? { label: sentence(status), tone: "neutral" };
+}
+
 // How full the bar is: stock as a share of the threshold, clamped to 0-100.
 export function stockPercent(quantity: number, threshold: number): number {
   return Math.min(100, Math.max(0, (quantity / Math.max(threshold, 1)) * 100));

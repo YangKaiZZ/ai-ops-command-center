@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useDashboard } from "@/components/DashboardProvider";
 import { ChatCircleDotsIcon, EraserIcon, PaperPlaneRightIcon } from "@/components/icons";
-import { inputClass, Note, primaryButton, type Message } from "@/components/ui";
+import { inputClass, Note, PageHeader, primaryButton, type Message } from "@/components/ui";
 import {
   MAX_QUESTION,
   ordersSearchHref,
@@ -82,7 +82,12 @@ function Bubble({ message }: { message: ChatMessage }) {
 export default function ChatPage() {
   const { session } = useDashboard();
   const key = storageKey(session.token);
-  return <Chat key={key} storageKey={key} />;
+  return (
+    <>
+      <PageHeader title="Chat" sub="Questions about your orders, stock and the agent's calls, answered from your own data" />
+      <Chat key={key} storageKey={key} />
+    </>
+  );
 }
 
 function Chat({ storageKey: key }: { storageKey: string }) {

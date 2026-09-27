@@ -6,9 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { BuyerName } from "@/components/BuyerName";
 import { useDashboard } from "@/components/DashboardProvider";
-import { Empty, Panel } from "@/components/Panel";
+import { MagnifyingGlassIcon } from "@/components/icons";
+import { card, Empty } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
-import { actionInfo, formatMoney, riskBadge, riskSummary, riskWorthShowing } from "@/lib/format";
+import { eyebrow, fieldClass, focusRing, PageHeader, secondaryButton, small, Tabs, type TabItem } from "@/components/ui";
+import { actionInfo, formatMoney, fulfillmentBadge, paymentBadge, riskBadge, riskSummary } from "@/lib/format";
 import {
   filtersUrl,
   hasFilters,
@@ -24,19 +26,25 @@ import { useApi } from "@/lib/useApi";
 
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 300;
-const pageButton =
-  "rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
-const fieldClass =
-  "rounded-lg border border-hairline bg-page px-2.5 py-1.5 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block whitespace-nowrap rounded-full border border-border bg-ink/5 px-2 text-xs text-ink-2">{children}</span>
-  );
+// The tabs are presets of the filters: each keeps the search, payment and
+// dates, and sets the rest.
+type View = "all" | "needs" | "flagged" | "fulfilled";
+const VIEWS: { key: View; label: string; set: Pick<OrderFilters, "needsAction" | "flagged" | "status"> }[] = [
+  { key: "all", label: "All", set: { needsAction: false, flagged: false, status: "" } },
+  { key: "needs", label: "Needs action", set: { needsAction: true, flagged: false, status: "" } },
+  { key: "flagged", label: "Flagged for fraud", set: { needsAction: false, flagged: true, status: "" } },
+  { key: "fulfilled", label: "Fulfilled", set: { needsAction: false, flagged: false, status: "fulfilled" } },
+];
+
+// Which tab the filters are, or null for a mix no tab matches.
+function viewOf(f: OrderFilters): View | null {
+  const match = VIEWS.find((v) => v.set.needsAction === f.needsAction && v.set.flagged === f.flagged && v.set.status === f.status);
+  return match?.key ?? null;
 }
 
-// Search, the two statuses, a date range, "needs action" and fraud risk. Every change
-// goes to the URL (back to page 1); typing in the search box waits for a pause.
+// Search, payment, shipping and a date range. Every change goes to the URL
+// (back to page 1); typing in the search box waits for a pause.
 function FilterBar({ filters, apply }: { filters: OrderFilters; apply: (f: OrderFilters) => void }) {
   const [text, setText] = useState(filters.q);
   // The search the URL had when `text` was last taken from it or sent to it. When
@@ -63,29 +71,24 @@ function FilterBar({ filters, apply }: { filters: OrderFilters; apply: (f: Order
     <form
       role="search"
       aria-label="Filter orders"
-      className="mb-3 flex flex-wrap items-end gap-2"
+      className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3 sm:px-[18px]"
       onSubmit={(event) => {
         event.preventDefault();
         set({});
       }}
     >
-      <input
-        type="search"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        maxLength={100}
-        placeholder="Order number or customer"
-        aria-label="Search by order number or customer"
-        className={`${fieldClass} min-w-[12rem] flex-1`}
-      />
-      <select aria-label="Shipping status" value={filters.status} onChange={(e) => set({ status: e.target.value })} className={fieldClass}>
-        <option value="">Any shipping</option>
-        {SHIPPING_OPTIONS.map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+      <span className={`${fieldClass} flex min-w-[12rem] flex-1 items-center gap-2 focus-within:border-accent/50`}>
+        <MagnifyingGlassIcon aria-hidden="true" className="size-[15px] shrink-0 text-ink-2" />
+        <input
+          type="search"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          maxLength={100}
+          placeholder="Order number or customer"
+          aria-label="Search by order number or customer"
+          className="min-w-0 flex-1 bg-transparent placeholder:text-ink-2 focus:outline-none"
+        />
+      </span>
       <select aria-label="Payment status" value={filters.payment} onChange={(e) => set({ payment: e.target.value })} className={fieldClass}>
         <option value="">Any payment</option>
         {PAYMENT_OPTIONS.map(([value, label]) => (
@@ -94,24 +97,24 @@ function FilterBar({ filters, apply }: { filters: OrderFilters; apply: (f: Order
           </option>
         ))}
       </select>
-      <label className="flex items-center gap-1.5 text-sm text-ink-2">
+      <select aria-label="Shipping status" value={filters.status} onChange={(e) => set({ status: e.target.value })} className={fieldClass}>
+        <option value="">Any shipping</option>
+        {SHIPPING_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <label className="flex items-center gap-1.5 text-[13px] text-ink-2">
         From
         <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => set({ from: e.target.value })} className={fieldClass} />
       </label>
-      <label className="flex items-center gap-1.5 text-sm text-ink-2">
+      <label className="flex items-center gap-1.5 text-[13px] text-ink-2">
         To
         <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => set({ to: e.target.value })} className={fieldClass} />
       </label>
-      <label className="flex items-center gap-1.5 py-1.5 text-sm">
-        <input type="checkbox" checked={filters.needsAction} onChange={(e) => set({ needsAction: e.target.checked })} className="size-4 accent-accent" />
-        Needs action
-      </label>
-      <label className="flex items-center gap-1.5 py-1.5 text-sm">
-        <input type="checkbox" checked={filters.flagged} onChange={(e) => set({ flagged: e.target.checked })} className="size-4 accent-accent" />
-        Flagged for fraud
-      </label>
       {hasFilters(filters) && (
-        <button type="button" onClick={() => apply(NO_FILTERS)} className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-accent hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        <button type="button" onClick={() => apply(NO_FILTERS)} className={`rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-ink/5 ${focusRing}`}>
           Clear filters
         </button>
       )}
@@ -125,19 +128,20 @@ function Pager({ page, total, filters }: { page: number; total: number; filters:
   const first = (page - 1) * PAGE_SIZE + 1;
   const last = Math.min(page * PAGE_SIZE, total);
   const noun = hasFilters(filters) ? "matching orders" : "orders";
+  const button = `${secondaryButton} ${small}`;
   return (
-    <nav aria-label="Order pages" className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+    <nav aria-label="Order pages" className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-[12.5px] sm:px-[18px]">
       <span className="text-ink-2" aria-live="polite">
-        {first <= total ? `${first}–${last} of ${total} ${noun}` : `${total} ${noun}`}
+        {first <= total ? `Showing ${first}–${last} of ${total} ${noun}` : `${total} ${noun}`}
       </span>
       {pages > 1 && (
         <div className="flex items-center gap-2">
           {page > 1 ? (
-            <Link href={filtersUrl(filters, page - 1)} className={pageButton}>
+            <Link href={filtersUrl(filters, page - 1)} className={button}>
               Previous
             </Link>
           ) : (
-            <span className={`${pageButton} cursor-not-allowed opacity-50`} aria-disabled="true">
+            <span className={`${button} cursor-not-allowed opacity-50`} aria-disabled="true">
               Previous
             </span>
           )}
@@ -145,11 +149,11 @@ function Pager({ page, total, filters }: { page: number; total: number; filters:
             Page {Math.min(page, pages)} of {pages}
           </span>
           {page < pages ? (
-            <Link href={filtersUrl(filters, page + 1)} className={pageButton}>
+            <Link href={filtersUrl(filters, page + 1)} className={button}>
               Next
             </Link>
           ) : (
-            <span className={`${pageButton} cursor-not-allowed opacity-50`} aria-disabled="true">
+            <span className={`${button} cursor-not-allowed opacity-50`} aria-disabled="true">
               Next
             </span>
           )}
@@ -158,6 +162,9 @@ function Pager({ page, total, filters }: { page: number; total: number; filters:
     </nav>
   );
 }
+
+const th = `${eyebrow} whitespace-nowrap px-3 py-3 text-left first:pl-4 last:pr-4 sm:first:pl-[18px] sm:last:pr-[18px]`;
+const td = "whitespace-nowrap px-3 py-3.5 first:pl-4 last:pr-4 sm:first:pl-[18px] sm:last:pr-[18px]";
 
 function OrdersList() {
   const { data, updatedAt } = useDashboard();
@@ -169,6 +176,7 @@ function OrdersList() {
   const page = Math.max(1, Math.floor(Number(searchParams.get("page"))) || 1);
   const query = ordersApiQuery(filters, page, PAGE_SIZE);
   const [result, setResult] = useState<(OrdersPage & { query: string }) | null>(null);
+  const [counts, setCounts] = useState<Partial<Record<View, number>>>({});
   const [error, setError] = useState("");
 
   const apply = useCallback((f: OrderFilters) => router.replace(filtersUrl(f), { scroll: false }), [router]);
@@ -190,23 +198,51 @@ function OrdersList() {
     };
   }, [api, query, updatedAt]);
 
+  // Each tab's count, with the same search, payment and dates.
+  const countsKey = JSON.stringify({ q: filters.q, payment: filters.payment, from: filters.from, to: filters.to });
+  useEffect(() => {
+    let cancelled = false;
+    const base = JSON.parse(countsKey) as Pick<OrderFilters, "q" | "payment" | "from" | "to">;
+    Promise.all(
+      VIEWS.map((v) => api<OrdersPage>(`/api/orders?${ordersApiQuery({ ...NO_FILTERS, ...base, ...v.set }, 1, 1)}`).then((body) => [v.key, body.total] as const))
+    )
+      .then((pairs) => {
+        if (!cancelled) setCounts(Object.fromEntries(pairs));
+      })
+      .catch(() => {}); // the list shows any error; the tabs just go without counts
+    return () => {
+      cancelled = true;
+    };
+  }, [api, countsKey, updatedAt]);
+
   if (!data || (!result && !error)) return <Empty>Loading orders…</Empty>;
 
   const filtered = hasFilters(filters);
   // A store with no orders at all gets the setup messages, not an empty filter bar.
   if (result && result.total === 0 && !filtered) {
-    return data.settings.store.connected ? (
-      <Empty>No orders synced yet. Use “Sync from Shopify”.</Empty>
-    ) : (
-      <Empty>
-        Connect your store in{" "}
-        <Link href="/settings" className="text-accent underline">
-          Settings
-        </Link>{" "}
-        to see your orders here.
-      </Empty>
+    return (
+      <div className={`${card} px-5 py-4`}>
+        {data.settings.store.connected ? (
+          <Empty>No orders synced yet. Use “Sync now” at the top.</Empty>
+        ) : (
+          <Empty>
+            Connect your store in{" "}
+            <Link href="/settings" className="text-accent underline">
+              Settings
+            </Link>{" "}
+            to see your orders here.
+          </Empty>
+        )}
+      </div>
     );
   }
+
+  const tabs: TabItem<View>[] = VIEWS.map((v) => ({
+    key: v.key,
+    label: v.label,
+    count: counts[v.key] ?? null,
+    href: filtersUrl({ ...filters, ...v.set }),
+  }));
 
   const stale = result !== null && result.query !== query; // the previous view, until this one arrives
   const listUrl = filtersUrl(filters, page);
@@ -216,70 +252,88 @@ function OrdersList() {
     body = null;
   } else if (!stale && result.total === 0) {
     body = (
-      <Empty>
-        No orders match these filters.{" "}
-        <button type="button" onClick={() => apply(NO_FILTERS)} className="text-accent underline">
-          Clear filters
-        </button>
-      </Empty>
+      <div className="px-4 py-3 sm:px-[18px]">
+        <Empty>
+          No orders match these filters.{" "}
+          <button type="button" onClick={() => apply(NO_FILTERS)} className="text-accent underline">
+            Clear filters
+          </button>
+        </Empty>
+      </div>
     );
   } else if (!stale && result.orders.length === 0) {
     body = (
-      <Empty>
-        There&rsquo;s no page {page}.{" "}
-        <Link href={filtersUrl(filters)} className="text-accent underline">
-          Back to the first page
-        </Link>
-      </Empty>
+      <div className="px-4 py-3 sm:px-[18px]">
+        <Empty>
+          There&rsquo;s no page {page}.{" "}
+          <Link href={filtersUrl(filters)} className="text-accent underline">
+            Back to the first page
+          </Link>
+        </Empty>
+      </div>
     );
   } else {
     body = (
       <>
         <div className="overflow-x-auto" aria-busy={stale}>
-          <table className={`w-full border-collapse text-sm ${stale ? "opacity-60" : ""}`}>
+          <table className={`w-full border-collapse text-[13.5px] ${stale ? "opacity-60" : ""}`}>
             <thead>
-              <tr className="border-b border-hairline text-left font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-ink-2">
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3">Order</th>
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3">Customer</th>
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3 text-right">Total</th>
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3">Shipping</th>
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3">Payment</th>
-                <th scope="col" className="whitespace-nowrap pb-2 pr-3">Placed</th>
-                <th scope="col" className="whitespace-nowrap pb-2">Agent verdict</th>
+              <tr>
+                <th scope="col" className={th}>Order</th>
+                <th scope="col" className={th}>Customer</th>
+                <th scope="col" className={`${th} text-right`}>Total</th>
+                <th scope="col" className={th}>Payment</th>
+                <th scope="col" className={th}>Fulfillment</th>
+                <th scope="col" className={th}>Agent</th>
+                <th scope="col" className={th}>Fraud risk</th>
+                <th scope="col" className={th}>Placed</th>
               </tr>
             </thead>
             <tbody>
               {result.orders.map((order) => {
                 const action = order.latest_decision && actionInfo(order.latest_decision.action_taken);
                 const placed = order.order_placed_at ? new Date(order.order_placed_at) : null;
-                const risk = riskWorthShowing(order.risk) ? order.risk : null;
+                const risk = order.risk;
+                const href = detailHref(order.id);
                 return (
-                  <tr key={order.id} className="border-b border-hairline transition-colors last:border-0 hover:bg-ink/[0.03]" data-order={order.order_number ?? ""}>
-                    <td className="py-2.5 pr-3 font-semibold">
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={detailHref(order.id)} className="text-accent hover:underline focus-visible:underline">
-                          {order.order_number ?? `Order ${order.id}`}
-                        </Link>
-                        {risk && (
-                          <span title={[riskSummary(risk), ...risk.reasons].join("\n")}>
-                            <Badge {...riskBadge(risk)} />
-                          </span>
-                        )}
-                      </span>
+                  <tr
+                    key={order.id}
+                    onClick={(event) => {
+                      // The whole row opens the order; the link in it is there for keyboards.
+                      if (!(event.target as HTMLElement).closest("a")) router.push(href);
+                    }}
+                    className={`cursor-pointer border-t border-hairline transition-colors hover:bg-line ${risk?.flagged ? "bg-critical/[0.04]" : ""}`}
+                    data-order={order.order_number ?? ""}
+                  >
+                    <td className={`${td} font-mono font-semibold`}>
+                      <Link href={href} className={`hover:text-accent ${focusRing}`}>
+                        {order.order_number ?? `Order ${order.id}`}
+                      </Link>
                     </td>
-                    <td className="py-2.5 pr-3"><BuyerName name={order.buyer_name} /></td>
-                    <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(order.total_amount)}</td>
-                    <td className="py-2.5 pr-3"><Chip>{order.status || "—"}</Chip></td>
-                    <td className="py-2.5 pr-3"><Chip>{order.financial_status || "—"}</Chip></td>
-                    <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums" title={placed?.toLocaleString()}>
-                      {placed ? placed.toLocaleDateString() : "—"}
+                    <td className={td}>
+                      <BuyerName name={order.buyer_name} />
                     </td>
-                    <td className="py-2.5">
-                      {action ? (
-                        <Badge label={action.label} tone={action.tone} icon={action.icon} />
+                    <td className={`${td} text-right font-mono`}>{formatMoney(order.total_amount)}</td>
+                    <td className={td}>
+                      <Badge {...paymentBadge(order.financial_status)} />
+                    </td>
+                    <td className={td}>
+                      <Badge {...fulfillmentBadge(order.status)} />
+                    </td>
+                    <td className={td}>
+                      {action ? <Badge label={action.label} tone={action.tone} /> : <span className="text-[12.5px] text-ink-2">No call</span>}
+                    </td>
+                    <td className={td}>
+                      {risk ? (
+                        <span title={[riskSummary(risk), ...risk.reasons].join("\n")}>
+                          <Badge label={riskBadge(risk).label} tone={risk.flagged || risk.level === "pending" ? riskBadge(risk).tone : "neutral"} />
+                        </span>
                       ) : (
-                        <span className="text-sm text-ink-2">No decision</span>
+                        <span className="text-ink-2">—</span>
                       )}
+                    </td>
+                    <td className={`${td} text-[12.5px] text-ink-2`} title={placed?.toLocaleString()}>
+                      {placed ? placed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: placed.getFullYear() === new Date().getFullYear() ? undefined : "numeric" }) : "—"}
                     </td>
                   </tr>
                 );
@@ -294,13 +348,16 @@ function OrdersList() {
 
   return (
     <>
-      <FilterBar filters={filters} apply={apply} />
+      <Tabs label="Order views" tabs={tabs} active={viewOf(filters)} />
       {error && (
-        <p role="alert" className="mb-2 text-sm text-error">
+        <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}
-      {body}
+      <section className={`${card} overflow-hidden`}>
+        <FilterBar filters={filters} apply={apply} />
+        {body}
+      </section>
     </>
   );
 }
@@ -309,14 +366,13 @@ export default function OrdersPage() {
   const { data } = useDashboard();
 
   return (
-    <div className="grid gap-4">
+    <>
+      <PageHeader title="Orders" sub="Every order from your store, with the agent's call on each" />
       {data && <SetupChecklist settings={data.settings} />}
-      <Panel title="Orders">
-        {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
-        <Suspense fallback={<Empty>Loading orders…</Empty>}>
-          <OrdersList />
-        </Suspense>
-      </Panel>
-    </div>
+      {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
+      <Suspense fallback={<Empty>Loading orders…</Empty>}>
+        <OrdersList />
+      </Suspense>
+    </>
   );
 }

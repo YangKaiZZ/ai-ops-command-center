@@ -1,28 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { useDashboard } from "@/components/DashboardProvider";
-import { Empty, Panel } from "@/components/Panel";
-import { secondaryButton } from "@/components/ui";
-import { forecastPhrases, historySummary, roughNote, shortDate, stockPercent, stockTone } from "@/lib/format";
+import { DownloadSimpleIcon } from "@/components/icons";
+import { card, Empty, Panel } from "@/components/Panel";
+import { eyebrow, focusRing, PageHeader, secondaryButton, small, Tabs } from "@/components/ui";
+import { daysLeftPercent, historySummary, roughNote, shortDate, stockStatus } from "@/lib/format";
+import { localDay } from "@/lib/overview";
+import { perDayText, reorderCsv, SOON_DAYS, stockCounts } from "@/lib/stock";
 import { jsonBody, useApi } from "@/lib/useApi";
 import type { Forecast, InventoryItem, ItemForecast } from "@/lib/types";
 
-// Fill = the status color; track = a lighter step of the same hue.
-const METER_CLASSES = {
-  critical: { track: "bg-critical/20", fill: "bg-critical" },
-  warning: { track: "bg-warning/25", fill: "bg-warning" },
-  good: { track: "bg-good/20", fill: "bg-good" },
-} as const;
-
-const STATUS_BADGES = {
-  critical: <Badge label="Out of stock" tone="critical" icon="empty" />,
-  warning: <Badge label="Low" tone="warning" icon="alert" />,
-  good: <Badge label="OK" tone="good" icon="check" />,
-} as const;
+// Tailwind only sees class names written out in full.
+const BAR = { critical: "bg-critical", serious: "bg-serious", warning: "bg-warning", good: "bg-good" } as const;
+const NUMBER = { critical: "text-critical", serious: "text-serious", warning: "text-warning", good: "" } as const;
 
 // The item's own low-stock level, saved when changed.
 function ThresholdField({ item, onSaved }: { item: InventoryItem; onSaved: () => Promise<void> }) {
@@ -47,9 +41,9 @@ function ThresholdField({ item, onSaved }: { item: InventoryItem; onSaved: () =>
   }
 
   return (
-    <form onSubmit={save} className="flex flex-wrap items-center gap-2 text-sm">
-      <label htmlFor={`threshold-${item.id}`} className="text-ink-2">
-        Low at or below
+    <form onSubmit={save} className="flex items-center gap-1.5">
+      <label htmlFor={`threshold-${item.id}`} className="sr-only">
+        {item.item_name}: low at or below
       </label>
       <input
         id={`threshold-${item.id}`}
@@ -59,87 +53,101 @@ function ThresholdField({ item, onSaved }: { item: InventoryItem; onSaved: () =>
         required
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="w-20 rounded-lg border border-hairline bg-page px-2 py-1 text-sm tabular-nums text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className={`w-16 rounded-md border border-border bg-field px-2 py-1 font-mono text-[13px] tabular-nums text-ink ${focusRing}`}
       />
       {changed && (
-        <button type="submit" disabled={busy} className={`${secondaryButton} py-1`}>
+        <button type="submit" disabled={busy} className={`${secondaryButton} ${small}`}>
           {busy ? "Saving…" : "Save"}
         </button>
       )}
       {error && (
-        <span role="alert" className="text-error">
-          {error}
+        <span role="alert" className="text-xs text-error" title={error}>
+          Not saved
         </span>
       )}
     </form>
   );
 }
 
-// How fast it sells, when it runs out and how many to reorder, e.g.
-// "Sells about 1.3 a day · runs out in about 8 days (Oct 3) · Reorder 30 to last 30 days".
-function ForecastLine({ forecast, lookbackDays, coverDays }: { forecast: ItemForecast; lookbackDays: number; coverDays: number }) {
-  const parts: React.ReactNode[] = forecastPhrases(forecast, lookbackDays, shortDate);
-  if (forecast.reorder_quantity > 0) {
-    parts.push(
-      <>
-        <span className="font-medium text-ink">Reorder {forecast.reorder_quantity}</span>{" "}
-        {/* Not selling but below zero: the reorder is what's already been sold. */}
-        {forecast.units_sold > 0 ? `to last ${coverDays} days` : "to cover what's oversold"}
-      </>
-    );
-  }
-  const rough = roughNote(forecast);
-  if (rough) parts.push(rough);
-  return (
-    <p className="text-sm text-ink-2">
-      {parts.map((part, i) => (
-        <Fragment key={i}>
-          {i > 0 && " · "}
-          {part}
-        </Fragment>
-      ))}
-    </p>
-  );
-}
-
-type ForecastContext = { lookbackDays: number; coverDays: number };
+const th = `${eyebrow} whitespace-nowrap px-3 py-3 text-left first:pl-5 last:pr-5`;
+const td = "whitespace-nowrap px-3 py-3 first:pl-5 last:pr-5";
 
 function StockRow({
   item,
   forecast,
-  context,
+  coverDays,
+  lookbackDays,
   onSaved,
 }: {
   item: InventoryItem;
   forecast?: ItemForecast;
-  context?: ForecastContext;
+  coverDays: number;
+  lookbackDays: number;
   onSaved: () => Promise<void>;
 }) {
-  const tone = stockTone(item.stock_quantity, item.low_stock_threshold);
-  const meter = METER_CLASSES[tone];
+  const status = stockStatus(item.stock_quantity, item.low_stock_threshold, forecast?.days_left, SOON_DAYS);
+  const soldOut = item.stock_quantity <= 0;
+  const percent = soldOut ? 0 : forecast ? daysLeftPercent(forecast.days_left, coverDays) : null;
+  const rough = forecast && roughNote(forecast);
+  const note = rough
+    ? rough.charAt(0).toUpperCase() + rough.slice(1)
+    : forecast && forecast.units_sold === 0
+      ? `No sales in the last ${lookbackDays} days`
+      : null;
   return (
-    <li className="grid gap-1.5 border-b border-hairline pb-4 last:border-0 last:pb-0" data-tone={tone}>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium [overflow-wrap:anywhere]">{item.item_name}</span>
-        <span className="whitespace-nowrap text-sm tabular-nums text-ink-2">{item.stock_quantity} in stock</span>
-      </div>
-      <div
-        role="meter"
-        aria-label={`${item.item_name} stock against its low-stock level`}
-        aria-valuemin={0}
-        aria-valuemax={item.low_stock_threshold}
-        aria-valuenow={item.stock_quantity}
-        className={`h-2 overflow-hidden rounded ${meter.track}`}
-      >
-        <div className={`h-full rounded ${meter.fill}`} style={{ width: `${stockPercent(item.stock_quantity, item.low_stock_threshold)}%` }} />
-      </div>
-      {forecast && context && <ForecastLine forecast={forecast} {...context} />}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {STATUS_BADGES[tone]}
+    <tr className="border-t border-hairline" data-tone={status.tone}>
+      <td className={`${td} whitespace-normal`}>
+        <div className="min-w-40 font-semibold [overflow-wrap:anywhere]">{item.item_name}</div>
+        {note && <div className="text-[11.5px] text-ink-2">{note}</div>}
+      </td>
+      <td className={`${td} font-mono ${soldOut ? "text-critical" : ""}`}>{item.stock_quantity}</td>
+      <td className={`${td} font-mono`}>{forecast ? perDayText(forecast.per_day) : "—"}</td>
+      <td className={td}>
+        {percent == null ? (
+          <span className="text-ink-2">{forecast ? "Not selling" : "—"}</span>
+        ) : (
+          <div
+            className="flex w-44 items-center gap-2.5"
+            role="meter"
+            aria-label={`${item.item_name}: days of stock left`}
+            aria-valuemin={0}
+            aria-valuemax={coverDays}
+            aria-valuenow={soldOut ? 0 : Math.round(forecast?.days_left ?? 0)}
+          >
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline">
+              <div className={`h-full rounded-full ${BAR[status.tone]}`} style={{ width: `${percent}%` }} />
+            </div>
+            <span className={`w-9 text-right font-mono ${NUMBER[status.tone]}`}>{soldOut ? 0 : Math.round(forecast?.days_left ?? 0)}</span>
+          </div>
+        )}
+      </td>
+      <td className={`${td} text-[12.5px] text-ink-2`}>{soldOut ? "Sold out" : forecast?.runs_out_at ? shortDate(forecast.runs_out_at) : "—"}</td>
+      <td className={`${td} font-mono font-semibold`}>
+        {forecast && forecast.reorder_quantity > 0 ? (
+          <span title={forecast.units_sold > 0 ? `To last ${coverDays} days at the current pace` : "To cover what's oversold"}>
+            {forecast.reorder_quantity} {forecast.reorder_quantity === 1 ? "unit" : "units"}
+          </span>
+        ) : (
+          <span className="font-normal text-ink-2">—</span>
+        )}
+      </td>
+      <td className={td}>
+        <Badge label={status.label} tone={status.tone} />
+      </td>
+      <td className={td}>
         {/* Keyed by the saved value, so a save elsewhere (e.g. "apply to all") resets the field. */}
         <ThresholdField key={item.low_stock_threshold} item={item} onSaved={onSaved} />
-      </div>
-    </li>
+      </td>
+    </tr>
+  );
+}
+
+function Stat({ label, value, tone = "" }: { label: string; value: number | null; tone?: string }) {
+  return (
+    <div className={`${card} grid gap-1 px-[18px] py-3.5`}>
+      <span className="text-[12.5px] text-ink-2">{label}</span>
+      <span className={`font-mono text-2xl font-bold ${tone}`}>{value ?? "…"}</span>
+    </div>
   );
 }
 
@@ -148,6 +156,15 @@ function noReorderText(forecast: Forecast | null, error: string) {
   if (!forecast) return error || "Working out restock forecasts…";
   if (!forecast.history.from) return "No orders yet, so there's nothing to forecast from.";
   return `Nothing needs reordering to last the next ${forecast.cover_days} days.`;
+}
+
+function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 type Show = "low" | "reorder" | "all";
@@ -183,99 +200,136 @@ function StockView() {
 
   if (!data) {
     return (
-      <Panel title="Stock">
-        <Empty>Loading stock…</Empty>
-      </Panel>
+      <>
+        <PageHeader title="Stock" />
+        <Panel title="Stock">
+          <Empty>Loading stock…</Empty>
+        </Panel>
+      </>
     );
   }
 
   const forecasts = new Map(forecast?.items.map((f) => [f.id, f]));
   const inventoryById = new Map(data.inventory.map((item) => [item.id, item]));
   // Soonest to run out first, as the forecast lists them.
-  const toReorder = (forecast?.items ?? [])
-    .filter((f) => f.reorder_quantity > 0)
-    .flatMap((f) => inventoryById.get(f.id) ?? []);
+  const toReorder = (forecast?.items ?? []).filter((f) => f.reorder_quantity > 0).flatMap((f) => inventoryById.get(f.id) ?? []);
   const items = show === "low" ? data.lowStock : show === "reorder" ? toReorder : data.inventory;
-  const filters = [
-    { key: "low" as const, label: "Low", count: data.lowStock.length },
-    { key: "reorder" as const, label: "Reorder", count: forecast ? toReorder.length : null },
-    { key: "all" as const, label: "All items", count: data.inventory.length },
-  ];
-  const context = forecast ? { lookbackDays: forecast.lookback_days, coverDays: forecast.cover_days } : undefined;
+  const counts = stockCounts(data.inventory, forecast?.items ?? null);
+  const coverDays = forecast?.cover_days ?? 30;
   const emptyText = {
     low: "Everything is above its low-stock level.",
     reorder: noReorderText(forecast, forecastError),
-    all: "No tracked items yet. Use “Sync from Shopify”.",
+    all: "No tracked items yet. Use “Sync now” at the top.",
   }[show];
 
   return (
-    <Panel title="Stock">
-      <div className="grid max-w-2xl gap-4">
-        <div role="group" aria-label="Show" className="flex w-fit gap-1 rounded-lg border border-hairline p-0.5">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              aria-pressed={show === f.key}
-              onClick={() => setShow(f.key)}
-              className={`rounded-md px-3 py-1 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                show === f.key ? "bg-ink/8 text-ink" : "text-ink-2 hover:text-ink"
-              }`}
-            >
-              {f.label} {f.count !== null && <span className="tabular-nums text-ink-2">{f.count}</span>}
-            </button>
-          ))}
-        </div>
+    <>
+      <PageHeader
+        title="Stock"
+        sub={forecast ? historySummary(forecast.history, shortDate) : forecastError ? undefined : "Working out restock forecasts…"}
+      >
+        <button
+          type="button"
+          disabled={!forecast || toReorder.length === 0}
+          onClick={() => forecast && download(`reorder-list-${localDay(new Date())}.csv`, reorderCsv(forecast.items, forecast.cover_days, (iso) => localDay(new Date(iso))))}
+          className={`${secondaryButton} disabled:!cursor-not-allowed`}
+          title={toReorder.length === 0 ? "Nothing to reorder right now" : "A CSV of what to reorder, soonest to run out first"}
+        >
+          <DownloadSimpleIcon aria-hidden="true" weight="bold" className="size-4" />
+          Export reorder list
+        </button>
+      </PageHeader>
 
-        {forecast && data.inventory.length > 0 && <p className="text-sm text-ink-2">{historySummary(forecast.history, shortDate)}</p>}
-        {forecastError && (
-          <p role="alert" className="text-sm text-error">
-            {forecastError}
-          </p>
-        )}
-
-        {!data.settings.store.connected && data.inventory.length === 0 ? (
-          <Empty>
-            Connect your store in{" "}
-            <Link href="/settings" className="text-accent underline">
-              Settings
-            </Link>{" "}
-            to see your stock here.
-          </Empty>
-        ) : items.length === 0 ? (
-          <Empty>{emptyText}</Empty>
-        ) : (
-          <ul className="grid gap-4">
-            {items.map((item) => (
-              <StockRow key={item.id} item={item} forecast={forecasts.get(item.id)} context={context} onSaved={refresh} />
-            ))}
-          </ul>
-        )}
-        <p className="text-xs text-ink-2">
-          An item counts as low at or below its level. New items start at{" "}
-          {data.settings.inventory.default_low_stock_threshold}; change that in{" "}
-          <Link href="/settings" className="text-accent underline">
-            Settings
-          </Link>
-          .
-          {forecast &&
-            ` Sales pace comes from the last ${forecast.lookback_days} days of orders (refunded ones don't count), and reorder amounts last ${forecast.cover_days} days at that pace. A forecast from under 3 orders or under a week of orders is marked as a rough estimate.`}
-        </p>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Tracked items" value={counts.tracked} />
+        <Stat label={`Run out within ${SOON_DAYS} days`} value={counts.runningOut} tone={counts.runningOut ? "text-warning" : ""} />
+        <Stat label="Out of stock" value={counts.outOfStock} tone={counts.outOfStock ? "text-critical" : ""} />
+        <Stat label="To reorder" value={counts.toReorder} />
       </div>
-    </Panel>
+
+      <Tabs
+        label="Show"
+        active={show}
+        onSelect={setShow}
+        tabs={[
+          { key: "low", label: "Low", count: data.lowStock.length },
+          { key: "reorder", label: "Reorder", count: forecast ? toReorder.length : null },
+          { key: "all", label: "All items", count: data.inventory.length },
+        ]}
+      />
+
+      {forecastError && (
+        <p role="alert" className="text-sm text-error">
+          {forecastError}
+        </p>
+      )}
+
+      <section className={`${card} overflow-hidden`}>
+        {!data.settings.store.connected && data.inventory.length === 0 ? (
+          <div className="px-5 py-4">
+            <Empty>
+              Connect your store in{" "}
+              <Link href="/settings" className="text-accent underline">
+                Settings
+              </Link>{" "}
+              to see your stock here.
+            </Empty>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="px-5 py-4">
+            <Empty>{emptyText}</Empty>
+          </div>
+        ) : (
+          // `relative` keeps the fields' screen-reader labels (absolutely placed) inside the scroll box.
+          <div className="relative overflow-x-auto">
+            <table className="w-full border-collapse text-[13.5px]">
+              <thead>
+                <tr>
+                  <th scope="col" className={th}>Item</th>
+                  <th scope="col" className={th}>In stock</th>
+                  <th scope="col" className={th}>Sells / day</th>
+                  <th scope="col" className={th}>Days left</th>
+                  <th scope="col" className={th}>Runs out</th>
+                  <th scope="col" className={th}>Reorder</th>
+                  <th scope="col" className={th}>Status</th>
+                  <th scope="col" className={th} title="The item counts as low at or below this">Low at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <StockRow
+                    key={item.id}
+                    item={item}
+                    forecast={forecasts.get(item.id)}
+                    coverDays={coverDays}
+                    lookbackDays={forecast?.lookback_days ?? 30}
+                    onSaved={refresh}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <p className="text-xs text-ink-2">
+        An item counts as low at or below its level (the Low at column). New items start at {data.settings.inventory.default_low_stock_threshold}; change
+        that in{" "}
+        <Link href="/settings#stock" className="text-accent underline">
+          Settings
+        </Link>
+        .
+        {forecast &&
+          ` Sales pace comes from the last ${forecast.lookback_days} days of orders (refunded ones don't count), and reorder amounts last ${forecast.cover_days} days at that pace. A forecast from under 3 orders or under a week of orders is marked as a rough estimate.`}
+      </p>
+    </>
   );
 }
 
 export default function StockPage() {
   return (
     // useSearchParams needs a Suspense boundary so the page can still prerender.
-    <Suspense
-      fallback={
-        <Panel title="Stock">
-          <Empty>Loading stock…</Empty>
-        </Panel>
-      }
-    >
+    <Suspense fallback={<Empty>Loading stock…</Empty>}>
       <StockView />
     </Suspense>
   );
