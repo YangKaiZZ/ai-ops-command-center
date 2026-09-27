@@ -5,6 +5,7 @@ const { startReportScheduler } = require('./services/reports');
 const { startWorker, stopWorker } = require('./services/jobQueue');
 const { startDemoCleanup } = require('./services/demo');
 const { refreshAllWebhooks } = require('./services/storeConnection');
+const { notifyOps } = require('./services/opsAlerts');
 require('./services/jobHandlers'); // what each job type does
 
 if (process.env.SLACK_WEBHOOK_URL) {
@@ -19,6 +20,8 @@ const server = app.listen(PORT, () => {
   startTelegramPolling();
   startDemoCleanup();
   refreshAllWebhooks().catch((err) => console.warn(`[webhooks] startup check failed: ${err.message}`));
+  // After a deploy that's expected; several in a row mean it keeps crashing.
+  notifyOps('backend-started', 'The backend started (after a deploy, a restart, or a crash).', { repeatMinutes: 10 });
   startWorker().catch((err) => console.error(`[jobs] worker failed to start: ${err.message}`));
 });
 

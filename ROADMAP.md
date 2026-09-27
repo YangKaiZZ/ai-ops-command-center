@@ -133,6 +133,11 @@ Separate from the code, and needed before anyone but the owner connects:
 - Delete account, in Settings: the password is asked again, the app is
   uninstalled from the store, and the account and everything kept for it
   (orders, stock, decisions and ratings, alert settings, API keys) is deleted.
+- Alerts to the operator (`OPS_ALERT_EMAIL`, `OPS_ALERT_TELEGRAM_CHAT_ID`)
+  when something breaks: a job failing for good, a store's sync failing 3
+  times in a row, a store disconnected by a refused token refresh, a failing
+  webhook, the agent's total cap, each backend start. `/api/health` checks
+  the database, for an uptime monitor.
 - Privacy policy page (`/privacy`, linked from sign-in and sign-up): what is
   kept, who else sees it (Shopify, DeepSeek, the alert channels), what stays
   in the browser, how long things are kept, deleting an account and

@@ -3,6 +3,7 @@
 const express = require('express');
 require('dotenv').config({ quiet: true });
 
+const pool = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const ordersRoutes = require('./routes/ordersRoutes');
 const storeRoutes = require('./routes/storeRoutes');
@@ -30,6 +31,16 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// For an uptime monitor from outside (Caddy only forwards /api/*): also
+// checks the database, so a backend that's up but can't reach it shows as down.
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok' });
+  } catch {
+    res.status(503).json({ status: 'database unreachable' });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', ordersRoutes);

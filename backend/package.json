@@ -30,7 +30,8 @@
     "test:alert-actions": "node scripts/test-alert-actions.js",
     "test:mcp-decisions": "node scripts/test-mcp-decisions.js",
     "test:demo": "node scripts/test-demo.js",
-    "test:chat": "node scripts/test-chat.js"
+    "test:chat": "node scripts/test-chat.js",
+    "test:ops-alerts": "node scripts/test-ops-alerts.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

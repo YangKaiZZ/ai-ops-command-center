@@ -20,15 +20,20 @@ function startScheduledSync() {
     try {
       for (const sellerId of await getConnectedSellerIds()) {
         const results = [];
+        const failures = [];
         for (const [label, sync] of [['orders', syncOrders], ['inventory', syncInventory]]) {
           try {
             const { message } = await sync(sellerId);
             results.push(message);
           } catch (err) {
-            results.push(`${label} FAILED (${err.response?.status || err.message})`);
+            const failed = `${label} FAILED (${err.response?.status || err.message})`;
+            results.push(failed);
+            failures.push(failed);
           }
         }
         console.log(`[sync] seller ${sellerId}: ${results.join('; ')}`);
+        // A store that keeps failing is worth a look (opsAlerts.js).
+        await require('./opsAlerts').recordSyncResult(sellerId, failures);
       }
     } catch (err) {
       console.error(`[sync] scheduled run failed: ${err.message}`);

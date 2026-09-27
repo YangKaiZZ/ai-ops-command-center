@@ -159,6 +159,12 @@ from their own dashboard.
 
 ## Reliability
 
+- **The operator hears about problems first**: a job that failed for good,
+  a store whose sync fails 3 times in a row, a store disconnected because
+  Shopify refused its token refresh, a failing webhook, the agent's total
+  cap, and every backend start go to `OPS_ALERT_EMAIL` and/or
+  `OPS_ALERT_TELEGRAM_CHAT_ID`, each kind at most once an hour.
+  `/api/health` (which also checks the database) is for an uptime monitor.
 - **Nothing lost on a restart**: agent runs go through a job queue in MySQL.
   A job is saved before Shopify gets its reply, retried with backoff if the
   model or network fails, and picked up again if the server stops mid-run.
@@ -197,8 +203,9 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
+| backend | `npm run test:ops-alerts` | alerts to the operator, with sends captured: email and Telegram, repeats held back, nothing set, and each trigger (a failed job, sync failures in a row, a refused token refresh, a failing webhook, the agent's total cap), plus `/api/health` |
 | backend | `npm run test:chat` | the dashboard chat against a fake DeepSeek and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
-| backend | `npm test` | 135 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
+| backend | `npm test` | 136 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, webhooks brought up to date at startup, deleting an account, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |

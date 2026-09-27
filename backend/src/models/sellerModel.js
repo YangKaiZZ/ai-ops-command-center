@@ -50,6 +50,12 @@ async function getStoreCredentials(sellerId) {
         // The refresh token expired or was revoked: only reconnecting fixes it.
         await clearShopifyToken(sellerId);
         console.warn(`[shopify] seller ${sellerId}: token refresh rejected (HTTP ${status}); store needs reconnecting`);
+        // Required here: opsAlerts -> telegram -> this model would be a cycle.
+        await require('../services/opsAlerts').notifyOps(
+          `store-disconnected:${sellerId}`,
+          `Seller ${sellerId}'s store (${shopDomain}) was disconnected: Shopify refused to refresh its token (HTTP ${status}). The seller has to use Connect with Shopify again; until then nothing syncs and no orders are checked.`,
+          { repeatMinutes: 24 * 60 }
+        );
         return null;
       }
       throw err;

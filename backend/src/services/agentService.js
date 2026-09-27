@@ -262,6 +262,13 @@ async function runAgent(sellerId, trigger) {
   if (limitHit) {
     const saved = await saveDecision(sellerId, trigger, skippedReasoning(limitHit, trigger));
     console.warn(`${tag} skipped: ${limitHit === 'account' ? "this account's" : 'the total'} daily agent limit is reached (decision #${saved.id})`);
+    if (limitHit === 'total') {
+      await require('./opsAlerts').notifyOps(
+        'agent-total-cap',
+        "The agent's daily limit for all accounts (AGENT_DAILY_LIMIT_TOTAL) is used up: new orders and stock changes are saved as Skipped until it frees up.",
+        { repeatMinutes: 12 * 60 }
+      );
+    }
     return null;
   }
 

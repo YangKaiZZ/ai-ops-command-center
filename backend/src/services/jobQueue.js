@@ -117,6 +117,11 @@ async function runJob(job) {
         [message, job.id]
       );
       console.error(`${tag} failed for good: ${message}`);
+      // Required here, not at the top: opsAlerts -> telegram -> models would be a cycle.
+      await require('./opsAlerts').notifyOps(
+        `job:${job.type}`,
+        `A ${job.type} job failed for good (job ${job.id}, seller ${job.sellerId}, try ${job.attempt} of ${job.maxAttempts}).\n${message}`
+      );
     } else {
       const delay = retryDelaySeconds(job.attempt);
       await pool.query(

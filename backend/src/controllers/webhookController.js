@@ -43,6 +43,8 @@ function webhookHandler(topic, handle) {
     } catch (err) {
       console.error(`[webhook] ${topic}:`, err);
       res.status(500).json({ error: 'Could not process webhook' }); // non-2xx -> Shopify retries later
+      // Shopify retries, but a webhook that keeps failing is eventually dropped.
+      await require('../services/opsAlerts').notifyOps(`webhook:${topic}`, `A ${topic} webhook failed (Shopify will retry it).\n${String(err.message || err).slice(0, 500)}`);
     }
   };
 }
