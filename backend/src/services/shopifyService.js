@@ -5,13 +5,21 @@ const axios = require('axios');
 // the oldest still supported, which changes under you. 2026-07 is supported
 // until 2027-07-16: move to a newer one before then.
 const API_VERSION = '2026-07';
-const PAGE_SIZE = 250; // Shopify's REST maximum
-const MAX_PAGES = 400; // 100k records: stop instead of paging forever on a bad cursor
+const MAX_PAGES = 400; // stop instead of paging forever on a bad cursor
 const MAX_RETRIES = 4;
+const ORDERS_PAGE = 50;
+const LINE_ITEMS_PAGE = 50; // an order with more gets the rest in follow-up queries
+const VARIANTS_PAGE = 250;
+const IDS_BATCH = 50; // ids per nodes() query, well inside Shopify's query cost limit
 
-// Every Shopify Admin REST call needs the shop's domain and its access
-// token. We build a fresh axios client per-call because each seller
-// (tenant) has their own shop domain and token.
+// Everything here goes through the GraphQL Admin API: Shopify calls REST
+// legacy, and App Store apps must use GraphQL only. Orders and variants come
+// back mapped to the REST field names the rest of the app reads, because the
+// webhooks Shopify delivers still use those: one shape, whichever way an
+// order came in.
+//
+// Each seller (tenant) has their own shop domain and token, so the client is
+// built per call.
 function shopifyClient(shopDomain, accessToken) {
   const client = axios.create({
     baseURL: `https://${shopDomain}/admin/api/${API_VERSION}`,
@@ -22,7 +30,6 @@ function shopifyClient(shopDomain, accessToken) {
     timeout: 20000,
   });
 
-  // Shopify rate-limits per store (a leaky bucket, about 2 requests/second).
   // A 429 says how long to wait in Retry-After, so wait and try again.
   client.interceptors.response.use(null, async (error) => {
     const { config, response } = error;
@@ -36,73 +43,205 @@ function shopifyClient(shopDomain, accessToken) {
   return client;
 }
 
-// Shopify paginates with a Link header holding cursor URLs, e.g.
-//   <https://shop/admin/api/2026-07/orders.json?limit=250&page_info=abc>; rel="next"
-function nextPageUrl(linkHeader) {
-  if (!linkHeader) return null;
-  for (const part of linkHeader.split(',')) {
-    const match = part.match(/<([^>]+)>;\s*rel="next"/);
-    if (match) return match[1];
+// A GraphQL query. Shopify answers a throttled one with 200 and a THROTTLED
+// error rather than a 429, so wait and try again here too. A missing scope
+// comes back as ACCESS_DENIED: the error then has accessDenied set.
+// `tolerate(errors)` returning true keeps the (partial) data instead of throwing.
+async function graphql(client, query, variables, { tolerate } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const { data } = await client.post('/graphql.json', { query, variables });
+    if (!data.errors?.length) return data.data;
+    if (data.data && tolerate?.(data.errors)) return data.data;
+    const throttled = data.errors.every((e) => e.extensions?.code === 'THROTTLED');
+    if (!throttled || attempt >= MAX_RETRIES) {
+      throw Object.assign(new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`), {
+        accessDenied: data.errors.some((e) => e.extensions?.code === 'ACCESS_DENIED'),
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
-  return null;
 }
 
-// Follows the Link header until the last page. The next-page URL carries the
-// cursor and the original filters, so later requests send no params of their own.
-async function fetchAllPages(client, path, params, key) {
-  const items = [];
-  let url = path;
-  let pageParams = { limit: PAGE_SIZE, ...params };
-  for (let page = 0; url; page++) {
-    if (page === MAX_PAGES) throw new Error(`Stopped after ${MAX_PAGES} pages of ${key}; sync is incomplete`);
-    const response = await client.get(url, { params: pageParams });
-    items.push(...response.data[key]);
-    url = nextPageUrl(response.headers.link);
-    pageParams = undefined;
+// Every page of a connection: `pick(data)` finds it in each answer.
+async function allPages(client, query, variables, pick) {
+  const nodes = [];
+  let cursor = null;
+  for (let page = 0; ; page++) {
+    if (page === MAX_PAGES) throw new Error(`Stopped after ${MAX_PAGES} pages; sync is incomplete`);
+    const connection = pick(await graphql(client, query, { ...variables, cursor }, { tolerate: onlyNamesDenied }));
+    nodes.push(...connection.nodes);
+    if (!connection.pageInfo.hasNextPage) return nodes;
+    cursor = connection.pageInfo.endCursor;
   }
-  return items;
 }
 
-// Every order in the store (any status), newest first. With updatedAtMin,
-// only orders created or changed since then.
+const gid = (type, id) => `gid://shopify/${type}/${id}`;
+const numericId = (value) => String(value).split('/').pop();
+
+// --- Orders ---
+
+// Without Shopify's approval for protected customer data, an order's
+// customer comes with its id but the name fields are refused (ACCESS_DENIED,
+// null in the answer). The rest of the order is there: keep it, and the
+// dashboard says "Name not shared", as it did with REST. Once Shopify
+// approves, the names simply come through.
+function onlyNamesDenied(errors) {
+  return errors.every(
+    (e) =>
+      e.extensions?.code === 'ACCESS_DENIED' &&
+      Array.isArray(e.path) &&
+      e.path.includes('customer') &&
+      ['firstName', 'lastName'].includes(e.path.at(-1))
+  );
+}
+
+const LINE_ITEM_FIELDS = `id title name variantTitle sku quantity unfulfilledQuantity
+  variant { id }
+  originalUnitPriceSet { shopMoney { amount } }`;
+
+const ORDER_FIELDS = `id name createdAt displayFulfillmentStatus displayFinancialStatus
+  totalPriceSet { shopMoney { amount } }
+  customer { id firstName lastName }
+  lineItems(first: ${LINE_ITEMS_PAGE}) { pageInfo { hasNextPage endCursor } nodes { ${LINE_ITEM_FIELDS} } }`;
+
+const ORDERS_QUERY = `query Orders($cursor: String, $query: String) {
+  orders(first: ${ORDERS_PAGE}, after: $cursor, query: $query, sortKey: UPDATED_AT) {
+    pageInfo { hasNextPage endCursor }
+    nodes { ${ORDER_FIELDS} }
+  }
+}`;
+
+const ORDER_NODES_QUERY = `query OrderNodes($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Order { ${ORDER_FIELDS} } }
+}`;
+
+const MORE_LINE_ITEMS_QUERY = `query MoreLineItems($id: ID!, $cursor: String) {
+  order(id: $id) {
+    lineItems(first: 250, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${LINE_ITEM_FIELDS} } }
+  }
+}`;
+
+// REST's fulfillment_status: null until something ships.
+const FULFILLMENT_STATUS = { FULFILLED: 'fulfilled', PARTIALLY_FULFILLED: 'partial', RESTOCKED: 'restocked' };
+
+// A GraphQL LineItem with REST's field names. fulfillable_quantity is what's
+// left to ship (unfulfilledQuantity).
+function toRestLineItem(item) {
+  return {
+    id: numericId(item.id),
+    variant_id: item.variant ? numericId(item.variant.id) : null,
+    title: item.title,
+    name: item.name,
+    variant_title: item.variantTitle ?? null,
+    sku: item.sku ?? null,
+    quantity: item.quantity,
+    fulfillable_quantity: item.unfulfilledQuantity ?? null,
+    price: item.originalUnitPriceSet?.shopMoney?.amount ?? null,
+  };
+}
+
+// A GraphQL Order with the REST fields that orderModel.upsertOrder and the
+// agent read (the orders/create and orders/updated webhooks send those).
+// createdAt ends in "Z", which MySQL rejects in a DATETIME: it gets "+00:00",
+// the same instant in the offset form REST used.
+function toRestOrder(node) {
+  return {
+    id: numericId(node.id),
+    name: node.name,
+    created_at: node.createdAt ? node.createdAt.replace(/Z$/, '+00:00') : null,
+    fulfillment_status: FULFILLMENT_STATUS[node.displayFulfillmentStatus] ?? null,
+    financial_status: node.displayFinancialStatus ? node.displayFinancialStatus.toLowerCase() : null,
+    total_price: node.totalPriceSet?.shopMoney?.amount ?? null,
+    customer: node.customer
+      ? { id: numericId(node.customer.id), first_name: node.customer.firstName ?? null, last_name: node.customer.lastName ?? null }
+      : null,
+    line_items: node.lineItems.nodes.map(toRestLineItem),
+  };
+}
+
+// toRestOrder, after fetching any line items past the first page (rare).
+async function completeOrder(client, node) {
+  let { pageInfo } = node.lineItems;
+  const items = [...node.lineItems.nodes];
+  while (pageInfo.hasNextPage) {
+    const { order } = await graphql(client, MORE_LINE_ITEMS_QUERY, { id: node.id, cursor: pageInfo.endCursor });
+    if (!order) break;
+    items.push(...order.lineItems.nodes);
+    pageInfo = order.lineItems.pageInfo;
+  }
+  return toRestOrder({ ...node, lineItems: { nodes: items } });
+}
+
+// Every order in the store (any status). With updatedAtMin, only orders
+// created or changed since then.
 async function fetchOrders(shopDomain, accessToken, { updatedAtMin } = {}) {
-  const params = { status: 'any' };
-  if (updatedAtMin) params.updated_at_min = updatedAtMin.toISOString();
-  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', params, 'orders');
+  const client = shopifyClient(shopDomain, accessToken);
+  const query = updatedAtMin ? `updated_at:>='${updatedAtMin.toISOString()}'` : null;
+  const nodes = await allPages(client, ORDERS_QUERY, { query }, (data) => data.orders);
+  const orders = [];
+  for (const node of nodes) orders.push(await completeOrder(client, node));
+  return orders;
 }
 
 // The given orders (any status). An id Shopify no longer has is left out.
 async function fetchOrdersByIds(shopDomain, accessToken, ids) {
-  if (!ids.length) return [];
-  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/orders.json', { status: 'any', ids: ids.join(',') }, 'orders');
+  const client = shopifyClient(shopDomain, accessToken);
+  const orders = [];
+  for (let i = 0; i < ids.length; i += IDS_BATCH) {
+    const batch = ids.slice(i, i + IDS_BATCH).map((id) => gid('Order', id));
+    const { nodes } = await graphql(client, ORDER_NODES_QUERY, { ids: batch }, { tolerate: onlyNamesDenied });
+    for (const node of nodes) if (node?.id) orders.push(await completeOrder(client, node));
+  }
+  return orders;
 }
 
-// Every product with its variants (variants hold the actual stock counts).
-async function fetchProducts(shopDomain, accessToken) {
-  return fetchAllPages(shopifyClient(shopDomain, accessToken), '/products.json', {}, 'products');
+// One order, or null if the store no longer has it.
+async function fetchOrder(shopDomain, accessToken, orderId) {
+  const [order] = await fetchOrdersByIds(shopDomain, accessToken, [orderId]);
+  return order ?? null;
+}
+
+// --- Stock ---
+
+const VARIANT_FIELDS = `id title inventoryQuantity
+  inventoryItem { id tracked }
+  product { id title }`;
+
+const VARIANTS_QUERY = `query Variants($cursor: String) {
+  productVariants(first: ${VARIANTS_PAGE}, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes { ${VARIANT_FIELDS} }
+  }
+}`;
+
+const VARIANT_QUERY = `query Variant($id: ID!) { productVariant(id: $id) { ${VARIANT_FIELDS} } }`;
+
+// A GraphQL ProductVariant with REST's field names, plus its product's id and
+// title. inventory_management is "shopify" when Shopify tracks its stock,
+// null when it doesn't (inventory_quantity then means nothing).
+function toRestVariant(node) {
+  return {
+    id: numericId(node.id),
+    product_id: numericId(node.product.id),
+    product_title: node.product.title,
+    title: node.title,
+    inventory_item_id: node.inventoryItem ? numericId(node.inventoryItem.id) : null,
+    inventory_quantity: node.inventoryQuantity ?? 0,
+    inventory_management: node.inventoryItem?.tracked ? 'shopify' : null,
+  };
+}
+
+// Every variant of every product (variants hold the actual stock counts).
+async function fetchVariants(shopDomain, accessToken) {
+  const nodes = await allPages(shopifyClient(shopDomain, accessToken), VARIANTS_QUERY, {}, (data) => data.productVariants);
+  return nodes.map(toRestVariant);
 }
 
 // One variant's live data (inventory_quantity, inventory_management), or
 // null if it no longer exists in the store.
 async function fetchVariant(shopDomain, accessToken, variantId) {
-  try {
-    const { data } = await shopifyClient(shopDomain, accessToken).get(`/variants/${encodeURIComponent(variantId)}.json`);
-    return data.variant;
-  } catch (err) {
-    if (err.response?.status === 404) return null;
-    throw err;
-  }
-}
-
-// One order, or null if the store no longer has it.
-async function fetchOrder(shopDomain, accessToken, orderId) {
-  try {
-    const { data } = await shopifyClient(shopDomain, accessToken).get(`/orders/${encodeURIComponent(orderId)}.json`);
-    return data.order;
-  } catch (err) {
-    if (err.response?.status === 404) return null;
-    throw err;
-  }
+  const { productVariant } = await graphql(shopifyClient(shopDomain, accessToken), VARIANT_QUERY, { id: gid('ProductVariant', variantId) });
+  return productVariant ? toRestVariant(productVariant) : null;
 }
 
 // Shopify's fraud analysis only comes from the GraphQL Admin API (the REST
@@ -120,24 +259,6 @@ const ORDER_RISK_QUERY = `query OrderRisks($ids: [ID!]!) {
     }
   }
 }`;
-const RISK_BATCH = 50; // orders per query, well inside Shopify's query cost limit
-
-// A GraphQL query. Shopify answers a throttled one with 200 and a THROTTLED
-// error rather than a 429, so wait and try again here too. A missing scope
-// comes back as ACCESS_DENIED: the error then has accessDenied set.
-async function graphql(client, query, variables) {
-  for (let attempt = 0; ; attempt++) {
-    const { data } = await client.post('/graphql.json', { query, variables });
-    if (!data.errors?.length) return data.data;
-    const throttled = data.errors.every((e) => e.extensions?.code === 'THROTTLED');
-    if (!throttled || attempt >= MAX_RETRIES) {
-      throw Object.assign(new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`), {
-        accessDenied: data.errors.some((e) => e.extensions?.code === 'ACCESS_DENIED'),
-      });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-}
 
 // A mutation's answer, or throws with Shopify's own words when it refused
 // (userErrors, e.g. "The fulfillment order is on hold"): err.userError is set.
@@ -155,8 +276,8 @@ async function mutate(client, mutation, variables, field) {
 async function fetchOrderRisks(shopDomain, accessToken, orderIds) {
   const found = new Map();
   const client = shopifyClient(shopDomain, accessToken);
-  for (let i = 0; i < orderIds.length; i += RISK_BATCH) {
-    const ids = orderIds.slice(i, i + RISK_BATCH).map((id) => `gid://shopify/Order/${id}`);
+  for (let i = 0; i < orderIds.length; i += IDS_BATCH) {
+    const ids = orderIds.slice(i, i + IDS_BATCH).map((id) => `gid://shopify/Order/${id}`);
     const { nodes } = await graphql(client, ORDER_RISK_QUERY, { ids });
     for (const node of nodes) if (node?.id) found.set(node.id.split('/').pop(), node);
   }
@@ -167,9 +288,6 @@ async function fetchOrderRisks(shopDomain, accessToken, orderIds) {
 // Shopify ships an order through its fulfillment orders: one per location the
 // items ship from. Each says what can be done with it now (supportedActions)
 // and carries its holds. These need write_merchant_managed_fulfillment_orders.
-
-const gid = (type, id) => `gid://shopify/${type}/${id}`;
-const numericId = (value) => String(value).split('/').pop();
 
 const FULFILLMENT_ORDERS_QUERY = `query FulfillmentOrders($id: ID!) {
   order(id: $id) {
@@ -254,12 +372,16 @@ module.exports = {
   fetchOrders,
   fetchOrder,
   fetchOrdersByIds,
-  fetchProducts,
+  fetchVariants,
   fetchVariant,
   fetchOrderRisks,
   fetchFulfillmentOrders,
   holdFulfillmentOrder,
   releaseFulfillmentHolds,
   createFulfillment,
-  nextPageUrl,
+  shopifyClient,
+  graphql,
+  toRestOrder,
+  toRestVariant,
+  onlyNamesDenied,
 };

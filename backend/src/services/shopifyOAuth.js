@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const axios = require('axios');
+const { shopifyClient, graphql } = require('./shopifyService');
 
 // Shopify's OAuth (authorization code grant) for "Connect with Shopify".
 // https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant
@@ -113,11 +114,8 @@ async function refreshAccessToken(shop, refreshToken) {
 
 // The scopes a token actually has (works for pasted custom-app tokens too).
 async function fetchGrantedScopes(shop, accessToken) {
-  const { data } = await axios.get(`https://${shop}/admin/oauth/access_scopes.json`, {
-    headers: { 'X-Shopify-Access-Token': accessToken },
-    timeout: 20000,
-  });
-  return data.access_scopes.map((s) => s.handle).join(',');
+  const data = await graphql(shopifyClient(shop, accessToken), '{ currentAppInstallation { accessScopes { handle } } }');
+  return data.currentAppInstallation.accessScopes.map((s) => s.handle).join(',');
 }
 
 // Required scopes the grant is missing. A write_x scope includes read_x.
@@ -141,10 +139,9 @@ function actionsAllowed(granted) {
 
 // Uninstalls the app from the store (Shopify then sends app/uninstalled).
 async function revokeAccess(shop, accessToken) {
-  await axios.delete(`https://${shop}/admin/api_permissions/current.json`, {
-    headers: { 'X-Shopify-Access-Token': accessToken },
-    timeout: 20000,
-  });
+  const data = await graphql(shopifyClient(shop, accessToken), 'mutation { appUninstall { userErrors { field message } } }');
+  const errors = data.appUninstall?.userErrors || [];
+  if (errors.length) throw new Error(`Shopify: ${errors.map((e) => e.message).join('; ')}`);
 }
 
 module.exports = {

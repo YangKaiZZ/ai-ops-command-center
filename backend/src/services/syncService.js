@@ -90,52 +90,50 @@ function syncOrders(sellerId) {
   });
 }
 
-// Pulls every product + variant, flattens tracked variants into inventory
+// Pulls every product variant, keeps the tracked ones as inventory
 // rows, and alerts the agent about items that just went low.
 function syncInventory(sellerId) {
   return withLock(`inventory:${sellerId}`, async () => {
     const creds = await requireCredentials(sellerId);
-    const products = await shopifyService.fetchProducts(creds.shopDomain, creds.accessToken);
+    const variants = await shopifyService.fetchVariants(creds.shopDomain, creds.accessToken);
     const before = await inventory.getStockSnapshot(sellerId);
     const defaultThreshold = await getDefaultThreshold(sellerId);
     const trackedVariantIds = [];
     const crossed = [];
     let untracked = 0;
 
-    for (const product of products) {
-      for (const variant of product.variants) {
-        // Shopify reports inventory_quantity 0 for variants it doesn't track
-        // (gift cards, "don't track quantity" products) — they'd show up as
-        // permanently low stock, so leave them out.
-        if (!variant.inventory_management) {
-          untracked++;
-          continue;
-        }
+    for (const variant of variants) {
+      // Shopify reports inventory_quantity 0 for variants it doesn't track
+      // ("don't track quantity" products) — they'd show up as permanently
+      // low stock, so leave them out.
+      if (!variant.inventory_management) {
+        untracked++;
+        continue;
+      }
 
-        const item = {
-          productId: String(product.id),
-          variantId: String(variant.id),
-          inventoryItemId: variant.inventory_item_id != null ? String(variant.inventory_item_id) : null,
-          itemName: `${product.title}${variant.title !== 'Default Title' ? ' - ' + variant.title : ''}`,
-          stock: variant.inventory_quantity || 0,
-        };
-        await inventory.upsertInventoryItem(sellerId, item, defaultThreshold);
-        trackedVariantIds.push(item.variantId);
+      const item = {
+        productId: String(variant.product_id),
+        variantId: String(variant.id),
+        inventoryItemId: variant.inventory_item_id != null ? String(variant.inventory_item_id) : null,
+        itemName: `${variant.product_title}${variant.title !== 'Default Title' ? ' - ' + variant.title : ''}`,
+        stock: variant.inventory_quantity || 0,
+      };
+      await inventory.upsertInventoryItem(sellerId, item, defaultThreshold);
+      trackedVariantIds.push(item.variantId);
 
-        const prev = before.get(item.variantId);
-        if (crossedLowStock(prev, item.stock)) {
-          crossed.push({
-            item_name: item.itemName,
-            shopify_variant_id: item.variantId,
-            previous_stock: prev.stock_quantity,
-            current_stock: item.stock,
-            low_stock_threshold: prev.low_stock_threshold,
-          });
-        }
+      const prev = before.get(item.variantId);
+      if (crossedLowStock(prev, item.stock)) {
+        crossed.push({
+          item_name: item.itemName,
+          shopify_variant_id: item.variantId,
+          previous_stock: prev.stock_quantity,
+          current_stock: item.stock,
+          low_stock_threshold: prev.low_stock_threshold,
+        });
       }
     }
 
-    // The product list was complete (every page), so anything else is gone.
+    // The variant list was complete (every page), so anything else is gone.
     await inventory.deleteInventoryExcept(sellerId, trackedVariantIds);
 
     if (crossed.length) await queueAgentRun(sellerId, { type: 'low_stock_crossed', items: crossed });

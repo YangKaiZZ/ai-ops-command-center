@@ -93,7 +93,7 @@ flowchart LR
   caddy -- "pages" --> dash[Dashboard<br/>Next.js]
   caddy -- "/api/*" --> api[Backend<br/>Express]
   shopify([Shopify]) -- "webhooks<br/>(HMAC-verified)" --> caddy
-  api <-- "REST + OAuth" --> shopify
+  api <-- "GraphQL + OAuth" --> shopify
   api --> db[(MySQL)]
   api -- "starts per run,<br/>10-min seller token" --> mcp[MCP server]
   mcp -- "REST" --> api

@@ -1,10 +1,9 @@
-const axios = require('axios');
-const { API_VERSION } = require('./shopifyService');
+const { shopifyClient, graphql } = require('./shopifyService');
 
 // The Shopify webhooks this backend listens for, and where. Registered
-// through the Admin API, so Shopify signs them with the app's client secret.
-// (The privacy/compliance topics can't be registered this way; they're set
-// in the app's configuration. See the README.)
+// through the GraphQL Admin API, so Shopify signs them with the app's client
+// secret. (The privacy/compliance topics can't be registered this way;
+// they're set in the app's configuration. See the README.)
 const WEBHOOK_TOPICS = {
   'orders/create': '/api/webhooks/orders-create',
   'orders/updated': '/api/webhooks/orders-updated',
@@ -12,13 +11,8 @@ const WEBHOOK_TOPICS = {
   'app/uninstalled': '/api/webhooks/app-uninstalled',
 };
 
-function adminClient({ shopDomain, accessToken }) {
-  return axios.create({
-    baseURL: `https://${shopDomain}/admin/api/${API_VERSION}`,
-    headers: { 'X-Shopify-Access-Token': accessToken },
-    timeout: 20000,
-  });
-}
+// "inventory_levels/update" -> INVENTORY_LEVELS_UPDATE, GraphQL's name for the topic.
+const topicEnum = (topic) => topic.toUpperCase().replace('/', '_');
 
 // Shopify only delivers webhooks to public https addresses.
 function isPublicHttpsUrl(url) {
@@ -30,9 +24,48 @@ function isPublicHttpsUrl(url) {
   }
 }
 
+const LIST_QUERY = `query Webhooks($cursor: String) {
+  webhookSubscriptions(first: 100, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes { id topic uri }
+  }
+}`;
+
+const CREATE_MUTATION = `mutation Create($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
+  webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) {
+    webhookSubscription { id }
+    userErrors { field message }
+  }
+}`;
+
+const UPDATE_MUTATION = `mutation Update($id: ID!, $sub: WebhookSubscriptionInput!) {
+  webhookSubscriptionUpdate(id: $id, webhookSubscription: $sub) {
+    webhookSubscription { id }
+    userErrors { field message }
+  }
+}`;
+
+// Every subscription this app has on the store, as { id, topic, address }.
+// A topic we listen for keeps its REST-style name ("orders/create"); any
+// other shows as Shopify's enum.
 async function listWebhooks(creds) {
-  const { data } = await adminClient(creds).get('/webhooks.json', { params: { limit: 250 } });
-  return data.webhooks;
+  const client = shopifyClient(creds.shopDomain, creds.accessToken);
+  const names = new Map(Object.keys(WEBHOOK_TOPICS).map((topic) => [topicEnum(topic), topic]));
+  const found = [];
+  let cursor = null;
+  do {
+    const { webhookSubscriptions: page } = await graphql(client, LIST_QUERY, { cursor });
+    for (const w of page.nodes) found.push({ id: w.id, topic: names.get(w.topic) || w.topic, address: w.uri });
+    cursor = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
+  } while (cursor);
+  return found;
+}
+
+// A mutation that throws with Shopify's own words when it refused (userErrors).
+async function mutate(client, mutation, variables, field) {
+  const result = (await graphql(client, mutation, variables))[field];
+  if (result.userErrors?.length) throw new Error(result.userErrors.map((e) => e.message).join('; '));
+  return result;
 }
 
 // Makes every topic point at baseUrl: leaves correct ones alone, moves ones
@@ -40,7 +73,7 @@ async function listWebhooks(creds) {
 // Returns one result per topic: { topic, address, action, from?, error? }
 // where action is ok | moved | registered | would-move | would-register | failed.
 async function registerWebhooks(creds, baseUrl, { dryRun = false } = {}) {
-  const shopify = adminClient(creds);
+  const client = shopifyClient(creds.shopDomain, creds.accessToken);
   const existing = await listWebhooks(creds);
   const results = [];
 
@@ -51,24 +84,24 @@ async function registerWebhooks(creds, baseUrl, { dryRun = false } = {}) {
       if (current.some((w) => w.address === address)) {
         results.push({ topic, address, action: 'ok' });
       } else if (current.length) {
-        if (!dryRun) await shopify.put(`/webhooks/${current[0].id}.json`, { webhook: { id: current[0].id, address } });
+        if (!dryRun) await mutate(client, UPDATE_MUTATION, { id: current[0].id, sub: { uri: address } }, 'webhookSubscriptionUpdate');
         results.push({ topic, address, action: dryRun ? 'would-move' : 'moved', from: current[0].address });
       } else {
-        if (!dryRun) await shopify.post('/webhooks.json', { webhook: { topic, address, format: 'json' } });
+        if (!dryRun) {
+          await mutate(client, CREATE_MUTATION, { topic: topicEnum(topic), sub: { uri: address, format: 'JSON' } }, 'webhookSubscriptionCreate');
+        }
         results.push({ topic, address, action: dryRun ? 'would-register' : 'registered' });
       }
     } catch (err) {
-      const status = err.response?.status;
-      const detail = status ? `HTTP ${status} ${JSON.stringify(err.response.data)}` : err.message;
       results.push({
         topic,
         address,
         action: 'failed',
-        error: status === 403 ? `${detail} (the token may be missing a scope, e.g. read_inventory)` : detail,
+        error: err.accessDenied ? `${err.message} (the token may be missing a scope, e.g. read_inventory)` : err.message,
       });
     }
   }
   return { existing, results };
 }
 
-module.exports = { WEBHOOK_TOPICS, isPublicHttpsUrl, listWebhooks, registerWebhooks };
+module.exports = { WEBHOOK_TOPICS, topicEnum, isPublicHttpsUrl, listWebhooks, registerWebhooks };

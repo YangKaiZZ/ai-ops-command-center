@@ -18,9 +18,6 @@ listed at the end.
 
 ## Shopify platform
 
-- **Move orders, products and webhooks to GraphQL**: Shopify calls its REST
-  Admin API legacy, and new App Store apps must use GraphQL only. REST still
-  answers on the pinned version, so this is needed before a listing, not now.
 - **Next API version before July 2027**: `2026-07` is supported until
   2027-07-16. Move `API_VERSION` on and re-run the live read check.
 
@@ -117,3 +114,11 @@ Separate from the code, and needed before anyone but the owner connects:
   orders, fraud checks, rated decisions, forecasts), with hold and fulfill
   against a stand-in for Shopify; no Shopify or model calls, nothing that
   reaches outside, deleted after 4 hours (migration 010).
+- Every Shopify call goes through the GraphQL Admin API (App Store apps must
+  use GraphQL only): orders, stock, webhook subscriptions, granted scopes and
+  uninstalling, alongside the fraud checks and fulfillment that already did.
+  Orders and variants are mapped to the field names Shopify's webhooks use,
+  so an order looks the same whichever way it came in. Checked read-only
+  against the dev store: the same orders, items, statuses and stock as REST.
+  Customer names Shopify refuses without approval are left empty, as before,
+  and come through once it approves.
