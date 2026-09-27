@@ -15,6 +15,7 @@ const {
   setAutoHoldSetting,
 } = require('../controllers/settingsController');
 const alerts = require('../controllers/alertsController');
+const { deleteAccount } = require('../controllers/accountController');
 const reports = require('../controllers/reportsController');
 
 router.use(requireAuth, requireSession);
@@ -36,5 +37,7 @@ router.delete('/telegram', alerts.removeTelegram);
 router.post('/test-alert', notInDemo, alerts.testAlert);
 router.put('/reports', reports.saveReports);
 router.post('/reports/summary', notInDemo, reports.sendSummaryNow);
+// A demo account has no password and deletes itself when it expires.
+router.delete('/account', notInDemo, deleteAccount);
 
 module.exports = router;

@@ -14,6 +14,7 @@ function LoginForm() {
   const session = useSession();
   const params = useSearchParams();
   const expired = params.has("expired");
+  const deleted = params.has("deleted");
   // Came from Shopify's install link via sign-up: connect that store next.
   const shop = shopParam(params.get("shop"));
   const [error, setError] = useState("");
@@ -77,7 +78,10 @@ function LoginForm() {
     }
   }
 
-  const message = error || (expired && !submitted ? "Your session expired. Sign in again." : "");
+  const message =
+    error ||
+    (!submitted && expired ? "Your session expired. Sign in again." : "") ||
+    (!submitted && deleted ? "Your account and its data were deleted." : "");
   const signupHref = shop ? `/signup?shop=${encodeURIComponent(shop)}` : "/signup";
 
   return (
@@ -96,7 +100,7 @@ function LoginForm() {
         <input type="password" name="password" autoComplete="current-password" required className={labelledInputClass} />
       </label>
       {message && (
-        <p role="alert" className="text-sm text-error">
+        <p role={error || expired ? "alert" : "status"} className={`text-sm ${error || expired ? "text-error" : "text-ink-2"}`}>
           {message}
         </p>
       )}

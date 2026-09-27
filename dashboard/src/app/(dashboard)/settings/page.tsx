@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
 import { AlertsSection } from "@/components/settings/AlertsSection";
+import { DeleteAccountSection } from "@/components/settings/DeleteAccountSection";
 import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { PrivacySection } from "@/components/settings/PrivacySection";
 import { ReportsSection } from "@/components/settings/ReportsSection";
@@ -75,6 +76,7 @@ function SettingsContent() {
       <StockDefaultsSection settings={settings} onChange={refresh} />
       <ApiKeysSection />
       <PrivacySection />
+      {!settings.demo && <DeleteAccountSection />}
     </div>
   );
 }

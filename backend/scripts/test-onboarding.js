@@ -11,6 +11,8 @@
 //   8. Privacy (GDPR) webhooks
 //   9. Low-stock thresholds: seller default for new items, per-item overrides
 //  10. At startup, connected stores' webhooks are brought up to date
+//  11. Deleting an account: password asked again (wrong ones limited), not
+//      with an API key or in the demo, uninstalls on Shopify, removes it all
 //
 // Usage:  npm run test:onboarding
 const path = require('path');
@@ -388,6 +390,58 @@ async function main() {
       "every connected store's webhooks are brought up to date (a topic added later reaches it)",
       refreshed.map((c) => c[1]).join(', ')
     );
+
+    console.log('\n11. Deleting an account');
+    const gone = await register('delete-me');
+    created.push(gone.id);
+    const SHOP_4 = `onboard-${RUN}-d.myshopify.com`;
+    await pool.query('UPDATE sellers SET shopify_shop_domain = ?, shopify_access_token = ? WHERE id = ?', [
+      SHOP_4,
+      require('../src/config/secrets').encryptSecret('shpat_delete_me'),
+      gone.id,
+    ]);
+    const [goneOrder] = await pool.query(
+      "INSERT INTO orders (seller_id, shopify_order_id, order_number, status, financial_status, total_amount, order_placed_at) VALUES (?, 'del-1', '#D1', 'unfulfilled', 'paid', 5, NOW())",
+      [gone.id]
+    );
+    await pool.query("INSERT INTO order_line_items (order_id, shopify_line_item_id, title, quantity) VALUES (?, 'li-1', 'Mug', 1)", [goneOrder.insertId]);
+    await pool.query("INSERT INTO decisions (seller_id, order_id, order_number, reasoning, action_taken) VALUES (?, ?, '#D1', 'FULFILL - ok', 'fulfill')", [
+      gone.id,
+      goneOrder.insertId,
+    ]);
+    await pool.query("INSERT INTO inventory_items (seller_id, shopify_product_id, shopify_variant_id, item_name, stock_quantity) VALUES (?, 'p', 'v', 'Mug', 3)", [gone.id]);
+    const goneKey = (await createApiKey(gone.id, 'delete test')).key;
+    await pool.query("INSERT INTO privacy_requests (seller_id, topic, shop_domain, details) VALUES (?, 'customers/redact', ?, '{}')", [gone.id, SHOP_4]);
+
+    let del = await http('DELETE', '/api/settings/account', { token: goneKey, body: { password: 'test-password-1' } });
+    check(del.status === 403 && (await row(gone.id)), 'an API key cannot delete the account', `HTTP ${del.status}`);
+    del = await http('DELETE', '/api/settings/account', { token: gone.token, body: {} });
+    check(del.status === 400, 'no password: 400', del.json?.error);
+    del = await http('DELETE', '/api/settings/account', { token: gone.token, body: { password: 'wrong-password' } });
+    check(del.status === 403 && /wrong/.test(del.json?.error) && (await row(gone.id)), 'a wrong password: refused, nothing deleted', del.json?.error);
+    const revokesBefore = called('revokeAccess').length;
+    del = await http('DELETE', '/api/settings/account', { token: gone.token, body: { password: 'test-password-1' } });
+    check(del.status === 200 && del.json?.deleted === true, 'the right password: deleted', JSON.stringify(del.json));
+    check(called('revokeAccess').slice(revokesBefore).some((c) => c[1] === SHOP_4), 'the app is uninstalled from the store first');
+    const remaining = {};
+    for (const table of ['orders', 'decisions', 'inventory_items', 'api_keys']) {
+      remaining[table] = Number((await pool.query(`SELECT COUNT(*) AS n FROM ${table} WHERE seller_id = ?`, [gone.id]))[0][0].n);
+    }
+    remaining.order_line_items = Number((await pool.query('SELECT COUNT(*) AS n FROM order_line_items WHERE order_id = ?', [goneOrder.insertId]))[0][0].n);
+    check(!(await row(gone.id)) && Object.values(remaining).every((n) => n === 0), 'the account, orders, items, decisions, stock and keys are gone', JSON.stringify(remaining));
+    const [[loggedRequest]] = await pool.query('SELECT seller_id FROM privacy_requests WHERE shop_domain = ?', [SHOP_4]);
+    check(loggedRequest && loggedRequest.seller_id === null, 'the privacy request log keeps its entry, without the seller');
+    const after = await http('GET', '/api/settings', { token: gone.token });
+    check(after.status === 401, 'its session no longer works', `HTTP ${after.status}`);
+    await pool.query('DELETE FROM privacy_requests WHERE shop_domain = ?', [SHOP_4]);
+
+    const demoRes = await http('POST', '/api/auth/demo');
+    if (demoRes.json?.token) {
+      const demoId = demoRes.json.sellerId ?? require('jsonwebtoken').decode(demoRes.json.token).sellerId;
+      created.push(demoId);
+      del = await http('DELETE', '/api/settings/account', { token: demoRes.json.token, body: { password: 'x' } });
+      check(del.status === 403 && /demo/.test(del.json?.error), 'a demo account: refused (it deletes itself)', del.json?.error);
+    }
   } finally {
     for (const id of created) {
       for (const table of ['api_keys', 'decisions', 'orders', 'inventory_items', 'oauth_states', 'privacy_requests']) {

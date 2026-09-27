@@ -9,7 +9,8 @@ const SESSION_KEY = "aiops.session";
 const listeners = new Set<() => void>();
 let cachedRaw: string | null | undefined;
 let cachedSession: Session | null = null;
-let signOutReason: "expired" | null = null;
+type SignOutReason = "expired" | "deleted" | null;
+let signOutReason: SignOutReason = null;
 
 function readRaw(): string | null {
   try {
@@ -66,7 +67,7 @@ export function saveSession(session: Session) {
   notify();
 }
 
-export function clearSession(reason: "expired" | null = null) {
+export function clearSession(reason: SignOutReason = null) {
   signOutReason = reason;
   try {
     localStorage.removeItem(SESSION_KEY);

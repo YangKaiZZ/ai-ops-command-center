@@ -129,3 +129,6 @@ Separate from the code, and needed before anyone but the owner connects:
   read-only. Order numbers in answers link to the order; the conversation
   stays in the browser tab. Signed-in sellers only (not API keys, not the
   demo), with its own daily caps (`CHAT_DAILY_LIMIT_PER_ACCOUNT`, `_TOTAL`).
+- Delete account, in Settings: the password is asked again, the app is
+  uninstalled from the store, and the account and everything kept for it
+  (orders, stock, decisions and ratings, alert settings, API keys) is deleted.

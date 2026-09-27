@@ -52,7 +52,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Re-checks storage: during hydration `session` is briefly null even when signed in.
   useEffect(() => {
     if (!session && !loadSession()) {
-      router.replace(takeSignOutReason() === "expired" ? "/login?expired=1" : "/login");
+      const reason = takeSignOutReason();
+      router.replace(reason === "expired" ? "/login?expired=1" : reason === "deleted" ? "/login?deleted=1" : "/login");
     }
   }, [session, router]);
 

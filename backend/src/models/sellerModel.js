@@ -196,7 +196,29 @@ async function setSlackWebhookUrl(sellerId, url) {
   await pool.query('UPDATE sellers SET slack_webhook_url = ? WHERE id = ?', [encryptSecret(url), sellerId]);
 }
 
+// Deletes a seller and everything kept for them, in one transaction: order
+// line items and hold/fulfill records go with the orders; agent runs, jobs,
+// password resets and channel links with the seller. The privacy request log
+// keeps its rows (ids only) without the seller.
+async function deleteSellerAccount(sellerId) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const table of ['decisions', 'orders', 'inventory_items', 'customer_messages', 'api_keys']) {
+      await conn.query(`DELETE FROM ${table} WHERE seller_id = ?`, [sellerId]);
+    }
+    await conn.query('DELETE FROM sellers WHERE id = ?', [sellerId]);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
+  deleteSellerAccount,
   needsRefresh,
   getStoreCredentials,
   saveShopifyConnection,

@@ -146,6 +146,9 @@ from their own dashboard.
 - **Password reset** by emailed link: single-use, one-hour, stored only as a
   hash, rate-limited, and it signs out every older session.
 - **Privacy requests** are logged with ids and outcomes only, never the personal data.
+- **Sellers can delete their account** from Settings, after entering their
+  password again (wrong ones count toward the sign-in limit): the app is
+  uninstalled from their store and everything kept for them is deleted.
 - **LLM cost is capped**: agent runs are limited per account and for all
   accounts together over any 24 hours, and each run makes at most 6 model
   calls. Events over a limit are saved as "Skipped" instead of checked.
@@ -194,7 +197,7 @@ on a VPS; that README walks through it.
 | --- | --- | --- |
 | backend | `npm run test:chat` | the dashboard chat against a fake DeepSeek and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
 | backend | `npm test` | 135 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
-| backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
+| backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, webhooks brought up to date at startup, deleting an account, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
 | backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |
