@@ -9,7 +9,7 @@ import { Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { accuracyText } from "@/lib/feedback";
 import { ACTIONS, formatDaysLeft, historySummary, roughNote, shortDate, timeAgo } from "@/lib/format";
-import { change, localDay, periodStart, PERIOD_DAYS, tileCount, tileMoney, type Change } from "@/lib/overview";
+import { change, fraudComparison, localDay, periodStart, PERIOD_DAYS, tileCount, tileMoney, type Change } from "@/lib/overview";
 import type { Action, Overview } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 
@@ -67,7 +67,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const VERDICTS: Action[] = ["fulfill", "hold", "low_stock_alert", "skipped", "unknown"];
 
 function OverviewView({ overview }: { overview: Overview }) {
-  const { orders, stock, decisions } = overview;
+  const { orders, fraud, stock, decisions } = overview;
   const from = localDay(new Date(overview.period.from));
   const oldest = orders.oldest_unshipped;
 
@@ -78,7 +78,7 @@ function OverviewView({ overview }: { overview: Overview }) {
       </p>
 
       <Section title="Orders">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile label="Orders" value={tileCount(orders.count)} href={`/orders?from=${from}`}>
             <ChangeLine value={change(orders.count, orders.previous_count, tileCount)} />
           </Tile>
@@ -97,6 +97,18 @@ function OverviewView({ overview }: { overview: Overview }) {
                 </>
               ) : (
                 "Nothing waiting to ship"
+              )}
+            </span>
+          </Tile>
+          <Tile label="Flagged for fraud" value={tileCount(fraud.flagged)} href={`/orders?risk=flagged&from=${from}`}>
+            <span className="text-sm text-ink-2">{fraudComparison(fraud.previous_flagged)}</span>
+            <span className="text-sm text-ink-2">
+              {fraud.flagged_needs_action ? (
+                <Link href="/orders?risk=flagged&needs_action=1" className={`relative z-10 font-medium text-warning underline ${focusRing}`}>
+                  {tileCount(fraud.flagged_needs_action)} still {fraud.flagged_needs_action === 1 ? "needs" : "need"} action
+                </Link>
+              ) : (
+                "None waiting on you"
               )}
             </span>
           </Tile>

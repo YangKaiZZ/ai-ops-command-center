@@ -17,7 +17,6 @@ listed at the end.
 
 ## Smaller ideas
 
-- "Flagged for fraud" on the Overview and in the daily summary.
 - An MCP tool to read and rate the agent's decisions.
 - Real Slack interactivity, for one-click rating inside Slack.
 
@@ -107,3 +106,5 @@ Separate from the code, and needed before anyone but the owner connects:
   October 2026). Checked read-only against a dev store on both versions:
   the same order, product, variant, webhook and fraud-check fields, and the
   hold and fulfill inputs in the GraphQL schema.
+- "Flagged for fraud" on the Overview (a tile: this period, the one before,
+  and any still needing action) and a fraud line in the daily summary.

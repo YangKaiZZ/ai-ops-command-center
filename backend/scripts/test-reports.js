@@ -209,12 +209,14 @@ async function main() {
     // The main seller's data, placed relative to its local days.
     const yesterday = addDays(today, -1);
     const dayStart = startOfDay(yesterday, zone).getTime();
-    await order(seller, dayStart + 2 * HOUR, 'fulfilled', 'paid', '100.00');
+    const flaggedShipped = await order(seller, dayStart + 2 * HOUR, 'fulfilled', 'paid', '100.00');
     await order(seller, dayStart + 5 * HOUR, 'fulfilled', 'paid', '50.50');
     await order(seller, dayStart + 6 * HOUR, 'fulfilled', 'refunded', '999.00'); // counted, no sales
     await order(seller, startOfDay(addDays(today, -2), zone).getTime() + 3 * HOUR, 'fulfilled', 'paid', '40.00'); // the day before
     const now = Date.now();
     const lateId = await order(seller, now - 30 * HOUR, null, 'paid', '58.00'); // late
+    // Shopify's fraud check flagged two: one shipped yesterday, one still to ship.
+    await pool.query("UPDATE orders SET risk_level = 'high', risk_recommendation = 'cancel', risk_checked_at = NOW() WHERE id IN (?)", [[flaggedShipped, lateId]]);
     await order(seller, now - 40 * HOUR, null, 'pending', '20.00'); // payment pending: not late
     await order(seller, now - 10 * HOUR, null, 'paid', '15.00'); // not late yet
     await order(seller, now - 20 * 24 * HOUR, null, 'paid', '12.00'); // late long ago: in the summary, not alerted
@@ -256,7 +258,15 @@ async function main() {
       `${body.split('\n')[1]} (expected ${expectDay.length} orders, ${sales(expectDay).toFixed(2)})`
     );
     check(/- Needs action: 4 orders\. Oldest unshipped: #R\d+, placed 20 days ago\./.test(body), 'what needs action, oldest first', body.split('\n')[2]);
-    check(/- Late: 2 paid orders not shipped after 24 hours\./.test(body), 'late orders (all of them, in the summary)', body.split('\n')[3]);
+    const flaggedYesterday = 1 + (now - 30 * HOUR >= dayStart && now - 30 * HOUR < todayStart ? 1 : 0); // the late one may fall in yesterday too
+    const fraudLine = body.split('\n').find((line) => line.startsWith('- Fraud:'));
+    check(
+      fraudLine ===
+        `- Fraud: ${flaggedYesterday} order${flaggedYesterday === 1 ? '' : 's'} placed that day flagged by Shopify's fraud check. 1 flagged order still needs action: https://ops.example.test/orders?risk=flagged&needs_action=1`,
+      'orders flagged for fraud yesterday, and the one still to ship',
+      fraudLine
+    );
+    check(/- Late: 2 paid orders not shipped after 24 hours\./.test(body), 'late orders (all of them, in the summary)', body.split('\n')[4]);
     check(/- Stock: 1 running low, 1 out of stock\./.test(body), 'stock');
     check(/- Agent: 3 decisions \(2 fulfill, 1 hold\)\. 1 of 2 rated right\./.test(body), "yesterday's decisions and how they were rated");
     check(/aren't rated yet: https:\/\/ops\.example\.test\/decisions\?show=unrated/.test(body) || /isn't rated yet/.test(body), 'a nudge to rate the rest');

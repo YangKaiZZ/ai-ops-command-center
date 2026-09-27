@@ -50,11 +50,12 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   note), a signed, expiring rating page from Slack and email.
 - **Daily summary and late orders.** At an hour the seller picks, in their
   time zone: yesterday's orders and sales against the day before, what needs
-  action, stock running out and the agent's decisions. Separately, an alert
-  when a paid order still isn't shipped after 12-72 hours, once per order.
+  action, orders flagged for fraud, stock running out and the agent's
+  decisions. Separately, an alert when a paid order still isn't shipped
+  after 12-72 hours, once per order.
   Queued as jobs with keys, so each is sent exactly once.
 - **Dashboard.** An overview of the last 7 days against the 7 before (orders,
-  sales, what needs action, what runs out soon, the agent's decisions), orders with the agent's verdict and fraud risk (searchable, filterable, paginated, each with its own page: fraud check, hold and fulfill in Shopify, line items and decisions), the decision history with
+  sales, what needs action, orders flagged for fraud, what runs out soon, the agent's decisions), orders with the agent's verdict and fraud risk (searchable, filterable, paginated, each with its own page: fraud check, hold and fulfill in Shopify, line items and decisions), the decision history with
   its reasoning, stock with editable levels and restock forecasts, settings,
   and a setup checklist for new accounts.
 - **Is the agent right?** The seller rates each decision thumbs up or down,
@@ -168,10 +169,10 @@ on a VPS; that README walks through it.
 | backend | `npm run test:order-queries` | order paging and filters through the API and the MCP tools: totals, date ranges, lookups, bad input, other sellers' orders |
 | backend | `npm run test:order-detail` | line items saved and replaced, the customer name (unknown when Shopify leaves it out, filled in later, never un-redacted), the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
 | backend | `npm run test:forecast` | restock forecasts through the API, the MCP tool and a low-stock agent run (fake DeepSeek): pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
-| backend | `npm run test:overview` | the Overview numbers: this period against the one before, sales without refunded or voided orders, what needs action, stock and what runs out soon, decisions by verdict, other sellers' data |
+| backend | `npm run test:overview` | the Overview numbers: this period against the one before, sales without refunded or voided orders, what needs action, orders flagged for fraud, stock and what runs out soon, decisions by verdict, other sellers' data |
 | backend | `npm run test:decision-feedback` | thumbs up/down on decisions: rating, notes, changing and clearing, the counts on the feed and the Overview, bad input, skipped runs, other sellers, privacy redaction of notes |
 | backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake DeepSeek: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
-| backend | `npm run test:reports` | the daily summary through the job queue, late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
+| backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
 | backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |

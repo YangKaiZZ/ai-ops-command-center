@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { PENDING_WHERE } = require('./ordersController');
 const { getForecast } = require('../services/restockForecast');
 const { countRatings, RATINGS_SELECT } = require('../models/decisionModel');
+const { FLAGGED_WHERE } = require('../services/riskCheck');
 
 // The dashboard's Overview: the key numbers for a period (by default the last
 // 7 days) next to the same length of time just before it. Everything is
@@ -77,9 +78,16 @@ async function getOverview(req, res) {
        FROM orders WHERE seller_id = ? AND order_placed_at >= FROM_UNIXTIME(?)`,
       [from, from, from, from, seller, previousFrom]
     );
-    const [[{ needsAction }]] = await pool.query(`SELECT COUNT(*) AS needsAction FROM orders WHERE seller_id = ? AND (${PENDING_WHERE})`, [
-      seller,
-    ]);
+    const [[{ needsAction, flaggedNeedsAction }]] = await pool.query(
+      `SELECT COUNT(*) AS needsAction, COALESCE(SUM(${FLAGGED_WHERE}), 0) AS flaggedNeedsAction
+       FROM orders WHERE seller_id = ? AND (${PENDING_WHERE})`,
+      [seller]
+    );
+    const [[flagged]] = await pool.query(
+      `SELECT COALESCE(SUM(order_placed_at >= FROM_UNIXTIME(?)), 0) AS count, COALESCE(SUM(order_placed_at < FROM_UNIXTIME(?)), 0) AS previous_count
+       FROM orders WHERE seller_id = ? AND order_placed_at >= FROM_UNIXTIME(?) AND ${FLAGGED_WHERE}`,
+      [from, from, seller, previousFrom]
+    );
     const [[oldest]] = await pool.query(
       `SELECT id, order_number, order_placed_at FROM orders
        WHERE seller_id = ? AND status IN ('unfulfilled', 'partial') AND ${COUNTED}
@@ -111,6 +119,13 @@ async function getOverview(req, res) {
         previous_sales: money(orders.previous_sales),
         needs_action: Number(needsAction),
         oldest_unshipped: oldest || null,
+      },
+      // Orders Shopify's fraud check flagged (high or medium risk, or "cancel" /
+      // "investigate"): placed in each period, and any still needing action.
+      fraud: {
+        flagged: Number(flagged.count),
+        previous_flagged: Number(flagged.previous_count),
+        flagged_needs_action: Number(flaggedNeedsAction),
       },
       stock: {
         tracked: Number(stock.tracked),

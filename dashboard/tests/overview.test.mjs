@@ -26,3 +26,9 @@ test('tile numbers stay short', () => {
   assert.equal(tileMoney(170.5), (170.5).toLocaleString(undefined, { minimumFractionDigits: 2 }));
   assert.match(tileMoney(4_200_000), /^4\.2\s?M$/);
 });
+
+test('the fraud tile compares with the period before in words, not up/down', async () => {
+  const { fraudComparison } = await import('../src/lib/overview.ts');
+  assert.equal(fraudComparison(0), 'None in the 7 days before');
+  assert.equal(fraudComparison(3), '3 in the 7 days before');
+});

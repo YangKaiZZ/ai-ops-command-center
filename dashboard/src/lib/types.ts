@@ -131,6 +131,9 @@ export type Overview = {
     needs_action: number;
     oldest_unshipped: { id: number; order_number: string | null; order_placed_at: string } | null;
   };
+  // Orders Shopify's fraud check flagged: placed in the period, the period
+  // before, and (any time) still needing action.
+  fraud: { flagged: number; previous_flagged: number; flagged_needs_action: number };
   stock: {
     tracked: number;
     low: number; // at or below the item's level, out of stock included

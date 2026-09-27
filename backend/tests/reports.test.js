@@ -49,6 +49,7 @@ const numbers = {
   orders: { count: 12, sales: 1548.85, previous_count: 9, previous_sales: 1338.85 },
   needs_action: 4,
   oldest_unshipped: { order_number: '#1041', order_placed_at: '2026-09-23T23:00:00Z' },
+  fraud: { flagged: 1, flagged_needs_action: 2 },
   late: 2,
   late_after_hours: 24,
   stock: { tracked: 30, low: 3, out_of_stock: 1 },
@@ -67,6 +68,7 @@ test('the summary says what happened yesterday and what needs doing', () => {
     '*Daily summary for Gloria Flowers: Fri, Sep 25*',
     '- Orders: 12, up 3 on the day before. Sales: 1,548.85, up 210.00 on the day before.',
     '- Needs action: 4 orders. Oldest unshipped: #1041, placed 2 days ago.', // 50 hours: said in days from 48
+    "- Fraud: 1 order placed that day flagged by Shopify's fraud check. 2 flagged orders still need action: https://ops.example.test/orders?risk=flagged&needs_action=1",
     '- Late: 2 paid orders not shipped after 24 hours.',
     '- Stock: 3 running low, 1 out of stock.',
     '- Runs out this week: Linen Scarf in about 2 days (reorder 40); Ceramic Mug in about 5 days (reorder 12).',
@@ -82,6 +84,7 @@ test('a quiet day is said plainly', () => {
     orders: { count: 0, sales: 0, previous_count: 0, previous_sales: 0 },
     needs_action: 0,
     oldest_unshipped: null,
+    fraud: { flagged: 0, flagged_needs_action: 0 },
     late: 0,
     stock: { tracked: 0, low: 0, out_of_stock: 0 },
     running_out: [],
@@ -94,6 +97,14 @@ test('a quiet day is said plainly', () => {
   assert.match(lines[4], /^- 1 decision from the last 7 days isn't rated yet/);
   const fewer = formatSummary({ ...quiet, orders: { count: 2, sales: 50, previous_count: 5, previous_sales: 50 } }, { businessName: 'Shop', link: 'https://x.test', now: NOW });
   assert.match(fewer, /Orders: 2, down 3 on the day before\. Sales: 50\.00, the same as the day before\./);
+  assert.doesNotMatch(fewer, /Fraud/); // nothing flagged: no line
+});
+
+test('the fraud line: flagged orders still open, even when none were flagged that day', () => {
+  const text = formatSummary({ ...numbers, fraud: { flagged: 0, flagged_needs_action: 1 } }, { businessName: 'Shop', link: 'https://x.test', now: NOW });
+  assert.match(text, /^- Fraud: None flagged that day\. 1 flagged order still needs action: https:\/\/x\.test\/orders\?risk=flagged&needs_action=1$/m);
+  const done = formatSummary({ ...numbers, fraud: { flagged: 2, flagged_needs_action: 0 } }, { businessName: 'Shop', link: 'https://x.test', now: NOW });
+  assert.match(done, /^- Fraud: 2 orders placed that day flagged by Shopify's fraud check\.$/m);
 });
 
 test('a late-order alert names each order, the first 10', () => {

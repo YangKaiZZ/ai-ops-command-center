@@ -2,7 +2,8 @@
 // database with throwaway sellers (removed at the end):
 //   1. the default period (last 7 days) and the 7 days before it: order
 //      counts, sales without refunded/voided orders, what needs action, the
-//      oldest unshipped order, stock counts, what runs out soon, decisions
+//      oldest unshipped order, orders flagged for fraud, stock counts, what
+//      runs out soon, decisions
 //   2. a period starting at ?from=, and bad values
 //   3. each seller sees only their own numbers; a new seller sees zeros
 //
@@ -87,7 +88,7 @@ async function main() {
     await upsertOrder(seller, shopifyOrder(3, 'fulfilled', 'refunded', '30.00', [[4, 20]])); // counted, no sales
     const d = await upsertOrder(seller, shopifyOrder(6, null, 'pending', '20.00')); // needs action
     // The 7 days before
-    await upsertOrder(seller, shopifyOrder(9, 'fulfilled', 'paid', '40.00', [[1, 10]]));
+    const lastWeek = await upsertOrder(seller, shopifyOrder(9, 'fulfilled', 'paid', '40.00', [[1, 10]]));
     await upsertOrder(seller, shopifyOrder(10, null, 'voided', '99.00')); // counted, no sales, no action
     const g = await upsertOrder(seller, shopifyOrder(12, 'partial', 'paid', '10.00')); // needs action, oldest unshipped
     // Earlier: the store's first order, so forecasts have 20 days of history.
@@ -99,6 +100,14 @@ async function main() {
     await addDecision(seller, 'skipped', 5);
     await addDecision(seller, 'low_stock_alert', 10); // before the period
 
+    // Shopify's fraud check: flagged is high or medium risk, or "cancel" / "investigate".
+    const setRisk = (id, level, recommendation) =>
+      pool.query('UPDATE orders SET risk_level = ?, risk_recommendation = ?, risk_checked_at = NOW() WHERE id = ?', [level, recommendation, id]);
+    await setRisk(b, 'high', 'cancel'); // this week, needs action
+    await setRisk(a, 'low', 'investigate'); // this week, shipped
+    await setRisk(lastWeek, 'medium', 'none'); // the week before, shipped
+    await setRisk(g, 'low', 'accept'); // not flagged
+
     console.log('\n1. The last 7 days');
     let res = await get('/api/overview', seller);
     const o = res.body || {};
@@ -108,6 +117,11 @@ async function main() {
     check(o.orders?.needs_action === 3, 'orders that need action, at any time', String(o.orders?.needs_action));
     check(o.orders?.oldest_unshipped?.id === g && o.orders.oldest_unshipped.order_number === '#880007', 'the oldest unshipped order (not the voided one)', JSON.stringify(o.orders?.oldest_unshipped));
     check([a, b, d].every(Boolean), 'orders were saved');
+    check(
+      o.fraud?.flagged === 2 && o.fraud.previous_flagged === 1 && o.fraud.flagged_needs_action === 1,
+      'flagged for fraud: this period, the one before, and still needing action',
+      JSON.stringify(o.fraud)
+    );
     const s = o.stock || {};
     check(s.tracked === 4 && s.low === 2 && s.out_of_stock === 1, 'stock: tracked, low (out of stock included), out of stock', JSON.stringify({ tracked: s.tracked, low: s.low, out: s.out_of_stock }));
     check(s.to_reorder === 2, 'items to reorder, as on the Reorder tab (Mug and Scarf)', String(s.to_reorder));

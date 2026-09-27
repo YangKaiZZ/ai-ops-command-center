@@ -5,6 +5,7 @@ const { PENDING_WHERE } = require('../controllers/ordersController');
 const { COUNTED, countDecisions, runningOut } = require('../controllers/overviewController');
 const { countRatings, RATINGS_SELECT } = require('../models/decisionModel');
 const { getForecast } = require('./restockForecast');
+const { FLAGGED_WHERE } = require('./riskCheck');
 const { postDecision } = require('./notifier');
 const { dashboardUrl } = require('./ratingLinks');
 const { enqueue } = require('./jobQueue');
@@ -65,7 +66,16 @@ async function summaryNumbers(sellerId, { zone, today, lateAfterHours, now = new
      FROM orders WHERE seller_id = ? AND order_placed_at >= FROM_UNIXTIME(?) AND order_placed_at < FROM_UNIXTIME(?)`,
     [from, from, from, from, sellerId, previousFrom, to]
   );
-  const [[{ needsAction }]] = await pool.query(`SELECT COUNT(*) AS needsAction FROM orders WHERE seller_id = ? AND (${PENDING_WHERE})`, [sellerId]);
+  const [[{ needsAction, flaggedNeedsAction }]] = await pool.query(
+    `SELECT COUNT(*) AS needsAction, COALESCE(SUM(${FLAGGED_WHERE}), 0) AS flaggedNeedsAction
+     FROM orders WHERE seller_id = ? AND (${PENDING_WHERE})`,
+    [sellerId]
+  );
+  const [[{ flagged }]] = await pool.query(
+    `SELECT COUNT(*) AS flagged FROM orders
+     WHERE seller_id = ? AND order_placed_at >= FROM_UNIXTIME(?) AND order_placed_at < FROM_UNIXTIME(?) AND ${FLAGGED_WHERE}`,
+    [sellerId, from, to]
+  );
   const [[oldest]] = await pool.query(
     `SELECT order_number, order_placed_at FROM orders
      WHERE seller_id = ? AND status IN ('unfulfilled', 'partial') AND ${COUNTED}
@@ -104,6 +114,7 @@ async function summaryNumbers(sellerId, { zone, today, lateAfterHours, now = new
     },
     needs_action: Number(needsAction),
     oldest_unshipped: oldest || null,
+    fraud: { flagged: Number(flagged), flagged_needs_action: Number(flaggedNeedsAction) },
     late: Number(late),
     late_after_hours: lateAfterHours,
     stock: { tracked: Number(stock.tracked), low: Number(stock.low), out_of_stock: Number(stock.out_of_stock) },
@@ -132,6 +143,14 @@ function formatSummary(n, { businessName, link, now = new Date() }) {
     lines.push(`- Needs action: ${plural(n.needs_action, 'order')}.${oldest}`);
   } else {
     lines.push('- Needs action: nothing.');
+  }
+  const fraud = n.fraud;
+  if (fraud && (fraud.flagged || fraud.flagged_needs_action)) {
+    const placed = fraud.flagged ? `${plural(fraud.flagged, 'order')} placed that day flagged by Shopify's fraud check.` : 'None flagged that day.';
+    const open = fraud.flagged_needs_action
+      ? ` ${plural(fraud.flagged_needs_action, 'flagged order')} still ${fraud.flagged_needs_action === 1 ? 'needs' : 'need'} action: ${link}/orders?risk=flagged&needs_action=1`
+      : '';
+    lines.push(`- Fraud: ${placed}${open}`);
   }
   if (n.late) lines.push(`- Late: ${plural(n.late, 'paid order')} not shipped after ${n.late_after_hours} hours.`);
   if (n.stock.tracked) {

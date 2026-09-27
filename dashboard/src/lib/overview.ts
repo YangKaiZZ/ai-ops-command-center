@@ -37,3 +37,9 @@ export function tileCount(n: number): string {
 export function tileMoney(amount: number): string {
   return Math.abs(amount) < 10_000 ? cents.format(amount) : compact.format(amount);
 }
+
+// The line under the "Flagged for fraud" tile: the period before, said
+// without an up/down color (fewer is better here, unlike orders and sales).
+export function fraudComparison(previous: number, days = PERIOD_DAYS): string {
+  return previous ? `${tileCount(previous)} in the ${days} days before` : `None in the ${days} days before`;
+}
