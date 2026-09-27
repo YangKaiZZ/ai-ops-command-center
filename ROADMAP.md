@@ -8,15 +8,37 @@ listed at the end.
 - **Hold and fulfill from the alert itself**: "Hold in Shopify" and "Fulfill"
   in email, Slack and Telegram alerts, each opening a signed confirm page
   like the rating page (Telegram: buttons in the chat).
-- **A current Shopify API version**: the app asks for `2024-10`, which
-  Shopify has retired, so it's answered by the oldest version still
-  supported. Pin a current one and re-test the sync against it.
 - **Faster late fraud results**: subscribe to `orders/risk_assessment_changed`
   (GraphQL-only; the webhooks are registered through REST today), so a risk
   that rises after the agent decided is alerted at once, not at the next sync.
 - **In-dashboard chat** using the same tools. Host the MCP server remotely
   with OAuth, so power users paste a URL instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
+
+## Smaller ideas
+
+- "Flagged for fraud" on the Overview and in the daily summary.
+- An MCP tool to read and rate the agent's decisions.
+- Real Slack interactivity, for one-click rating inside Slack.
+
+## Shopify platform
+
+- **Move orders, products and webhooks to GraphQL**: Shopify calls its REST
+  Admin API legacy, and new App Store apps must use GraphQL only. REST still
+  answers on the pinned version, so this is needed before a listing, not now.
+- **Next API version before July 2027**: `2026-07` is supported until
+  2027-07-16. Move `API_VERSION` on and re-run the live read check.
+
+## Going live for other stores
+
+Separate from the code, and needed before anyone but the owner connects:
+
+- Shopify's approval for protected customer data. Until then Shopify leaves
+  customer names and emails out of orders, so orders show no customer name.
+- How stores install it: a private install link or an App Store listing
+  (which needs Shopify's review).
+- A privacy policy page.
+- Opening sign-up (today it's invite-only).
 
 ## Done: before production
 
@@ -80,3 +102,8 @@ listed at the end.
   it went. Every attempt is logged with Shopify's answer; API keys can't act.
   In the dashboard: an "In Shopify" panel on each order's page, links from
   HOLD and FULFILL decision cards, and the auto-hold switch in Settings.
+- Shopify API version pinned to `2026-07` in one place, replacing the retired
+  `2024-10` (which Shopify was answering with `2025-10`, itself retired in
+  October 2026). Checked read-only against a dev store on both versions:
+  the same order, product, variant, webhook and fraud-check fields, and the
+  hold and fulfill inputs in the GraphQL schema.

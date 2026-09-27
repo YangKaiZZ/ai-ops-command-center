@@ -1,6 +1,10 @@
 const axios = require('axios');
 
-const API_VERSION = '2024-10';
+// The Admin API version for every Shopify call (REST, GraphQL, webhooks).
+// Shopify supports each version for 12 months; a retired one is answered by
+// the oldest still supported, which changes under you. 2026-07 is supported
+// until 2027-07-16: move to a newer one before then.
+const API_VERSION = '2026-07';
 const PAGE_SIZE = 250; // Shopify's REST maximum
 const MAX_PAGES = 400; // 100k records: stop instead of paging forever on a bad cursor
 const MAX_RETRIES = 4;
@@ -33,7 +37,7 @@ function shopifyClient(shopDomain, accessToken) {
 }
 
 // Shopify paginates with a Link header holding cursor URLs, e.g.
-//   <https://shop/admin/api/2024-10/orders.json?limit=250&page_info=abc>; rel="next"
+//   <https://shop/admin/api/2026-07/orders.json?limit=250&page_info=abc>; rel="next"
 function nextPageUrl(linkHeader) {
   if (!linkHeader) return null;
   for (const part of linkHeader.split(',')) {
@@ -246,6 +250,7 @@ async function createFulfillment(shopDomain, accessToken, fulfillmentOrderId, { 
 }
 
 module.exports = {
+  API_VERSION,
   fetchOrders,
   fetchOrder,
   fetchOrdersByIds,

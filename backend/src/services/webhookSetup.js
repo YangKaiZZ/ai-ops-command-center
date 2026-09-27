@@ -1,10 +1,10 @@
 const axios = require('axios');
+const { API_VERSION } = require('./shopifyService');
 
 // The Shopify webhooks this backend listens for, and where. Registered
 // through the Admin API, so Shopify signs them with the app's client secret.
 // (The privacy/compliance topics can't be registered this way; they're set
 // in the app's configuration. See the README.)
-const API_VERSION = '2024-10';
 const WEBHOOK_TOPICS = {
   'orders/create': '/api/webhooks/orders-create',
   'orders/updated': '/api/webhooks/orders-updated',

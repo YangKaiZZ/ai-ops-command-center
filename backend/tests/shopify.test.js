@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 
 process.env.JWT_SECRET = 'test-jwt-secret-0123456789abcdef';
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
-const { nextPageUrl } = require('../src/services/shopifyService');
+const { API_VERSION, nextPageUrl } = require('../src/services/shopifyService');
 
-const base = 'https://shop.myshopify.com/admin/api/2024-10/orders.json';
+const base = `https://shop.myshopify.com/admin/api/${API_VERSION}/orders.json`;
 
 test('finds the next-page cursor URL in a Link header', () => {
   assert.equal(nextPageUrl(`<${base}?limit=250&page_info=abc>; rel="next"`), `${base}?limit=250&page_info=abc`);

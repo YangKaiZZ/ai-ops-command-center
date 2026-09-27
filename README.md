@@ -126,6 +126,10 @@ from their own dashboard.
 - **No double work**: one agent run per order, and webhook delivery ids are
   kept in the database, so Shopify's redeliveries are recognised even after
   a restart.
+- **A pinned Shopify API version**: every call asks for `2026-07` (supported
+  until July 2027), set in one place (`API_VERSION` in
+  `backend/src/services/shopifyService.js`). A retired version would be
+  answered by whichever one Shopify supports oldest, which shifts each quarter.
 
 ## Tech stack
 
