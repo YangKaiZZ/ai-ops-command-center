@@ -143,6 +143,23 @@ test('any other GraphQL error still fails the fetch', async () => {
   }
 });
 
+test('throttled along with hidden names: waits and tries again, then keeps the order', async () => {
+  let calls = 0;
+  const fake = fakeShopify(() => {
+    calls++;
+    const node = orderNode(1, { customer: { id: 'gid://shopify/Customer/5', firstName: null, lastName: null } });
+    if (calls === 1) return { data: null, errors: [{ message: 'Throttled', extensions: { code: 'THROTTLED' } }, ...namesDenied(0)] };
+    return { data: { orders: { pageInfo: { hasNextPage: false }, nodes: [node] } }, errors: namesDenied(0) };
+  });
+  try {
+    const orders = await shopify.fetchOrders('shop.myshopify.com', 'token');
+    assert.equal(calls, 2);
+    assert.deepEqual(orders.map((o) => o.id), ['1']);
+  } finally {
+    fake.restore();
+  }
+});
+
 test('orders by id skip ones Shopify no longer has; a missing order is null', async () => {
   const fake = fakeShopify((query, vars) => ({ data: { nodes: vars.ids.map((id) => (id.endsWith('/404') ? null : orderNode(id.split('/').pop()))) } }));
   try {

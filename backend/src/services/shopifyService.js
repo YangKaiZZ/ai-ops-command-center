@@ -46,16 +46,16 @@ function shopifyClient(shopDomain, accessToken) {
 // A GraphQL query. Shopify answers a throttled one with 200 and a THROTTLED
 // error rather than a 429, so wait and try again here too. A missing scope
 // comes back as ACCESS_DENIED: the error then has accessDenied set.
-// `tolerate(errors)` returning true keeps the (partial) data instead of throwing.
+// Errors `tolerate([error])` accepts are ignored, keeping the (partial) data.
 async function graphql(client, query, variables, { tolerate } = {}) {
   for (let attempt = 0; ; attempt++) {
     const { data } = await client.post('/graphql.json', { query, variables });
-    if (!data.errors?.length) return data.data;
-    if (data.data && tolerate?.(data.errors)) return data.data;
-    const throttled = data.errors.every((e) => e.extensions?.code === 'THROTTLED');
+    const errors = (data.errors || []).filter((e) => !tolerate?.([e]));
+    if (!errors.length && (data.data || !data.errors?.length)) return data.data;
+    const throttled = errors.length > 0 && errors.every((e) => e.extensions?.code === 'THROTTLED');
     if (!throttled || attempt >= MAX_RETRIES) {
-      throw Object.assign(new Error(`Shopify GraphQL: ${data.errors.map((e) => e.message).join('; ')}`), {
-        accessDenied: data.errors.some((e) => e.extensions?.code === 'ACCESS_DENIED'),
+      throw Object.assign(new Error(`Shopify GraphQL: ${(errors.length ? errors : data.errors).map((e) => e.message).join('; ')}`), {
+        accessDenied: errors.some((e) => e.extensions?.code === 'ACCESS_DENIED'),
       });
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
