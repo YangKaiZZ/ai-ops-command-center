@@ -4,6 +4,7 @@ const { startTelegramPolling } = require('./services/telegram');
 const { startReportScheduler } = require('./services/reports');
 const { startWorker, stopWorker } = require('./services/jobQueue');
 const { startDemoCleanup } = require('./services/demo');
+const { refreshAllWebhooks } = require('./services/storeConnection');
 require('./services/jobHandlers'); // what each job type does
 
 if (process.env.SLACK_WEBHOOK_URL) {
@@ -17,6 +18,7 @@ const server = app.listen(PORT, () => {
   startReportScheduler();
   startTelegramPolling();
   startDemoCleanup();
+  refreshAllWebhooks().catch((err) => console.warn(`[webhooks] startup check failed: ${err.message}`));
   startWorker().catch((err) => console.error(`[jobs] worker failed to start: ${err.message}`));
 });
 

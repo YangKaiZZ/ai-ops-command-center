@@ -15,6 +15,9 @@
 //   5. the API: `risk` on orders, ?risk=flagged, and the order page reads the
 //      check of an order that never had one
 //   6. privacy: data requests include it; a redact removes its reasons
+//   7. the orders/risk_assessment_changed webhook: signed, through the job
+//      queue, re-reads that one order and alerts once when risk went up after
+//      a decision; unsigned, unknown or closed orders do nothing
 //
 // Usage:  npm run test:risk
 const path = require('path');
@@ -109,6 +112,7 @@ async function main() {
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '100',
     AGENT_DAILY_LIMIT_TOTAL: '100000',
     DASHBOARD_URL: 'https://dash.example.test',
+    SHOPIFY_API_SECRET: 'risk-test-secret',
   });
   require('dotenv').config({ quiet: true });
   process.env.MCP_SERVER_PATH ||= path.join(__dirname, '..', '..', 'mcp', 'server.js');
@@ -403,6 +407,90 @@ async function main() {
     await privacy.redactCustomer(store, ['8001']);
     const redacted = (await pool.query('SELECT buyer_name, risk_level, risk_reasons FROM orders WHERE id = ?', [ids.A]))[0][0];
     check(redacted.buyer_name === 'Redacted' && redacted.risk_reasons === null && redacted.risk_level === 'high', 'a redact removes its reasons (they can describe the buyer) and keeps the level');
+
+    console.log('\n7. The risk webhook');
+    const hookStore = await addSeller('hook');
+    const [[hookSeller]] = await pool.query('SELECT shopify_shop_domain FROM sellers WHERE id = ?', [hookStore]);
+    const riskWebhook = async (payload, { secret = 'risk-test-secret', id = crypto.randomUUID() } = {}) => {
+      const raw = JSON.stringify(payload);
+      const res = await fetch(`${base}/api/webhooks/orders-risk-assessment-changed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', secret).update(raw).digest('base64'),
+          'X-Shopify-Shop-Domain': hookSeller.shopify_shop_domain,
+          'X-Shopify-Topic': 'orders/risk_assessment_changed',
+          'X-Shopify-Webhook-Id': id,
+        },
+        body: raw,
+      });
+      return res.status;
+    };
+    const hookJobs = async () =>
+      (await pool.query("SELECT status, payload FROM jobs WHERE seller_id = ? AND type = 'refresh_order_risk' ORDER BY id", [hookStore]))[0];
+    const [[queued]] = await pool.query("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('queued', 'running')");
+    if (Number(queued.n) > 0) {
+      check(false, `the job queue is empty (${queued.n} job(s) queued or running; run this test when it's empty)`);
+    } else {
+      const addHookOrder = async (n, { status = 'unfulfilled', verdict = 'fulfill' } = {}) => {
+        const [r] = await pool.query(
+          `INSERT INTO orders (seller_id, shopify_order_id, order_number, status, financial_status, buyer_name, total_amount, order_placed_at,
+             risk_level, risk_recommendation, risk_reasons, billing_matches_shipping, risk_checked_at)
+           VALUES (?, ?, ?, ?, 'paid', NULL, 50.00, NOW() - INTERVAL 30 DAY, 'low', 'accept', '[]', 1, NOW() - INTERVAL 1 HOUR)`,
+          [hookStore, String(n), `#${n}`, status]
+        );
+        if (verdict) {
+          await pool.query("INSERT INTO decisions (seller_id, order_id, order_number, reasoning, action_taken) VALUES (?, ?, ?, 'FULFILL - fine', ?)", [
+            hookStore,
+            r.insertId,
+            `#${n}`,
+            verdict,
+          ]);
+        }
+        return r.insertId;
+      };
+      // A month old: past the sync's week, which only the webhook reaches.
+      const hookOrder = await addHookOrder(9001);
+      await addHookOrder(9002, { status: 'fulfilled' });
+      risks.set('9001', riskNode(9001, 'HIGH', { recommendation: 'CANCEL', reasons: ['Card declined 4 times'] }));
+      risks.set('9002', riskNode(9002, 'HIGH', { recommendation: 'CANCEL' }));
+      riskCalls.length = 0;
+      alerts.length = 0;
+
+      check((await riskWebhook({ order_id: 9001 }, { secret: 'wrong' })) === 401 && (await hookJobs()).length === 0, 'a badly signed one is refused and queues nothing');
+      const deliveryId = crypto.randomUUID();
+      check((await riskWebhook({ order_id: 9001, risk_level: 'high' }, { id: deliveryId })) === 200, 'a signed one is accepted');
+      check((await riskWebhook({ order_id: 9001, risk_level: 'high' }, { id: deliveryId })) === 200 && (await hookJobs()).length === 1, 'the same delivery twice queues one job');
+      await riskWebhook({ admin_graphql_api_order_id: 'gid://shopify/Order/9002' });
+      await riskWebhook({ order_id: 9999 }); // an order we don't have
+      await riskWebhook({ provider_title: 'Fraud app' }); // no order id
+      const jobs = await hookJobs();
+      check(
+        JSON.stringify(jobs.map((j) => (typeof j.payload === 'string' ? JSON.parse(j.payload) : j.payload).shopifyOrderId)) === JSON.stringify(['9001', '9002', '9999']),
+        'one job per order named, by either id field; none without an order id',
+        JSON.stringify(jobs.map((j) => j.payload))
+      );
+
+      await queue.startWorker({ concurrency: 1 });
+      const allDone = await until(async () => ((await hookJobs()).every((j) => j.status === 'done') ? true : null));
+      await queue.stopWorker(5000);
+      check(allDone, 'the jobs run');
+      check(JSON.stringify(riskCalls) === JSON.stringify([['9001']]), 'only the open order is read from Shopify, alone', JSON.stringify(riskCalls));
+      check(
+        alerts.length === 1 && alerts[0].text.startsWith('*Fraud risk: order #9001*\nShopify now rates it high risk and recommends cancelling it.') && alerts[0].orderId === hookOrder,
+        'the seller is alerted at once, about that order',
+        JSON.stringify(alerts.map((a) => a.text.split('\n')[0]))
+      );
+      const hooked = (await pool.query('SELECT risk_level, risk_alerted_at FROM orders WHERE id = ?', [hookOrder]))[0][0];
+      check(hooked.risk_level === 'high' && hooked.risk_alerted_at, 'saved and marked alerted');
+
+      alerts.length = 0;
+      await riskWebhook({ order_id: 9001 });
+      await queue.startWorker({ concurrency: 1 });
+      await until(async () => ((await hookJobs()).every((j) => j.status === 'done') ? true : null));
+      await queue.stopWorker(5000);
+      check(alerts.length === 0, 'another change to the same order alerts nothing again');
+    }
   } finally {
     await queue.stopWorker(5000);
     llm.server.close();

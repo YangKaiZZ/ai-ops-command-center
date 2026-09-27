@@ -10,6 +10,7 @@
 //   7. Disconnect button, and switching stores clears the old store's data
 //   8. Privacy (GDPR) webhooks
 //   9. Low-stock thresholds: seller default for new items, per-item overrides
+//  10. At startup, connected stores' webhooks are brought up to date
 //
 // Usage:  npm run test:onboarding
 const path = require('path');
@@ -372,6 +373,21 @@ async function main() {
     check(applyAll.json.items_updated === 2 && thresholds.length === 1 && thresholds[0].t === 8, 'apply to all resets every item');
     const settingsInv = await http('GET', '/api/settings', { token: a.token });
     check(settingsInv.json.inventory.default_low_stock_threshold === 8, 'settings shows the default');
+
+    console.log('\n10. Webhooks at startup');
+    const SHOP_3 = `onboard-${RUN}-c.myshopify.com`;
+    await pool.query(
+      'UPDATE sellers SET shopify_shop_domain = ?, shopify_access_token = ?, shopify_refresh_token = NULL, shopify_token_expires_at = NULL WHERE id = ?',
+      [SHOP_3, require('../src/config/secrets').encryptSecret('shpat_startup'), a.id]
+    );
+    const registeredBefore = called('registerWebhooks').length;
+    await require('../src/services/storeConnection').refreshAllWebhooks();
+    const refreshed = called('registerWebhooks').slice(registeredBefore);
+    check(
+      refreshed.some((c) => c[1] === SHOP_3 && c[2] === 'https://ops.example.test'),
+      "every connected store's webhooks are brought up to date (a topic added later reaches it)",
+      refreshed.map((c) => c[1]).join(', ')
+    );
   } finally {
     for (const id of created) {
       for (const table of ['api_keys', 'decisions', 'orders', 'inventory_items', 'oauth_states', 'privacy_requests']) {

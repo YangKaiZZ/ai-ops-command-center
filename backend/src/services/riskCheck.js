@@ -13,8 +13,12 @@ const { autoHold } = require('./orderActions');
 // Assessments can come in after the order (Shopify's own takes seconds, an
 // app's can take longer), so:
 //   - an order's agent run waits a few minutes for a pending one (agentService.js)
-//   - each order sync reads it again for open orders from the last week, and
-//     if it went up after the agent had decided, tells the seller (refreshRecentRisks)
+//   - Shopify tells us when an order's assessment changes (the
+//     orders/risk_assessment_changed webhook): that order is read again at
+//     once, and if its risk went up after the agent had decided, the seller
+//     is told (refreshOrderRisk)
+//   - each order sync does the same for open orders from the last week, in
+//     case a webhook was missed (refreshRecentRisks)
 
 const LEVEL_RANK = { none: 0, low: 1, medium: 2, high: 3 };
 const RECOMMENDATIONS = ['accept', 'investigate', 'cancel', 'none'];
@@ -161,10 +165,26 @@ function formatRiskAlert(order, risk, holdLine = null) {
   return lines.join('\n');
 }
 
-// Reads the analysis again for open orders from the last week and saves it.
-// When an order's risk went up to flagged after the agent had decided on it,
-// the seller gets an alert, once per order. (An order the agent hasn't run on
-// yet needs none: its run reads the risk itself.) Returns { checked, alerted }.
+// Saves an order's fresh analysis (`node` from fetchOrderRisks). When its
+// risk went up to flagged after the agent had decided on it, the seller gets
+// an alert, once per order. (An order the agent hasn't run on yet needs none:
+// its run reads the risk itself.) Returns whether an alert went out.
+async function applyFreshRisk(sellerId, row, node) {
+  const risk = summarizeRisk(node);
+  await orderModel.saveRisk(sellerId, row.shopify_order_id, risk);
+  if (!row.latest_verdict || row.risk_alerted_at || !isFlagged(risk) || isFlagged(riskFromRow(row))) return false;
+  // High risk (or "cancel") is a HOLD the agent would have made: with
+  // auto-hold on, it's put on hold in Shopify too.
+  const holdLine = mustHold(risk)
+    ? await autoHold(sellerId, row.shopify_order_id, { reason: 'HIGH_RISK_OF_FRAUD', note: describeRisk(risk).slice(0, 255) })
+    : null;
+  await postDecision(sellerId, formatRiskAlert(row, risk, holdLine), { orderId: row.id });
+  await orderModel.markRiskAlerted(row.id);
+  return true;
+}
+
+// Reads the analysis again for open orders from the last week (applyFreshRisk).
+// Returns { checked, alerted }.
 async function refreshRecentRisks(sellerId, creds) {
   const rows = await orderModel.openOrdersForRiskCheck(sellerId, RECHECK_DAYS, RECHECK_LIMIT);
   if (!rows.length) return { checked: 0, alerted: 0 };
@@ -179,21 +199,26 @@ async function refreshRecentRisks(sellerId, creds) {
   for (const row of rows) {
     const node = nodes.get(String(row.shopify_order_id));
     if (!node) continue;
-    const risk = summarizeRisk(node);
-    await orderModel.saveRisk(sellerId, row.shopify_order_id, risk);
     checked++;
-    if (row.latest_verdict && !row.risk_alerted_at && isFlagged(risk) && !isFlagged(riskFromRow(row))) {
-      // High risk (or "cancel") is a HOLD the agent would have made: with
-      // auto-hold on, it's put on hold in Shopify too.
-      const holdLine = mustHold(risk)
-        ? await autoHold(sellerId, row.shopify_order_id, { reason: 'HIGH_RISK_OF_FRAUD', note: describeRisk(risk).slice(0, 255) })
-        : null;
-      await postDecision(sellerId, formatRiskAlert(row, risk, holdLine), { orderId: row.id });
-      await orderModel.markRiskAlerted(row.id);
-      alerted++;
-    }
+    if (await applyFreshRisk(sellerId, row, node)) alerted++;
   }
   return { checked, alerted };
+}
+
+// One order's analysis changed in Shopify (the orders/risk_assessment_changed
+// webhook): read it again now (applyFreshRisk). Throws when Shopify can't be
+// asked, so the job tries again. Returns what happened, for the log.
+async function refreshOrderRisk(sellerId, shopifyOrderId) {
+  const id = String(shopifyOrderId);
+  const row = await orderModel.openOrderForRiskCheck(sellerId, id);
+  // Not stored yet (its agent run reads the risk itself), or no longer open.
+  if (!row) return 'not an open order here';
+  const creds = await sellerModel.getStoreCredentials(sellerId);
+  if (!creds) return 'store not connected';
+  const node = (await shopifyService.fetchOrderRisks(creds.shopDomain, creds.accessToken, [id])).get(id);
+  if (!node) return 'Shopify did not return it';
+  const alerted = await applyFreshRisk(sellerId, row, node);
+  return alerted ? 'risk went up: seller alerted' : `saved (${summarizeRisk(node).level})`;
 }
 
 module.exports = {
@@ -206,6 +231,7 @@ module.exports = {
   checkOrderRisk,
   formatRiskAlert,
   refreshRecentRisks,
+  refreshOrderRisk,
   FLAGGED_WHERE,
   RECHECK_DAYS,
 };

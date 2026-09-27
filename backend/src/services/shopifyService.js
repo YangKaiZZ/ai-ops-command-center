@@ -125,7 +125,8 @@ const MORE_LINE_ITEMS_QUERY = `query MoreLineItems($id: ID!, $cursor: String) {
 const FULFILLMENT_STATUS = { FULFILLED: 'fulfilled', PARTIALLY_FULFILLED: 'partial', RESTOCKED: 'restocked' };
 
 // A GraphQL LineItem with REST's field names. fulfillable_quantity is what's
-// left to ship (unfulfilledQuantity).
+// left to ship (unfulfilledQuantity), counting items on hold; the REST
+// webhooks count those as 0 until the hold is released.
 function toRestLineItem(item) {
   return {
     id: numericId(item.id),

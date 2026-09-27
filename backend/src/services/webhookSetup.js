@@ -9,6 +9,7 @@ const WEBHOOK_TOPICS = {
   'orders/updated': '/api/webhooks/orders-updated',
   'inventory_levels/update': '/api/webhooks/inventory-levels-update',
   'app/uninstalled': '/api/webhooks/app-uninstalled',
+  'orders/risk_assessment_changed': '/api/webhooks/orders-risk-assessment-changed',
 };
 
 // "inventory_levels/update" -> INVENTORY_LEVELS_UPDATE, GraphQL's name for the topic.

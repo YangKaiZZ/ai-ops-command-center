@@ -5,9 +5,6 @@ listed at the end.
 
 ## Write actions
 
-- **Faster late fraud results**: subscribe to `orders/risk_assessment_changed`
-  (GraphQL-only; the webhooks are registered through REST today), so a risk
-  that rises after the agent decided is alerted at once, not at the next sync.
 - **In-dashboard chat** using the same tools. Host the MCP server remotely
   with OAuth, so power users paste a URL instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
@@ -122,3 +119,8 @@ Separate from the code, and needed before anyone but the owner connects:
   against the dev store: the same orders, items, statuses and stock as REST.
   Customer names Shopify refuses without approval are left empty, as before,
   and come through once it approves.
+- Faster late fraud results: the `orders/risk_assessment_changed` webhook
+  (GraphQL-only) has an order's fraud check read again as soon as it changes,
+  so a risk that rises after the agent decided is alerted in seconds, for any
+  open order, not only at the next sync for last week's. Connected stores
+  get the new webhook when the backend starts.

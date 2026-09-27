@@ -71,6 +71,28 @@ const handleInventoryLevelUpdate = webhookHandler('inventory_levels/update', asy
   await enqueue('refresh_inventory_item', sellerId, { inventoryItemId: String(level.inventory_item_id) });
 });
 
+// The order a risk webhook is about. Shopify documents the topic but not its
+// payload: it has carried order_id and admin_graphql_api_order_id, so either
+// is read. Null when neither is there.
+function riskWebhookOrderId(payload) {
+  const id = payload?.order_id ?? payload?.admin_graphql_api_order_id ?? payload?.order?.id ?? null;
+  const numeric = id == null ? '' : String(id).split('/').pop();
+  return /^\d+$/.test(numeric) ? numeric : null;
+}
+
+// POST /api/webhooks/orders-risk-assessment-changed
+// Shopify (or a fraud app) finished or changed an order's risk assessment.
+// Re-reading it goes on the job queue; if the risk went up after the agent
+// decided, the seller is alerted in seconds rather than at the next sync.
+const handleRiskAssessmentChanged = webhookHandler('orders/risk_assessment_changed', async (sellerId, payload) => {
+  const shopifyOrderId = riskWebhookOrderId(payload);
+  if (!shopifyOrderId) {
+    console.warn(`[webhook] orders/risk_assessment_changed for seller ${sellerId} without an order id - ignored`);
+    return;
+  }
+  await enqueue('refresh_order_risk', sellerId, { shopifyOrderId });
+});
+
 // POST /api/webhooks/app-uninstalled
 // The merchant removed the app (or we revoked it): the token no longer works.
 // The shop domain is kept so the privacy webhooks that follow still find this seller.
@@ -137,5 +159,7 @@ module.exports = {
   handleOrderUpdated,
   handleInventoryLevelUpdate,
   handleAppUninstalled,
+  handleRiskAssessmentChanged,
   handlePrivacyWebhook,
+  riskWebhookOrderId,
 };

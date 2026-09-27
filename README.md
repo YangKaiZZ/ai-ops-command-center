@@ -29,8 +29,11 @@ for now).
   reasons, and whether the billing and shipping addresses match. High risk
   (or "cancel") is a *hold* the model can't overrule; medium risk is a hold
   unless the seller's notes say otherwise. A run waits up to 10 minutes for a
-  pending analysis, and each sync reads it again for recent open orders: if
-  an order's risk goes up after the agent decided, the seller gets an alert.
+  pending analysis. When Shopify or a fraud app changes an order's assessment
+  later, Shopify's `orders/risk_assessment_changed` webhook has it read again
+  at once (each sync also re-checks recent open orders, in case one was
+  missed): if the risk went up after the agent decided, the seller gets an
+  alert in seconds.
 - **Hold and fulfill in Shopify.** From an order's page the seller puts it on
   a real Shopify hold (with a reason), releases it, or marks it shipped with
   a tracking number and an email to the customer. With auto-hold switched on,
@@ -182,7 +185,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
-| backend | `npm test` | 129 unit tests: auth, API keys, secrets, Shopify OAuth and sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
+| backend | `npm test` | 135 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
@@ -197,7 +200,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:decision-feedback` | thumbs up/down on decisions: rating, notes, changing and clearing, the counts on the feed and the Overview, bad input, skipped runs, other sellers, privacy redaction of notes |
 | backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake DeepSeek: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
 | backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
-| backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
+| backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, the signed risk webhook through the job queue (one alert, at once), `?risk=flagged`, the order page, privacy |
 | backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
 | backend | `npm run test:demo` | "Try the demo": a signed-in account with its sample store (orders, fraud checks, decisions, forecasts, the Overview), hold / release / fulfill in the stand-in store, everything that reaches outside refused, no Shopify or model calls, expiry, the cap and turning it off |
 | backend | `npm run test:mcp-decisions` | the MCP tools that read and rate decisions, through the real MCP server with an API key: filters, ratings and notes, a skipped run and another seller's decision refused, and the agent not getting them |

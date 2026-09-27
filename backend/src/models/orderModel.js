@@ -105,20 +105,32 @@ async function saveRisk(sellerId, shopifyOrderId, risk) {
   );
 }
 
-// Open orders placed in the last `days`, newest first, with their stored risk
-// and the verdict of the agent's latest decision on each (null if none).
+// An order's stored risk and the verdict of the agent's latest decision on it
+// (null if none), for the risk re-checks.
+const RISK_CHECK_SELECT = `SELECT o.id, o.shopify_order_id, o.order_number, ${RISK_COLUMNS}, o.risk_alerted_at,
+   (SELECT d.action_taken FROM decisions d WHERE d.seller_id = o.seller_id AND d.order_id = o.id
+    ORDER BY d.created_at DESC, d.id DESC LIMIT 1) AS latest_verdict
+ FROM orders o`;
+
+// Open orders placed in the last `days`, newest first (RISK_CHECK_SELECT).
 async function openOrdersForRiskCheck(sellerId, days, limit) {
   const [rows] = await pool.query(
-    `SELECT o.id, o.shopify_order_id, o.order_number, ${RISK_COLUMNS}, o.risk_alerted_at,
-       (SELECT d.action_taken FROM decisions d WHERE d.seller_id = o.seller_id AND d.order_id = o.id
-        ORDER BY d.created_at DESC, d.id DESC LIMIT 1) AS latest_verdict
-     FROM orders o
+    `${RISK_CHECK_SELECT}
      WHERE o.seller_id = ? AND ${OPEN_WHERE} AND o.order_placed_at >= NOW() - INTERVAL ? DAY
      ORDER BY o.order_placed_at DESC, o.id DESC
      LIMIT ?`,
     [sellerId, days, limit]
   );
   return rows;
+}
+
+// One order by its Shopify id, if we have it and it's still open (RISK_CHECK_SELECT).
+async function openOrderForRiskCheck(sellerId, shopifyOrderId) {
+  const [[row]] = await pool.query(`${RISK_CHECK_SELECT} WHERE o.seller_id = ? AND o.shopify_order_id = ? AND ${OPEN_WHERE}`, [
+    sellerId,
+    String(shopifyOrderId),
+  ]);
+  return row ?? null;
 }
 
 async function markRiskAlerted(orderId) {
@@ -142,6 +154,7 @@ module.exports = {
   ordersMissingLineItems,
   saveRisk,
   openOrdersForRiskCheck,
+  openOrderForRiskCheck,
   markRiskAlerted,
   orderSellerForTelegramChat,
   RISK_COLUMNS,

@@ -2,6 +2,7 @@ const { registerHandler } = require('./jobQueue');
 const { runAgent } = require('./agentService');
 const { refreshInventoryItem } = require('./syncService');
 const { sendDailySummary, sendLateOrderAlert } = require('./reports');
+const { refreshOrderRisk } = require('./riskCheck');
 
 // What each kind of job does. server.js loads this before starting the worker.
 
@@ -16,6 +17,14 @@ registerHandler('refresh_inventory_item', async (job) => {
   console.log(
     `[job ${job.id}] inventory item ${inventoryItemId} seller=${job.sellerId}: ${result.status}${result.stock != null ? `, stock ${result.stock}` : ''}`
   );
+});
+
+// An orders/risk_assessment_changed webhook: read that order's fraud check
+// again, and alert when it went up after the agent decided.
+registerHandler('refresh_order_risk', async (job) => {
+  const { shopifyOrderId } = job.payload;
+  const result = await refreshOrderRisk(job.sellerId, shopifyOrderId);
+  console.log(`[job ${job.id}] fraud check of order ${shopifyOrderId} seller=${job.sellerId}: ${result}`);
 });
 
 // A daily summary that came due (reports.queueDueReports); `today` is the
