@@ -26,7 +26,8 @@ Separate from the code, and needed before anyone but the owner connects:
   customer names and emails out of orders, so orders show no customer name.
 - How stores install it: a private install link or an App Store listing
   (which needs Shopify's review).
-- A privacy policy page.
+- The operator's name and a contact address for the privacy policy page
+  (`PRIVACY_OPERATOR`, `PRIVACY_CONTACT_EMAIL`); the page itself is done.
 - Opening sign-up (today it's invite-only).
 
 ## Done: before production
@@ -132,3 +133,8 @@ Separate from the code, and needed before anyone but the owner connects:
 - Delete account, in Settings: the password is asked again, the app is
   uninstalled from the store, and the account and everything kept for it
   (orders, stock, decisions and ratings, alert settings, API keys) is deleted.
+- Privacy policy page (`/privacy`, linked from sign-in and sign-up): what is
+  kept, who else sees it (Shopify, DeepSeek, the alert channels), what stays
+  in the browser, how long things are kept, deleting an account and
+  customers' requests, all as the code does it. Who runs the server and a
+  contact address come from settings; until set, the page says so.

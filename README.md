@@ -91,7 +91,9 @@ for now).
   built from the demo's own tables. It never calls Shopify or the model,
   can't connect a store or send messages, and is deleted after 4 hours.
 - **Shopify compliance.** The mandatory privacy webhooks (customer data
-  request, customer redact, shop redact) and app uninstall are handled.
+  request, customer redact, shop redact) and app uninstall are handled, and
+  a privacy policy page (`/privacy`) says what is kept and shared, as the
+  code does it; the operator's name and contact come from settings.
 
 ## How it fits together
 

@@ -124,6 +124,11 @@ function SignupForm() {
           Sign in
         </Link>
       </p>
+      <p className="text-center text-xs text-ink-2">
+        <Link href="/privacy" className="underline hover:text-ink">
+          Privacy policy
+        </Link>
+      </p>
     </form>
   );
 }

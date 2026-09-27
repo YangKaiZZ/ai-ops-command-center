@@ -66,10 +66,19 @@ async function register(req, res) {
   }
 }
 
-// GET /api/auth/config: what the sign-in and sign-up pages need to know
-// before showing their forms.
+// Who runs this server and how to reach them, for the privacy policy page:
+// facts only the operator can give, so they're settings (PRIVACY_OPERATOR,
+// PRIVACY_CONTACT_EMAIL), null until set.
+function privacyContact() {
+  const operator = (process.env.PRIVACY_OPERATOR || '').trim().slice(0, 200) || null;
+  const email = (process.env.PRIVACY_CONTACT_EMAIL || '').trim();
+  return { operator, contact_email: isEmail(email) ? email : null };
+}
+
+// GET /api/auth/config: what the sign-in, sign-up and privacy pages need to
+// know before showing.
 function config(req, res) {
-  res.json({ invite_required: isInviteRequired(), demo_available: demo.isDemoEnabled() });
+  res.json({ invite_required: isInviteRequired(), demo_available: demo.isDemoEnabled(), privacy: privacyContact() });
 }
 
 // POST /api/auth/demo
