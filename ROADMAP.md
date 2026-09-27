@@ -26,8 +26,6 @@ Separate from the code, and needed before anyone but the owner connects:
   customer names and emails out of orders, so orders show no customer name.
 - How stores install it: a private install link or an App Store listing
   (which needs Shopify's review).
-- The operator's name and a contact address for the privacy policy page
-  (`PRIVACY_OPERATOR`, `PRIVACY_CONTACT_EMAIL`); the page itself is done.
 - Opening sign-up (today it's invite-only).
 
 ## Done: before production
@@ -143,3 +141,9 @@ Separate from the code, and needed before anyone but the owner connects:
   in the browser, how long things are kept, deleting an account and
   customers' requests, all as the code does it. Who runs the server and a
   contact address come from settings; until set, the page says so.
+- Dashboard redesign: a side navigation with live counts, a top bar with the
+  store, order search (Ctrl K) and Sync; an Overview over 7, 14 or 30 days
+  with the orders waiting on the seller; order tabs with counts; a two-column
+  order page with a timeline; a stock table with days-left bars and a CSV
+  reorder list; decisions beside the notes the agent learns from; a Settings
+  menu that follows the scroll.
