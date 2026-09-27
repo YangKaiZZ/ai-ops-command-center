@@ -8,7 +8,9 @@ and run everything from a web dashboard. The same tools are available in
 Claude Desktop through an MCP server.
 
 Tested end to end against a Shopify development store. Live at
-https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
+https://ai-ops-drew.duckdns.org: press **Try the demo** on the sign-in page
+for a sample store of your own (no account needed; sign-up is invite-only
+for now).
 
 ## What it does
 
@@ -74,6 +76,12 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   authenticated with revocable API keys, plus two for the seller only: read
   the agent's decisions and rate them ("that #1001 call was wrong: bank
   transfers show pending first"), which the agent learns from.
+- **A demo anyone can try.** "Try the demo" gives each visitor their own
+  sample store: a month of orders, fraud checks, the agent's decisions (some
+  rated, one marked wrong with the note it learns from), stock forecasts and
+  a late order. Hold, release and fulfill work against a stand-in for Shopify
+  built from the demo's own tables. It never calls Shopify or the model,
+  can't connect a store or send messages, and is deleted after 4 hours.
 - **Shopify compliance.** The mandatory privacy webhooks (customer data
   request, customer redact, shop redact) and app uninstall are handled.
 
@@ -115,6 +123,12 @@ from their own dashboard.
   buttons only work from the chat linked to the order's account.
 - **Shopify requests are verified**: webhooks by HMAC over the raw body;
   OAuth redirects by HMAC, a one-time `state` and a timestamp.
+- **Demo accounts are sealed off**: no password (sign-in is a token that
+  expires with the account), no real store, no model calls (the agent
+  refuses to run for one), and anything that reaches outside (connecting a
+  store, alert channels, API keys, sending a summary) is refused. At most 10
+  per address an hour and 200 at once; each is deleted with its data when it
+  expires.
 - **Sign-up can be invite-only**: set `SIGNUP_INVITE_CODE` and creating an
   account needs that code (wrong guesses are rate-limited), so strangers can't
   connect stores and spend LLM credits before you're ready.
@@ -185,6 +199,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
 | backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
+| backend | `npm run test:demo` | "Try the demo": a signed-in account with its sample store (orders, fraud checks, decisions, forecasts, the Overview), hold / release / fulfill in the stand-in store, everything that reaches outside refused, no Shopify or model calls, expiry, the cap and turning it off |
 | backend | `npm run test:mcp-decisions` | the MCP tools that read and rate decisions, through the real MCP server with an API key: filters, ratings and notes, a skipped run and another seller's decision refused, and the agent not getting them |
 | backend | `npm run test:alert-actions` | holding and fulfilling from alerts: the links in email and buttons in Telegram (only when the seller can act), the confirm page's API (signed, one order and one action, expiring, reads until confirmed), Telegram's ask-first flow from the seller's own chat only, against a fake Shopify, mail server and Telegram |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |

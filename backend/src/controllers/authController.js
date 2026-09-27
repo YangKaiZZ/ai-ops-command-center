@@ -6,6 +6,7 @@ const { isEmail } = require('../utils/isEmail');
 const rateLimit = require('../services/rateLimit');
 const passwordReset = require('../services/passwordReset');
 const { isInviteRequired, isValidInviteCode } = require('../services/inviteCode');
+const demo = require('../services/demo');
 
 const { LIMITS } = rateLimit;
 const MIN_PASSWORD = 8;
@@ -65,9 +66,30 @@ async function register(req, res) {
   }
 }
 
-// GET /api/auth/config: what the sign-up page needs to know before showing its form.
+// GET /api/auth/config: what the sign-in and sign-up pages need to know
+// before showing their forms.
 function config(req, res) {
-  res.json({ invite_required: isInviteRequired() });
+  res.json({ invite_required: isInviteRequired(), demo_available: demo.isDemoEnabled() });
+}
+
+// POST /api/auth/demo
+// "Try the demo": a new demo account with a sample store (services/demo.js),
+// signed in until it expires. No password, no invite code.
+async function startDemo(req, res) {
+  if (!demo.isDemoEnabled()) return res.status(404).json({ error: 'The demo is turned off' });
+  try {
+    const limitedByIp = !rateLimit.isLoopback(req.ip);
+    const wait = limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.demosPerIp, req.ip) : 0;
+    if (wait) return rateLimit.tooManyRequests(res, wait, 'Too many demos started from your network');
+    const account = await demo.createDemoAccount();
+    if (limitedByIp) await rateLimit.record(LIMITS.demosPerIp, req.ip);
+    const token = jwt.sign({ sellerId: account.sellerId }, JWT_SECRET, { expiresIn: `${demo.demoHours()}h` });
+    res.status(201).json({ token, sellerId: account.sellerId, business_name: account.businessName, demo: { expires_at: account.expiresAt } });
+  } catch (err) {
+    if (err instanceof demo.DemoUnavailableError) return res.status(503).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Could not start the demo' });
+  }
 }
 
 // POST /api/auth/login
@@ -164,4 +186,4 @@ async function resetPassword(req, res) {
   }
 }
 
-module.exports = { register, config, login, forgotPassword, resetPassword, validateRegistration };
+module.exports = { register, config, login, startDemo, forgotPassword, resetPassword, validateRegistration };

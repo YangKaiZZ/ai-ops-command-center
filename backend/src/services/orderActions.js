@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const sellerModel = require('../models/sellerModel');
 const orderModel = require('../models/orderModel');
 const shopifyService = require('./shopifyService');
+const demoStore = require('./demoStore');
 const oauth = require('./shopifyOAuth');
 
 // Holding, releasing and fulfilling orders in Shopify from here: the buttons
@@ -45,13 +46,27 @@ async function findOrder(sellerId, orderId) {
   return order;
 }
 
-// The store's credentials, or an ActionError saying what to do first.
+// The store's credentials, or an ActionError saying what to do first. A demo
+// account (services/demo.js) gets { demo: true }: its store is demoStore.js.
 async function storeFor(sellerId) {
+  const [[seller]] = await pool.query('SELECT shopify_scopes, is_demo FROM sellers WHERE id = ?', [sellerId]);
+  if (seller?.is_demo) return { demo: true };
   const creds = await sellerModel.getStoreCredentials(sellerId);
   if (!creds) throw new ActionError('Connect your Shopify store first (Settings > Store).', 409);
-  const [[seller]] = await pool.query('SELECT shopify_scopes FROM sellers WHERE id = ?', [sellerId]);
   if (oauth.actionsAllowed(seller?.shopify_scopes) === false) throw new ActionError(MISSING_PERMISSION, 409);
   return creds;
+}
+
+// The fulfillment calls for this store: Shopify's, or the demo store's.
+// (Looked up on shopifyService at each call, so tests can replace them.)
+function storeApi(creds) {
+  if (creds.demo) return demoStore;
+  return {
+    fetchFulfillmentOrders: (order) => shopifyService.fetchFulfillmentOrders(creds.shopDomain, creds.accessToken, order.shopify_order_id),
+    holdFulfillmentOrder: (order, foId, hold) => shopifyService.holdFulfillmentOrder(creds.shopDomain, creds.accessToken, foId, hold),
+    releaseFulfillmentHolds: (order, foId, holdIds) => shopifyService.releaseFulfillmentHolds(creds.shopDomain, creds.accessToken, foId, holdIds),
+    createFulfillment: (order, foId, options) => shopifyService.createFulfillment(creds.shopDomain, creds.accessToken, foId, options),
+  };
 }
 
 // Shopify's fulfillment orders for an order, with its errors turned into
@@ -59,7 +74,7 @@ async function storeFor(sellerId) {
 async function fulfillmentOrdersOf(creds, order) {
   let found;
   try {
-    found = await shopifyService.fetchFulfillmentOrders(creds.shopDomain, creds.accessToken, order.shopify_order_id);
+    found = await storeApi(creds).fetchFulfillmentOrders(order);
   } catch (err) {
     if (err.accessDenied) throw new ActionError(MISSING_PERMISSION, 409);
     console.warn(`[actions] order ${order.id}: reading fulfillment orders failed: ${err.response?.status || err.message}`);
@@ -145,7 +160,7 @@ async function act(sellerId, orderId, fulfillmentOrderId, { action, can, cannot,
 
   const entry = { action, source, fulfillmentOrderId: fo.id, reason, note };
   try {
-    await run(creds, raw);
+    await run(storeApi(creds), raw, order);
   } catch (err) {
     const why = err.userError ? err.message : err.accessDenied ? MISSING_PERMISSION : "Shopify couldn't be reached";
     await logAction(sellerId, order.id, { ...entry, error: why });
@@ -162,7 +177,7 @@ function holdOrder(sellerId, orderId, { fulfillmentOrderId, reason, note, source
     orderId,
     fulfillmentOrderId,
     { action: 'hold', can: 'can_hold', cannot: "Shopify won't hold this now (it may be shipped already, or already on hold from here).", reason, note, source },
-    (creds, fo) => shopifyService.holdFulfillmentOrder(creds.shopDomain, creds.accessToken, fo.id, { reason, reasonNotes: note || undefined, handle: HOLD_HANDLE })
+    (store, fo, order) => store.holdFulfillmentOrder(order, fo.id, { reason, reasonNotes: note || undefined, handle: HOLD_HANDLE })
   );
 }
 
@@ -172,10 +187,9 @@ function releaseHold(sellerId, orderId, { fulfillmentOrderId }) {
     orderId,
     fulfillmentOrderId,
     { action: 'release', can: 'can_release', cannot: 'There is no hold from here to release (a hold another app placed is released there).' },
-    (creds, fo) =>
-      shopifyService.releaseFulfillmentHolds(
-        creds.shopDomain,
-        creds.accessToken,
+    (store, fo, order) =>
+      store.releaseFulfillmentHolds(
+        order,
         fo.id,
         fo.fulfillmentHolds.filter((hold) => hold.heldByRequestingApp).map((hold) => hold.id)
       )
@@ -188,14 +202,15 @@ async function fulfillOrder(sellerId, orderId, { fulfillmentOrderId, notifyCusto
     orderId,
     fulfillmentOrderId,
     { action: 'fulfill', can: 'can_fulfill', cannot: "Shopify won't fulfill this now (it may be on hold or shipped already).", note: tracking?.number ?? null, source },
-    (creds, fo) => shopifyService.createFulfillment(creds.shopDomain, creds.accessToken, fo.id, { notifyCustomer, tracking })
+    (store, fo, order) => store.createFulfillment(order, fo.id, { notifyCustomer, tracking })
   );
   await refreshOrder(sellerId, orderId);
   return state;
 }
 
 // The order's statuses from Shopify right after it shipped, so the dashboard
-// shows "fulfilled" now rather than at the next webhook or sync.
+// shows "fulfilled" now rather than at the next webhook or sync. (A demo
+// store marks it shipped itself.)
 async function refreshOrder(sellerId, orderId) {
   try {
     const order = await findOrder(sellerId, orderId);
@@ -232,7 +247,7 @@ async function autoHold(sellerId, shopifyOrderId, { reason, note }) {
     let refused = null;
     for (const fo of holdable) {
       try {
-        await shopifyService.holdFulfillmentOrder(creds.shopDomain, creds.accessToken, fo.id, { reason, reasonNotes: note || undefined, handle: HOLD_HANDLE });
+        await storeApi(creds).holdFulfillmentOrder(order, fo.id, { reason, reasonNotes: note || undefined, handle: HOLD_HANDLE });
         await logAction(sellerId, order.id, { ...entry, fulfillmentOrderId: fo.id });
         held++;
       } catch (err) {

@@ -113,3 +113,7 @@ Separate from the code, and needed before anyone but the owner connects:
 - MCP 1.4.0: `get_decisions` and `rate_decision`, so the seller can ask
   Claude Desktop which calls aren't rated yet and rate them with a note (the
   agent reads those). The agent itself doesn't get either tool.
+- "Try the demo" on the sign-in page: a sample store per visitor (a month of
+  orders, fraud checks, rated decisions, forecasts), with hold and fulfill
+  against a stand-in for Shopify; no Shopify or model calls, nothing that
+  reaches outside, deleted after 4 hours (migration 010).

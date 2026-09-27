@@ -137,26 +137,32 @@ async function getSettings(sellerId) {
   const [rows] = await pool.query(
     `SELECT business_name, email, shopify_shop_domain, shopify_scopes, default_low_stock_threshold,
        shopify_access_token IS NOT NULL AS store_connected, slack_webhook_url IS NOT NULL AS slack_connected,
-       alert_email, telegram_chat_id IS NOT NULL AS telegram_connected, auto_hold
+       alert_email, telegram_chat_id IS NOT NULL AS telegram_connected, auto_hold, is_demo, demo_expires_at
      FROM sellers WHERE id = ?`,
     [sellerId]
   );
   const seller = rows[0];
   if (!seller) return null;
-  const connected = Boolean(seller.store_connected);
+  // A demo account's store is the sample one (services/demo.js): shown as
+  // connected, with holding and fulfilling allowed.
+  const demo = Boolean(seller.is_demo);
+  const connected = demo || Boolean(seller.store_connected);
   return {
     business_name: seller.business_name,
     email: seller.email,
-    store: {
-      connected,
-      shop_domain: connected ? seller.shopify_shop_domain : null,
-      missing_scopes: connected && seller.shopify_scopes ? oauth.missingScopes(seller.shopify_scopes) : [],
-    },
+    demo: demo ? { expires_at: seller.demo_expires_at } : null,
+    store: demo
+      ? { connected: true, shop_domain: 'Sample store (demo)', missing_scopes: [] }
+      : {
+          connected,
+          shop_domain: connected ? seller.shopify_shop_domain : null,
+          missing_scopes: connected && seller.shopify_scopes ? oauth.missingScopes(seller.shopify_scopes) : [],
+        },
     shopify: { oauth_available: oauth.isConfigured() },
     // Holding and fulfilling from here (orderActions.js): allowed unless the
     // store's grant is known to lack it; auto_hold puts the agent's HOLDs on hold.
     shopify_actions: {
-      allowed: connected && oauth.actionsAllowed(seller.shopify_scopes) !== false,
+      allowed: demo || (connected && oauth.actionsAllowed(seller.shopify_scopes) !== false),
       auto_hold: Boolean(seller.auto_hold),
     },
     inventory: { default_low_stock_threshold: seller.default_low_stock_threshold },

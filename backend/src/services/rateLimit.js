@@ -19,6 +19,8 @@ const LIMITS = {
   resetRequestsPerAccount: { bucket: 'reset-request:account', max: 3, windowSeconds: 60 * 60 },
   // Reset emails asked for from one address, for any email.
   resetRequestsPerIp: { bucket: 'reset-request:ip', max: 10, windowSeconds: 60 * 60 },
+  // Demo accounts ("Try the demo") started from one address.
+  demosPerIp: { bucket: 'demo:ip', max: 10, windowSeconds: 60 * 60 },
   // Reset links that didn't work, from one address: slows guessing tokens.
   resetFailuresPerIp: { bucket: 'reset-fail:ip', max: 20, windowSeconds: 15 * 60 },
 };

@@ -35,6 +35,7 @@ test('the limits are the documented ones', () => {
       inviteFailuresPerIp: [10, 3600],
       resetRequestsPerAccount: [3, 3600],
       resetRequestsPerIp: [10, 3600],
+      demosPerIp: [10, 3600],
       resetFailuresPerIp: [20, 900],
     }
   );

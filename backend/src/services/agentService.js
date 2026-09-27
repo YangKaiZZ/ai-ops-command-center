@@ -6,6 +6,7 @@ const { checkOrderStock, describeShortfall } = require('./stockCheck');
 const { getForecast } = require('./restockForecast');
 const { claimRun, skippedReasoning } = require('./agentBudget');
 const { enqueue, runAgainLater } = require('./jobQueue');
+const { isDemoSeller } = require('./demo');
 const { checkOrderRisk, mustHold, isFlagged, describeRisk, riskForAgent } = require('./riskCheck');
 const { autoHold } = require('./orderActions');
 
@@ -244,6 +245,12 @@ function createLLMClient() {
 // tools it asks for, feed results back, repeat until it answers in text.
 async function runAgent(sellerId, trigger) {
   const tag = `[agent seller=${sellerId} ${trigger.type}]`;
+  // A demo account (services/demo.js) has sample decisions and no real store:
+  // nothing should queue a run for it, and if something does, no model is called.
+  if (await isDemoSeller(sellerId)) {
+    console.warn(`${tag} skipped: demo account`);
+    return null;
+  }
   const llm = createLLMClient(); // no key: stop here, before a run is counted
   // Before the run is counted too: while it's pending the job comes back later.
   const risk = trigger.type === 'order_created' ? await orderRisk(sellerId, trigger.order) : null;

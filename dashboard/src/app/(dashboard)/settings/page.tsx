@@ -63,6 +63,12 @@ function SettingsContent() {
           </p>
         </section>
       )}
+      {settings.demo && (
+        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-ink-2">
+          In the demo, the settings that would reach outside it (connecting a store, alert channels, API keys, sending a summary) are
+          turned off. The rest (auto-hold, the daily summary&rsquo;s hour, stock levels) can be changed.
+        </p>
+      )}
       <StoreSection settings={settings} onChange={refresh} initialShop={initialShop} flash={flash} />
       <AlertsSection settings={settings} onChange={refresh} />
       <ReportsSection settings={settings} onChange={refresh} />

@@ -39,12 +39,13 @@ async function requireAuth(req, res, next) {
 
   try {
     // A password reset signs out every token issued before it.
-    const [rows] = await pool.query('SELECT UNIX_TIMESTAMP(password_changed_at) AS changed_at FROM sellers WHERE id = ?', [decoded.sellerId]);
+    const [rows] = await pool.query('SELECT UNIX_TIMESTAMP(password_changed_at) AS changed_at, is_demo FROM sellers WHERE id = ?', [decoded.sellerId]);
     if (!rows[0] || (rows[0].changed_at && decoded.iat < Number(rows[0].changed_at))) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     req.sellerId = decoded.sellerId;
     req.authMethod = 'session';
+    req.isDemo = Boolean(rows[0].is_demo); // a "Try the demo" account (services/demo.js)
     next();
   } catch (err) {
     console.error(err);

@@ -4,6 +4,9 @@ const syncService = require('../services/syncService');
 // (services/scheduler.js), so the logic lives in syncService.
 function syncRoute(run, failureMessage) {
   return async (req, res) => {
+    if (req.isDemo) {
+      return res.json({ message: "This is the demo store: its orders and stock are sample data, so there's nothing to pull from Shopify" });
+    }
     try {
       const { message } = await run(req.sellerId);
       res.json({ message });

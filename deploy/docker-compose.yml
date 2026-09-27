@@ -69,6 +69,10 @@ services:
       SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-15}
       # The same for the daily summary and late-order check.
       REPORT_CHECK_MINUTES: ${REPORT_CHECK_MINUTES:-5}
+      # Blank means the defaults (on, 4 hours, 200 at once).
+      DEMO_ENABLED: ${DEMO_ENABLED:-}
+      DEMO_HOURS: ${DEMO_HOURS:-}
+      DEMO_MAX_ACTIVE: ${DEMO_MAX_ACTIVE:-}
     depends_on:
       mysql:
         condition: service_healthy

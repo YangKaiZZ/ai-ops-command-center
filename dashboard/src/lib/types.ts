@@ -177,6 +177,7 @@ export type Session = { token: string; business_name?: string };
 export type Settings = {
   business_name: string;
   email: string; // the account's sign-in address
+  demo: { expires_at: string } | null; // a "Try the demo" account, deleted at expires_at
   store: { connected: boolean; shop_domain: string | null; missing_scopes: string[] };
   shopify: { oauth_available: boolean }; // "Connect with Shopify" is set up on the server
   shopify_actions: { allowed: boolean; auto_hold: boolean }; // holding and fulfilling from here

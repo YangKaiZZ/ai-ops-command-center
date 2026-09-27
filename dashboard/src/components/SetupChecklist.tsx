@@ -9,6 +9,7 @@ import type { Settings } from "@/lib/types";
 // What a new seller still has to do before the agent is useful. Disappears
 // once the store is connected and at least one alert channel is on.
 export function SetupChecklist({ settings }: { settings: Settings }) {
+  if (settings.demo) return null; // the demo's sample store needs no setting up
   const steps = [
     {
       done: settings.store.connected,

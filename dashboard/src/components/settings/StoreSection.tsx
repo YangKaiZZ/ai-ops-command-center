@@ -152,11 +152,13 @@ export function StoreSection({
             </label>
             <Note message={holdMessage} />
           </div>
-          <div>
-            <button type="button" onClick={disconnect} disabled={busy} className={secondaryButton}>
-              Disconnect store
-            </button>
-          </div>
+          {!settings.demo && (
+            <div>
+              <button type="button" onClick={disconnect} disabled={busy} className={secondaryButton}>
+                Disconnect store
+              </button>
+            </div>
+          )}
           <Note message={message} />
         </div>
       </Panel>

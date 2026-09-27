@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardProvider";
 import { ArrowsClockwiseIcon, GearSixIcon, PackageIcon, RobotIcon, SignOutIcon, SquaresFourIcon, StackIcon } from "./icons";
+import { DemoBanner } from "./DemoBanner";
 import { Logo } from "./Logo";
 import { accentButton } from "./ui";
 
@@ -93,6 +94,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      {data?.settings.demo && <DemoBanner demo={data.settings.demo} />}
 
       {banner && (
         <p
