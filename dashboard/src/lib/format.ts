@@ -162,6 +162,14 @@ export function formatMoney(amount: string | null): string {
   return amount == null ? "—" : money.format(Number(amount));
 }
 
+// The customer shown for an order. "Guest" (stored by the backend) is an order
+// with no customer; no name means it has one but Shopify leaves names out
+// until the app is approved for protected customer data.
+export const NAME_HIDDEN_NOTE = "Shopify doesn't share customer names with this app yet: that needs its approval for customer data.";
+export function buyerLabel(name: string | null): { text: string; hidden: boolean } {
+  return name ? { text: name, hidden: false } : { text: "Name not shared", hidden: true };
+}
+
 // The ?shop= that Shopify's install link brings to sign-up, if it's a real
 // store address (same rule as the backend); "" otherwise.
 export function shopParam(value: string | null): string {

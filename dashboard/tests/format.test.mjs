@@ -104,3 +104,11 @@ test('what the forecasts are based on', () => {
   assert.match(historySummary({ ...history, orders_missing_items: 3 }, date), /3 orders from then don't have their items yet, so their sales aren't counted\.$/);
   assert.equal(historySummary({ from: null, days: 0, orders: 0, orders_missing_items: 0 }, date), "No orders yet, so there's nothing to forecast from.");
 });
+
+test('buyerLabel: a name as is, no name as not shared (Guest stays Guest)', async () => {
+  const { buyerLabel } = await import('../src/lib/format.ts');
+  assert.deepEqual(buyerLabel('Ana Smith'), { text: 'Ana Smith', hidden: false });
+  assert.deepEqual(buyerLabel('Guest'), { text: 'Guest', hidden: false });
+  assert.deepEqual(buyerLabel(null), { text: 'Name not shared', hidden: true });
+  assert.deepEqual(buyerLabel(''), { text: 'Name not shared', hidden: true });
+});

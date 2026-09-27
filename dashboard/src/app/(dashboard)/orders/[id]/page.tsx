@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
+import { BuyerName } from "@/components/BuyerName";
 import { DecisionCard } from "@/components/DecisionCard";
 import { useDashboard } from "@/components/DashboardProvider";
 import { ArrowLeftIcon, ArrowSquareOutIcon } from "@/components/icons";
@@ -189,7 +190,7 @@ function OrderView() {
       )}
       <Panel title={`Order ${order.order_number ?? order.id}`}>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Field label="Customer">{order.buyer_name || "Guest"}</Field>
+          <Field label="Customer"><BuyerName name={order.buyer_name} /></Field>
           <Field label="Total">
             <span className="tabular-nums">{formatMoney(order.total_amount)}</span>
           </Field>

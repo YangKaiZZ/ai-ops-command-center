@@ -2,7 +2,8 @@
 // in-process with Shopify's single-order fetch replaced by a fake. The real
 // database is used; the test sellers and their orders are removed at the end.
 //   1. saving an order stores its line items; a later payload replaces them;
-//      a payload without line_items leaves them alone
+//      a payload without line_items leaves them alone; the customer name
+//      (unknown when Shopify leaves it out, filled in later, never un-redacted)
 //   2. GET /api/orders/:id: fields, line items, every decision newest first, Shopify link
 //   3. orders saved before line items were kept are fetched from Shopify once
 //   4. when that can't happen (order gone, Shopify down, store not connected) the order still loads, with a note
@@ -97,6 +98,19 @@ async function main() {
     check(items.length === 1 && items[0].quantity === 3, 'a later payload replaces the items (an order edit)', items.map((i) => `${i.quantity}x ${i.title}`).join(', '));
     await upsertOrder(seller, shopifyOrder(9001, undefined, { fulfillment_status: 'partial' }));
     check((await itemsOf(orderId)).length === 1, 'a payload without line_items leaves them alone');
+
+    console.log('\n1b. The customer name');
+    const nameOf = async (id) => (await pool.query('SELECT buyer_name FROM orders WHERE id = ?', [id]))[0][0].buyer_name;
+    check((await nameOf(orderId)) === 'Ana Smith', 'a named customer is stored by name');
+    const hidden = await upsertOrder(seller, shopifyOrder(9101, [], { customer: { id: 1, email: null } }));
+    check((await nameOf(hidden)) === null, "a customer Shopify doesn't name is stored as unknown, not as a guest");
+    await upsertOrder(seller, shopifyOrder(9101, []));
+    check((await nameOf(hidden)) === 'Ana Smith', 'and filled in once Shopify sends the name');
+    const guest = await upsertOrder(seller, shopifyOrder(9102, [], { customer: null }));
+    check((await nameOf(guest)) === 'Guest', 'no customer at all is a guest');
+    await pool.query("UPDATE orders SET buyer_name = 'Redacted' WHERE id = ?", [hidden]);
+    await upsertOrder(seller, shopifyOrder(9101, []));
+    check((await nameOf(hidden)) === 'Redacted', 'a redacted name stays redacted when the order syncs again');
 
     console.log('\n2. The detail endpoint');
     await pool.query(

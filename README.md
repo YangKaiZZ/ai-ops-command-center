@@ -166,7 +166,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:rate-limits` | sign-in and sign-up limits through the real routes: per email, per IP, reset on success, no hint about which accounts exist |
 | backend | `npm run test:password-reset` | reset links against a fake mail server: one use, expiry, hashed storage, sign-out of old sessions, limits |
 | backend | `npm run test:order-queries` | order paging and filters through the API and the MCP tools: totals, date ranges, lookups, bad input, other sellers' orders |
-| backend | `npm run test:order-detail` | line items saved and replaced, the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
+| backend | `npm run test:order-detail` | line items saved and replaced, the customer name (unknown when Shopify leaves it out, filled in later, never un-redacted), the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
 | backend | `npm run test:forecast` | restock forecasts through the API, the MCP tool and a low-stock agent run (fake DeepSeek): pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
 | backend | `npm run test:overview` | the Overview numbers: this period against the one before, sales without refunded or voided orders, what needs action, stock and what runs out soon, decisions by verdict, other sellers' data |
 | backend | `npm run test:decision-feedback` | thumbs up/down on decisions: rating, notes, changing and clearing, the counts on the feed and the Overview, bad input, skipped runs, other sellers, privacy redaction of notes |

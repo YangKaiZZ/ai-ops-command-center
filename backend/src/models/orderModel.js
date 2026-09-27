@@ -17,6 +17,14 @@ function lineItemRow(orderId, item) {
   ];
 }
 
+// 'Guest' when the order has no customer; null when it has one but Shopify
+// leaves the name out (an app without approval for protected customer data
+// gets the customer with no first_name/last_name).
+function buyerName(customer) {
+  if (!customer) return 'Guest';
+  return text(`${customer.first_name || ''} ${customer.last_name || ''}`.trim());
+}
+
 // Shared by the Shopify sync, the order webhooks and the order detail view, so
 // an order looks the same in our tables no matter which path brought it in.
 // A payload with line_items replaces the order's stored ones. Returns our order id.
@@ -33,6 +41,7 @@ async function upsertOrder(sellerId, order) {
          status = VALUES(status),
          financial_status = VALUES(financial_status),
          total_amount = VALUES(total_amount),
+         buyer_name = IF(buyer_name IS NULL OR buyer_name = '', VALUES(buyer_name), buyer_name),
          synced_at = CURRENT_TIMESTAMP`,
       [
         sellerId,
@@ -40,7 +49,7 @@ async function upsertOrder(sellerId, order) {
         order.name, // e.g. "#1001"
         order.fulfillment_status || 'unfulfilled',
         order.financial_status,
-        order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : 'Guest',
+        buyerName(order.customer),
         order.total_price,
         order.created_at,
       ]

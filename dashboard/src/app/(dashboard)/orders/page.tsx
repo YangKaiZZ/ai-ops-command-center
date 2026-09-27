@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
+import { BuyerName } from "@/components/BuyerName";
 import { useDashboard } from "@/components/DashboardProvider";
 import { Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
@@ -266,7 +267,7 @@ function OrdersList() {
                         )}
                       </span>
                     </td>
-                    <td className="py-2.5 pr-3">{order.buyer_name || "Guest"}</td>
+                    <td className="py-2.5 pr-3"><BuyerName name={order.buyer_name} /></td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{formatMoney(order.total_amount)}</td>
                     <td className="py-2.5 pr-3"><Chip>{order.status || "—"}</Chip></td>
                     <td className="py-2.5 pr-3"><Chip>{order.financial_status || "—"}</Chip></td>
