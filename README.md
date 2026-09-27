@@ -79,6 +79,11 @@ for now).
   authenticated with revocable API keys, plus two for the seller only: read
   the agent's decisions and rate them ("that #1001 call was wrong: bank
   transfers show pending first"), which the agent learns from.
+- **Chat in the dashboard.** The seller asks about their store in their own
+  words ("what needs to ship today?", "which items run out this week?") and
+  gets an answer from their data, read with the agent's own MCP tools plus
+  the decision history. Read-only, order numbers link to the order, and the
+  conversation stays in the browser tab.
 - **A demo anyone can try.** "Try the demo" gives each visitor their own
   sample store: a month of orders, fraud checks, the agent's decisions (some
   rated, one marked wrong with the note it learns from), stock forecasts and
@@ -144,6 +149,8 @@ from their own dashboard.
 - **LLM cost is capped**: agent runs are limited per account and for all
   accounts together over any 24 hours, and each run makes at most 6 model
   calls. Events over a limit are saved as "Skipped" instead of checked.
+  Chat questions have their own daily caps (40 per account, 400 in total by
+  default), so chatting never uses up the checks new orders need.
 
 ## Reliability
 
@@ -185,6 +192,7 @@ on a VPS; that README walks through it.
 
 | Where | Command | What it covers |
 | --- | --- | --- |
+| backend | `npm run test:chat` | the dashboard chat against a fake DeepSeek and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
 | backend | `npm test` | 135 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
 | backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |

@@ -5,8 +5,8 @@ listed at the end.
 
 ## Write actions
 
-- **In-dashboard chat** using the same tools. Host the MCP server remotely
-  with OAuth, so power users paste a URL instead of editing JSON.
+- **Remote MCP server**: host it with OAuth, so power users paste a URL
+  into Claude instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
 
 ## Smaller ideas
@@ -124,3 +124,8 @@ Separate from the code, and needed before anyone but the owner connects:
   so a risk that rises after the agent decided is alerted in seconds, for any
   open order, not only at the next sync for last week's. Connected stores
   get the new webhook when the backend starts.
+- Chat in the dashboard: questions about the store in the seller's words,
+  answered by DeepSeek with the agent's MCP tools plus the decision history,
+  read-only. Order numbers in answers link to the order; the conversation
+  stays in the browser tab. Signed-in sellers only (not API keys, not the
+  demo), with its own daily caps (`CHAT_DAILY_LIMIT_PER_ACCOUNT`, `_TOTAL`).

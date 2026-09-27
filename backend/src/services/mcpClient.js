@@ -12,7 +12,8 @@ const AGENT_TOOLS = ['get_pending_orders', 'check_low_stock', 'get_all_orders', 
 // agent uses the exact same tools Claude Desktop does. The server is handed a
 // short-lived JWT for this seller, so every tool call stays tenant-scoped
 // (and doesn't depend on whatever token is sitting in the MCP server's .env).
-async function connectAsSeller(sellerId) {
+// `tools` narrows what may be called (the dashboard chat adds get_decisions).
+async function connectAsSeller(sellerId, { tools: allowedNames = AGENT_TOOLS } = {}) {
   const serverPath = process.env.MCP_SERVER_PATH;
   if (!serverPath) throw new Error('MCP_SERVER_PATH is not set in .env');
 
@@ -35,13 +36,13 @@ async function connectAsSeller(sellerId) {
   await client.connect(transport);
 
   const { tools } = await client.listTools();
-  const allowed = tools.filter((t) => AGENT_TOOLS.includes(t.name));
+  const allowed = tools.filter((t) => allowedNames.includes(t.name));
 
   return {
     tools: allowed,
 
     async callTool(name, args = {}) {
-      if (!AGENT_TOOLS.includes(name)) {
+      if (!allowedNames.includes(name)) {
         return { isError: true, text: `Tool "${name}" is not available to the agent` };
       }
       const result = await client.callTool({ name, arguments: args });

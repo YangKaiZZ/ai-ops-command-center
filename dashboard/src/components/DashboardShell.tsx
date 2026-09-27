@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardProvider";
-import { ArrowsClockwiseIcon, GearSixIcon, PackageIcon, RobotIcon, SignOutIcon, SquaresFourIcon, StackIcon } from "./icons";
+import { ArrowsClockwiseIcon, ChatCircleDotsIcon, GearSixIcon, PackageIcon, RobotIcon, SignOutIcon, SquaresFourIcon, StackIcon } from "./icons";
 import { DemoBanner } from "./DemoBanner";
 import { Logo } from "./Logo";
 import { accentButton } from "./ui";
@@ -20,6 +20,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: "/orders", label: "Orders", icon: PackageIcon, count: data?.pendingCount, countLabel: "need action" },
     { href: "/decisions", label: "Decisions", icon: RobotIcon, count: data?.decisions.length, countLabel: "total" },
     { href: "/stock", label: "Stock", icon: StackIcon, count: data?.lowStock.length, countLabel: "running low" },
+    { href: "/chat", label: "Chat", icon: ChatCircleDotsIcon, count: undefined, countLabel: "" },
     { href: "/settings", label: "Settings", icon: GearSixIcon, count: undefined, countLabel: "" },
   ];
 

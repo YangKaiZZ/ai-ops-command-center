@@ -23,6 +23,8 @@ test('waits read as minutes, rounded up', () => {
   assert.equal(describeWait(60), 'about a minute');
   assert.equal(describeWait(61), 'about 2 minutes');
   assert.equal(describeWait(900), 'about 15 minutes');
+  assert.equal(describeWait(90 * 60), 'about 90 minutes');
+  assert.equal(describeWait(24 * 3600), 'about 24 hours');
 });
 
 test('the limits are the documented ones', () => {

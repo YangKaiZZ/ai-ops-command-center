@@ -5,11 +5,14 @@
 export { ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 export { ArrowSquareOutIcon } from "@phosphor-icons/react/dist/ssr/ArrowSquareOut";
 export { ArrowsClockwiseIcon } from "@phosphor-icons/react/dist/ssr/ArrowsClockwise";
+export { ChatCircleDotsIcon } from "@phosphor-icons/react/dist/ssr/ChatCircleDots";
 export { CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
 export { CircleDashedIcon } from "@phosphor-icons/react/dist/ssr/CircleDashed";
+export { EraserIcon } from "@phosphor-icons/react/dist/ssr/Eraser";
 export { GearSixIcon } from "@phosphor-icons/react/dist/ssr/GearSix";
 export { MinusIcon } from "@phosphor-icons/react/dist/ssr/Minus";
 export { PackageIcon } from "@phosphor-icons/react/dist/ssr/Package";
+export { PaperPlaneRightIcon } from "@phosphor-icons/react/dist/ssr/PaperPlaneRight";
 export { PauseIcon } from "@phosphor-icons/react/dist/ssr/Pause";
 export { ProhibitIcon } from "@phosphor-icons/react/dist/ssr/Prohibit";
 export { PulseIcon } from "@phosphor-icons/react/dist/ssr/Pulse";

@@ -54,9 +54,10 @@ async function clear(limit, value) {
   await pool.query('DELETE FROM rate_limit_events WHERE bucket = ? AND subject = ?', [limit.bucket, subjectKey(limit, value)]);
 }
 
-// "about 12 minutes" for a wait in seconds.
+// "about 12 minutes" (or "about 5 hours" past 90 minutes) for a wait in seconds.
 function describeWait(seconds) {
   const minutes = Math.ceil(seconds / 60);
+  if (minutes > 90) return `about ${Math.ceil(minutes / 60)} hours`;
   return minutes <= 1 ? 'about a minute' : `about ${minutes} minutes`;
 }
 
