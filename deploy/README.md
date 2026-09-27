@@ -125,11 +125,17 @@ it stops, and anything cut off runs again once it's back.
 ## Backups
 
 `scripts/backup.sh` saves the database to `backups/ai_ops-<date>.sql.gz` and
-keeps the newest 14. Run it daily from cron (`crontab -e`):
+keeps the newest 14. Run it daily from cron, with the path to your clone
+(this adds it without opening an editor; `crontab -l` shows it):
 
+```bash
+(crontab -l 2>/dev/null; echo "30 3 * * * /opt/ai-ops/deploy/scripts/backup.sh >> /opt/ai-ops/deploy/backups/backup.log 2>&1") | crontab -
 ```
-30 3 * * * /opt/ai-ops/deploy/scripts/backup.sh >> /opt/ai-ops/deploy/backups/backup.log 2>&1
-```
+
+`scripts/restore-test.sh` checks that the newest backup really restores: it
+loads it into a scratch database next to the live one, prints the rows in
+each table in both, and drops the scratch database. The live data isn't
+touched. Run it after setting up backups, and now and then after that.
 
 Copy the backups off the server now and then (e.g. `scp`), because a backup
 on the same disk is lost along with the server. To restore one, which
