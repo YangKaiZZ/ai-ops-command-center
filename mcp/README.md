@@ -11,6 +11,8 @@ REST API as tools, so an AI model can look at a seller's store and act on it:
 | `get_order` | One order by number (`#1001`), with the agent's latest reasoning and Shopify's fraud check (level, recommendation, reasons, whether the billing and shipping addresses match) |
 | `forecast_restock` | When items run out at their current pace and how many to reorder, with the order history that's based on; items needing a reorder by default, or by name (`item`), or `all_items`; `days`, `cover_days`, `limit` |
 | `sync_latest_data` | Pulls the latest orders and stock from Shopify |
+| `get_decisions` | The agent's recent decisions, newest first: verdict, headline (or the full reasoning with `with_reasoning`), and the seller's rating and note; `show` (`unrated`, `wrong`), `order_number`, `limit`; plus the ratings so far |
+| `rate_decision` | Saves the seller's rating of a decision (`right`, `wrong` or `clear`) with an optional `note` on what it should have done, which the agent reads before similar decisions |
 
 Order lists come back one page at a time (20 by default, at most 100) as
 `{ total, returned, offset, next_offset, orders }`, so a big store doesn't
@@ -21,14 +23,15 @@ It's used in two places:
 - **The backend's agent** starts it as a subprocess for each run, with a
   10-minute token for that one seller, and gets the five read-only tools.
   (`sync_latest_data` is left out on purpose: a sync can trigger the agent,
-  so an agent that could sync could trigger itself.)
+  so an agent that could sync could trigger itself. The decision tools are
+  left out too: rating is the seller's call, not the agent's.)
 - **Claude Desktop**, so a seller can ask about their store in a chat.
 
 It never touches the database. It only calls the REST API with the seller's
 credentials, so every tool call is limited to that seller's data.
 
 ## Files
-- `server.js` — the six tools
+- `server.js` — the eight tools
 - `apiClient.js` — the HTTP client for the backend. Errors come back as
   messages the model can pass on ("the API key was revoked", "the backend
   isn't reachable").
@@ -52,4 +55,5 @@ credentials, so every tool call is limited to that seller's data.
    }
    ```
 4. Restart Claude Desktop and ask something like "which orders need my
-   attention?" or "what's running low?".
+   attention?", "what's running low?" or "which of the agent's calls haven't
+   I rated yet?".

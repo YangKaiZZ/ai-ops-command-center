@@ -5,7 +5,7 @@ const api = require('./apiClient');
 
 const server = new McpServer({
   name: 'ai-ops-command-center',
-  version: '1.3.0',
+  version: '1.4.0',
 });
 
 const FULFILLMENT_STATUSES = ['unfulfilled', 'partial', 'fulfilled', 'restocked'];
@@ -212,6 +212,100 @@ server.registerTool(
         {
           type: 'text',
           text: `${orders.data.message}. ${inventory.data.message}.`,
+        },
+      ],
+    };
+  }
+);
+
+// --- Tools 7 and 8: the agent's decisions, and the seller's ratings of them ---
+// "Was the agent right this week?", "mark the #1001 call as wrong: that
+// customer always pays by bank transfer". For the seller in Claude Desktop;
+// the agent itself doesn't get these (AGENT_TOOLS in backend/src/services/mcpClient.js).
+
+const RATING_WORDS = { up: 'right', down: 'wrong' };
+const DECISION_WINDOW = 200; // the most GET /api/decisions returns
+
+// One decision, compact: the verdict and its first line, or all of it.
+function slimDecision(d, withReasoning) {
+  const reasoning = (d.reasoning || '').trim();
+  return {
+    id: d.id,
+    order_number: d.order_number,
+    verdict: d.action_taken,
+    decided_at: d.created_at,
+    ...(withReasoning ? { reasoning } : { headline: reasoning.split('\n')[0].slice(0, 300) }),
+    rating: RATING_WORDS[d.feedback] ?? null,
+    note: d.feedback_note ?? null,
+  };
+}
+
+server.registerTool(
+  'get_decisions',
+  {
+    title: 'Get Agent Decisions',
+    description:
+      "Returns the agent's recent decisions (newest first): the verdict (fulfill, hold, low_stock_alert; skipped means a daily limit " +
+      'stopped it), its headline, and how the seller rated it (right, wrong or null) with their note. `ratings` counts every ' +
+      'decision so far: up = rated right, down = rated wrong. Filter with show: "unrated" (not rated yet) or "wrong" (rated wrong), ' +
+      'or by order number. Pass with_reasoning for the full reasoning.',
+    inputSchema: {
+      show: z.enum(['all', 'unrated', 'wrong']).optional().describe('Which decisions (default all)'),
+      order_number: z.string().min(1).max(50).optional().describe('Only decisions about this order, e.g. "#1001"'),
+      limit: z.number().int().min(1).max(50).optional().describe('How many to return (default 10, at most 50)'),
+      with_reasoning: z.boolean().optional().describe('Include the full reasoning (default false: the headline only)'),
+    },
+  },
+  async ({ show = 'all', order_number, limit = 10, with_reasoning = false }) => {
+    const { data } = await api.get('/api/decisions', { params: { limit: String(DECISION_WINDOW) } });
+    const number = order_number && `#${order_number.replace(/^#/, '')}`;
+    const matching = data.decisions.filter(
+      (d) =>
+        (show === 'all' || (show === 'unrated' ? !d.feedback && d.action_taken !== 'skipped' : d.feedback === 'down')) &&
+        (!number || d.order_number === number)
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ratings: data.ratings,
+            searched: `the latest ${data.decisions.length} decisions`,
+            matching: matching.length,
+            decisions: matching.slice(0, limit).map((d) => slimDecision(d, with_reasoning)),
+          }),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  'rate_decision',
+  {
+    title: 'Rate Agent Decision',
+    description:
+      "Saves the seller's rating of one of the agent's decisions: right or wrong, with an optional note on what it should have " +
+      'done. The agent reads wrong calls and notes before similar decisions, so only rate when the seller says how the call ' +
+      'was, never on your own judgement. "clear" removes the rating. The note replaces any saved note (leave it out to remove it). ' +
+      'Get the decision id from get_decisions.',
+    inputSchema: {
+      decision_id: z.number().int().min(1).describe('The decision id from get_decisions'),
+      rating: z.enum(['right', 'wrong', 'clear']).describe("The seller's verdict on the call"),
+      note: z.string().max(500).optional().describe("What it should have done, in the seller's words (at most 500 characters)"),
+    },
+  },
+  async ({ decision_id, rating, note }) => {
+    const feedback = rating === 'right' ? 'up' : rating === 'wrong' ? 'down' : null;
+    const { data } = await api.put(`/api/decisions/${decision_id}/feedback`, { feedback, note: note ?? null });
+    const saved = RATING_WORDS[data.feedback];
+    return {
+      content: [
+        {
+          type: 'text',
+          text: saved
+            ? `Saved: decision ${decision_id} rated ${saved}${data.feedback_note ? `, with the note "${data.feedback_note}"` : ''}.`
+            : `Cleared the rating of decision ${decision_id}.`,
         },
       ],
     };

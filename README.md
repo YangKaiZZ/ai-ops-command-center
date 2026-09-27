@@ -71,7 +71,9 @@ https://ai-ops-drew.duckdns.org (sign-up is invite-only for now).
   they fit and says when one changed its call. The stock check still has the
   final word.
 - **Claude Desktop.** The MCP server gives Claude the same store tools,
-  authenticated with revocable API keys.
+  authenticated with revocable API keys, plus two for the seller only: read
+  the agent's decisions and rate them ("that #1001 call was wrong: bank
+  transfers show pending first"), which the agent learns from.
 - **Shopify compliance.** The mandatory privacy webhooks (customer data
   request, customer redact, shop redact) and app uninstall are handled.
 
@@ -183,6 +185,7 @@ on a VPS; that README walks through it.
 | backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
 | backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, `?risk=flagged`, the order page, privacy |
 | backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
+| backend | `npm run test:mcp-decisions` | the MCP tools that read and rate decisions, through the real MCP server with an API key: filters, ratings and notes, a skipped run and another seller's decision refused, and the agent not getting them |
 | backend | `npm run test:alert-actions` | holding and fulfilling from alerts: the links in email and buttons in Telegram (only when the seller can act), the confirm page's API (signed, one order and one action, expiring, reads until confirmed), Telegram's ask-first flow from the seller's own chat only, against a fake Shopify, mail server and Telegram |
 | backend | `npm run test:migrations` | database migrations on throwaway databases: fresh install, new and edited files, adopting an old database, the lock |
 | dashboard | `npm test`, `npm run lint`, `npm run build` | helper unit tests, lint, type-check and production build |

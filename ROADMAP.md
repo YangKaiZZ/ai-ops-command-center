@@ -14,7 +14,6 @@ listed at the end.
 
 ## Smaller ideas
 
-- An MCP tool to read and rate the agent's decisions.
 - Real Slack interactivity, for one-click rating inside Slack.
 
 ## Shopify platform
@@ -111,3 +110,6 @@ Separate from the code, and needed before anyone but the owner connects:
   order's page; Telegram asks Yes / Cancel in the chat, with the hold reason
   picked from the fraud check or payment. Logged as done from an alert or
   from Telegram. Only offered when the store allows it.
+- MCP 1.4.0: `get_decisions` and `rate_decision`, so the seller can ask
+  Claude Desktop which calls aren't rated yet and rate them with a note (the
+  agent reads those). The agent itself doesn't get either tool.

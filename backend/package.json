@@ -27,7 +27,8 @@
     "test:reports": "node scripts/test-reports.js",
     "test:risk": "node scripts/test-risk.js",
     "test:actions": "node scripts/test-actions.js",
-    "test:alert-actions": "node scripts/test-alert-actions.js"
+    "test:alert-actions": "node scripts/test-alert-actions.js",
+    "test:mcp-decisions": "node scripts/test-mcp-decisions.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",
