@@ -83,6 +83,12 @@ async function expireEmailCodes(sellerId) {
   );
 }
 
+// A code whose email couldn't be sent: nobody got it, so it neither counts
+// toward the hourly limit nor shows as waiting to be entered.
+async function dropEmailCode(sellerId, code) {
+  await pool.query("DELETE FROM channel_links WHERE seller_id = ? AND channel = 'email' AND code_hash = ?", [sellerId, hashCode('email', code)]);
+}
+
 async function clearAlertEmail(sellerId) {
   await pool.query('UPDATE sellers SET alert_email = NULL WHERE id = ?', [sellerId]);
   await expireEmailCodes(sellerId);
@@ -138,6 +144,7 @@ module.exports = {
   createLinkCode,
   pendingEmail,
   verifyEmailCode,
+  dropEmailCode,
   clearAlertEmail,
   linkTelegramChat,
   unlinkTelegramChat,

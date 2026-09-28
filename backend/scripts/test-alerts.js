@@ -61,8 +61,13 @@ function startFakeSmtp() {
           to = [];
           socket.write('250 ok\r\n');
         } else if (cmd === 'RCPT') {
-          to.push(line.match(/<([^>]+)>/)?.[1]);
-          socket.write('250 ok\r\n');
+          const rcpt = line.match(/<([^>]+)>/)?.[1];
+          // Like a mail service in test mode, which only delivers to its owner.
+          if (rcpt?.startsWith('refused-')) socket.write('550 You can only send testing emails to your own email address\r\n');
+          else {
+            to.push(rcpt);
+            socket.write('250 ok\r\n');
+          }
         } else if (cmd === 'DATA') {
           inData = true;
           socket.write('354 go ahead\r\n');
@@ -161,6 +166,13 @@ async function main() {
     check(right.status === 200 && right.json.email_alerts.address === address, 'right code turns email alerts on');
     const again = await call('POST', '/api/settings/email/verify', token, { code });
     check(again.status === 400, 'a used code does not work twice', again.json.error);
+
+    // Codes the mail service refused never reached anyone: they don't use up the hourly limit.
+    let refused;
+    for (let i = 0; i < 6; i++) refused = await call('PUT', '/api/settings/email', token, { email: `refused-${i}-${run}@example.test` });
+    const afterRefused = (await call('GET', '/api/settings', token)).json.email_alerts;
+    check(refused.status === 502 && /Couldn't send/.test(refused.json.error), 'a refused code email is reported', refused.json?.error);
+    check(afterRefused.pending === null && afterRefused.address === address, "a refused address isn't left waiting for a code");
 
     for (let i = 0; i < 3; i++) await call('PUT', '/api/settings/email', token, { email: `other-${i}-${run}@example.test` });
     await call('DELETE', '/api/settings/email', token); // cancelling must not reset the limit

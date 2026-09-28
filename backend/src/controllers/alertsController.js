@@ -33,11 +33,16 @@ async function startEmail(req, res) {
       return res.status(429).json({ error: 'Too many codes sent. Try again in an hour.' });
     }
     const code = await channels.createLinkCode(req.sellerId, 'email', address);
-    await email.sendEmail({
-      to: address,
-      subject: `Your AI Ops code: ${code}`,
-      text: `Enter ${code} in AI Ops Settings to get alerts at this address.\n\nThe code works for 15 minutes. If you didn't ask for it, ignore this email.`,
-    });
+    try {
+      await email.sendEmail({
+        to: address,
+        subject: `Your AI Ops code: ${code}`,
+        text: `Enter ${code} in AI Ops Settings to get alerts at this address.\n\nThe code works for 15 minutes. If you didn't ask for it, ignore this email.`,
+      });
+    } catch (err) {
+      await channels.dropEmailCode(req.sellerId, code).catch(() => {});
+      throw err;
+    }
     res.json({ pending: address });
   } catch (err) {
     console.error(`[alerts] seller ${req.sellerId}: sending the email code failed: ${err.message}`);
