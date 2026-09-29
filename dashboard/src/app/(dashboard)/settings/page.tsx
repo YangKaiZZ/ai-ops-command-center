@@ -143,7 +143,7 @@ function SettingsContent() {
         <div className="grid max-w-3xl gap-4">
           {welcome && !settings.store.connected && (
             <section className={`${card} border-accent/30 p-4`}>
-              <h2 className="text-[15px] font-semibold">Welcome{session.business_name ? `, ${session.business_name}` : ""}</h2>
+              <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em]">Welcome{session.business_name ? `, ${session.business_name}` : ""}</h2>
               <p className="mt-1 text-sm text-ink-2">Two steps to get going: connect your Shopify store below, then choose where alerts should go.</p>
             </section>
           )}

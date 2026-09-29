@@ -14,7 +14,7 @@ type Contact = { operator: string | null; contact_email: string | null };
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-2.5">
-      <h2 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em] text-ink">{title}</h2>
       {children}
     </section>
   );

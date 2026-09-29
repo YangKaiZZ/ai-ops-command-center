@@ -9,7 +9,7 @@ import { useDashboard } from "@/components/DashboardProvider";
 import { MinusIcon, TrendDownIcon, TrendUpIcon } from "@/components/icons";
 import { card, Empty, Panel } from "@/components/Panel";
 import { SetupChecklist } from "@/components/SetupChecklist";
-import { accentButton, focusRing, PageHeader, secondaryButton, small } from "@/components/ui";
+import { accentOutlineButton, focusRing, PageHeader, secondaryButton, small } from "@/components/ui";
 import { accuracyPercent } from "@/lib/feedback";
 import { actionInfo, ACTIONS, formatMoney, historySummary, parseReasoning, riskSummary, roughNote, shortDate, timeAgo } from "@/lib/format";
 import { change, fraudComparison, localDay, percentChange, PERIOD_CHOICES, periodStart, readPeriod, tileCount, tileMoney } from "@/lib/overview";
@@ -86,7 +86,7 @@ function WaitingOnYou({ orders, total, decisions }: { orders: Order[] | null; to
     <section className={`${card} flex flex-col overflow-hidden`}>
       <div className="flex flex-wrap items-start justify-between gap-2 px-5 py-4">
         <div>
-          <h2 className="text-[15px] font-semibold">Waiting on you</h2>
+          <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em]">Waiting on you</h2>
           <p className="mt-0.5 text-[12.5px] text-ink-2">Orders still to ship or check, with the agent&rsquo;s call on each</p>
         </div>
         <Link href="/orders?needs_action=1" className={`text-[12.5px] text-ink-2 hover:text-ink ${focusRing}`}>
@@ -140,7 +140,7 @@ function WaitingOnYou({ orders, total, decisions }: { orders: Order[] | null; to
                     Open
                   </Link>
                   {act && (
-                    <Link href={`${href}#in-shopify`} className={`${accentButton} ${small}`}>
+                    <Link href={`${href}#in-shopify`} className={`${accentOutlineButton} ${small}`}>
                       {act}…
                     </Link>
                   )}

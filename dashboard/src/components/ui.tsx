@@ -14,15 +14,18 @@ export const labelledInputClass =
 export const fieldClass = `rounded-lg border border-border bg-field px-2.5 py-1.5 text-[13px] text-ink transition-colors hover:border-ink-2/40 ${focusRing}`;
 // Solid lime is kept for main actions: Sync, and each form's submit button. `accentButton` leaves
 // the disabled cursor to the caller; `primaryButton` shows it as busy.
-export const accentButton = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-accent bg-accent px-3.5 py-2 text-[13px] font-semibold text-on-accent transition hover:brightness-110 ${focusRing} disabled:opacity-60 disabled:hover:brightness-100`;
+export const accentButton = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-accent bg-accent px-3.5 py-2 text-[13px] font-semibold text-on-accent transition hover:brightness-105 hover:shadow-[0_0_0_3px_rgb(182_255_46/0.14)] ${focusRing} disabled:opacity-60 disabled:hover:brightness-100 disabled:hover:shadow-none`;
 export const primaryButton = `${accentButton} disabled:cursor-progress`;
+// The agent's call where it repeats down a list (one per row): lime, but only
+// its edge and text, so a list of them doesn't shout.
+export const accentOutlineButton = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-accent/35 bg-accent/[0.06] px-3.5 py-2 text-[13px] font-semibold text-accent transition-colors hover:border-accent/60 hover:bg-accent/10 ${focusRing}`;
 export const secondaryButton = `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border bg-field px-3.5 py-2 text-[13px] font-semibold text-ink transition-colors hover:border-ink-2/40 hover:bg-hairline ${focusRing} disabled:cursor-progress disabled:opacity-60`;
 // Appended to a button class: a size down, for rows in a list.
 export const small = "!px-2.5 !py-1.5 !text-xs";
 export const dangerTextButton = `rounded-lg px-2.5 py-1 text-sm font-medium text-error hover:bg-ink/5 ${focusRing} disabled:opacity-60`;
 
-// A small label in capitals, like an instrument panel's (table headings too).
-export const eyebrow = "text-[11px] font-medium uppercase tracking-[0.06em] text-ink-2";
+// A small label in spaced mono capitals, like an instrument panel's (table headings too).
+export const eyebrow = "font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink-2";
 
 export type Message = { text: string; isError: boolean } | null;
 
@@ -45,8 +48,8 @@ export function PageHeader({ title, sub, children }: { title: React.ReactNode; s
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-bold leading-tight tracking-[-0.01em]">{title}</h1>
-        {sub && <div className="mt-1 text-[13px] text-ink-2">{sub}</div>}
+        <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.025em]">{title}</h1>
+        {sub && <div className="mt-1 text-[13.5px] text-ink-2">{sub}</div>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2.5">{children}</div>}
     </div>
