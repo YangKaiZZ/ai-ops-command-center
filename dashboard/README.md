@@ -23,15 +23,21 @@ sync endpoints (disabled until a store is connected). An inventory sync can
 trigger the low-stock agent, which sends an alert.
 
 ## Look
-One dark theme: graphite surfaces (`#13161C` page, `#1F232B` cards,
-`#2E3542` edges) and a single accent, "Lime Compute" `#B6FF2E`, kept for main
-actions, the current tab and what's going well. The color tokens live in
-`src/app/globals.css`; statuses are always a translucent pill with an icon
-and a word, never color alone. Text is Inter, small labels JetBrains Mono,
-both in `src/app/fonts` (SIL Open Font License) and loaded with
-`next/font/local`, so builds need no network and pages make no font requests.
-Icons are [Phosphor](https://phosphoricons.com), imported one file each from
-`src/components/icons.ts` so only those are bundled.
+One dark theme from the brand kit: Ink surfaces (`#0B0D0A` page, `#121410`
+cards, `#282C24` edges, a near-black with a green undertone), Paper
+`#ECEEE6` for text, and a single accent, Signal Lime `#B6FF2E`, kept for main
+actions, where you are and what's going well. The color tokens live in
+`src/app/globals.css`; statuses are always a word, never color alone.
+
+The mark, "the Caret" (`src/components/Logo.tsx`, `src/app/icon.svg`), is a
+60-degree chevron, the A of AI Ops, with a lime crossbar floating free of the
+legs: the agent's call, waiting for the seller to close it.
+
+Titles are Instrument Sans, text is Inter, numbers and small labels
+JetBrains Mono, all in `src/app/fonts` (SIL Open Font License) and loaded
+with `next/font/local`, so builds need no network and pages make no font
+requests. Icons are [Phosphor](https://phosphoricons.com), imported one file
+each from `src/components/icons.ts` so only those are bundled.
 
 ## Run it
 The backend must be running on port 3000.

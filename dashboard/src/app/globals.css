@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
-/* One dark theme: graphite surfaces and a single high-voltage accent,
-   "Lime Compute", kept for what matters most (the main action, where you
-   are, what's going well). Tailwind utilities (bg-surface, text-ink-2,
-   border-accent/25, ...) resolve to these tokens. */
+/* One dark theme, from the brand kit: Ink (a near-black with a green
+   undertone), Paper for text, and Signal Lime kept for what matters most
+   (the main action, where you are, what's going well). Tailwind utilities
+   (bg-surface, text-ink-2, border-accent/25, ...) resolve to these tokens. */
 :root {
   color-scheme: dark;
-  --page: #13161c; /* primary background */
-  --sidebar: #0f1217; /* the side navigation, a step darker */
-  --line: #232833; /* the frame: sidebar and top bar edges, tab rules */
-  --surface: #1f232b; /* cards: "Deep Graphite" */
-  --field: #1a1e26; /* buttons, inputs and the search box */
-  --well: #181c23; /* a sunken box inside a card */
-  --ink: #e6e8ec; /* numbers and titles */
-  --ink-soft: #c7ccd6; /* body text inside cards */
-  --ink-2: #8a93a3; /* labels and secondary text */
-  --hairline: #2a303b; /* dividers inside cards */
-  --border: #2e3542; /* card edges */
-  --accent: #b6ff2e; /* "Lime Compute" */
-  --on-accent: #0d0f12; /* text on a lime fill */
-  --error: #ff8a8a;
+  --page: #0b0d0a; /* Ink: the primary background */
+  --sidebar: #080907; /* the side navigation, a step darker */
+  --line: #1d201a; /* the frame: sidebar and top bar edges, tab rules */
+  --surface: #121410; /* cards */
+  --field: #181b15; /* buttons, inputs and the search box: "Field" */
+  --well: #0e100c; /* a sunken box inside a card */
+  --ink: #eceee6; /* "Paper": numbers and titles */
+  --ink-soft: #c9cdc1; /* body text inside cards */
+  --ink-2: #8a9084; /* labels and secondary text */
+  --hairline: #1f231c; /* dividers inside cards */
+  --border: #282c24; /* card edges */
+  --accent: #b6ff2e; /* "Signal Lime" */
+  --on-accent: #0b0d0a; /* text on a lime fill */
+  --error: #ff8a7a;
 }
 
 @theme inline {
@@ -43,10 +43,12 @@
   --color-good: #b6ff2e;
   --color-warning: #f5b342;
   --color-serious: #ff9a5c;
-  --color-critical: #ff8a8a;
-  --color-neutral: #a3abb9;
+  --color-critical: #ff8a7a;
+  --color-neutral: #a0a697;
 
-  /* Set on <html> by next/font (self-hosted, no requests to Google). */
+  /* Set on <html> by next/font (self-hosted, no requests to Google).
+     Display is for page titles, big numbers' labels and the wordmark. */
+  --font-display: var(--font-instrument-sans), var(--font-inter), system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "Cascadia Code", Consolas, monospace;
 }

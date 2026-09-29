@@ -12,7 +12,6 @@ export { CircleDashedIcon } from "@phosphor-icons/react/dist/ssr/CircleDashed";
 export { CubeIcon } from "@phosphor-icons/react/dist/ssr/Cube";
 export { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
 export { EraserIcon } from "@phosphor-icons/react/dist/ssr/Eraser";
-export { LightningIcon } from "@phosphor-icons/react/dist/ssr/Lightning";
 export { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
 export { MinusIcon } from "@phosphor-icons/react/dist/ssr/Minus";
 export { PaperPlaneRightIcon } from "@phosphor-icons/react/dist/ssr/PaperPlaneRight";
