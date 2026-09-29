@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
-import { Logo } from "@/components/Logo";
+import { LinkPage } from "@/components/AuthShell";
 import { ShopifyOrderPanel, type Kind } from "@/components/ShopifyActions";
 import { formatMoney } from "@/lib/format";
 import type { ActionLink, ShopifyState } from "@/lib/types";
@@ -67,12 +67,9 @@ function ActForm() {
   const kinds = useMemo<Kind[]>(() => (link ? [link.action] : []), [link]);
 
   const error = token ? loadError : "This link isn't valid.";
-  const card = "glow relative grid w-full max-w-lg gap-4 rounded-xl border border-border bg-surface p-7";
+  const card = "grid w-full max-w-lg gap-4 rounded-xl border border-border bg-surface p-6 sm:p-7";
   const header = (
-    <div className="flex items-center gap-3">
-      <Logo />
-      <h1 className="text-lg font-semibold tracking-tight">{link ? TITLES[link.action] : "In Shopify"}</h1>
-    </div>
+    <h1 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.02em]">{link ? TITLES[link.action] : "In Shopify"}</h1>
   );
 
   if (error || !link) {
@@ -140,11 +137,11 @@ function ActForm() {
 
 export default function ActPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <LinkPage>
       {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
       <Suspense>
         <ActForm />
       </Suspense>
-    </main>
+    </LinkPage>
   );
 }

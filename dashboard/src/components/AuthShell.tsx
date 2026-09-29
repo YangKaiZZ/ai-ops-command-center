@@ -66,3 +66,14 @@ export function AuthTitle({ title, children }: { title: string; children?: React
     </div>
   );
 }
+
+// The pages an alert opens (act on an order, rate a call), mostly on a
+// phone: the lockup over one centered card.
+export function LinkPage({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-10">
+      <Lockup small />
+      {children}
+    </main>
+  );
+}

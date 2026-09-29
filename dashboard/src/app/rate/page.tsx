@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
-import { Logo } from "@/components/Logo";
+import { LinkPage } from "@/components/AuthShell";
 import { inputClass, primaryButton } from "@/components/ui";
 import { NOTE_MAX_LENGTH } from "@/lib/feedback";
 import { actionInfo, parseReasoning, timeAgo } from "@/lib/format";
@@ -78,12 +78,9 @@ function RateForm() {
 
   const error = token ? loadError : "This rating link isn't valid.";
   const header = (
-    <div className="flex items-center gap-3">
-      <Logo />
-      <h1 className="text-lg font-semibold tracking-tight">Rate the agent&rsquo;s call</h1>
-    </div>
+    <h1 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.02em]">Rate the agent&rsquo;s call</h1>
   );
-  const card = "glow relative grid w-full max-w-md gap-4 rounded-xl border border-border bg-surface p-7";
+  const card = "grid w-full max-w-md gap-4 rounded-xl border border-border bg-surface p-6 sm:p-7";
 
   if (error || !link) {
     return (
@@ -186,11 +183,11 @@ function RateForm() {
 
 export default function RatePage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <LinkPage>
       {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
       <Suspense>
         <RateForm />
       </Suspense>
-    </main>
+    </LinkPage>
   );
 }

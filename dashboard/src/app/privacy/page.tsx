@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Logo } from "@/components/Logo";
+import { Lockup } from "@/components/Logo";
 
 // The privacy policy. Everything here describes what the code does; who runs
 // the server and how to reach them come from its settings (PRIVACY_OPERATOR,
@@ -72,12 +72,11 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto grid max-w-2xl gap-7 px-4 pb-16 pt-8 text-sm leading-relaxed text-ink-2">
       <header className="grid gap-4">
-        <Link href="/login" className="flex w-fit items-center gap-3 text-ink">
-          <Logo />
-          <span className="font-semibold tracking-tight">AI Ops Command Center</span>
+        <Link href="/login" aria-label="AI Ops Command Center" className="mb-4 w-fit text-ink">
+          <Lockup small />
         </Link>
         <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Privacy policy</h1>
+          <h1 className="font-display text-[32px] font-semibold leading-tight tracking-[-0.03em] text-ink">Privacy policy</h1>
           <p className="font-mono text-xs">Last updated {UPDATED}</p>
         </div>
         <p>
