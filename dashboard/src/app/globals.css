@@ -62,23 +62,3 @@ body {
   background: rgb(182 255 46 / 0.3);
   color: var(--ink);
 }
-
-/* A soft lime light in the corner of a card (the Overview's Sales tile).
-   The card clips it, so it never reaches past the card's edge. */
-.glow {
-  position: relative;
-  overflow: hidden;
-}
-.glow::before {
-  content: "";
-  position: absolute;
-  right: -40px;
-  top: -40px;
-  width: 160px;
-  height: 160px;
-  border-radius: 999px;
-  background: var(--accent);
-  opacity: 0.08;
-  filter: blur(20px);
-  pointer-events: none;
-}

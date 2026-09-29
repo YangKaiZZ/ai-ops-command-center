@@ -46,7 +46,6 @@ function Tile({
   label,
   value,
   href,
-  glow = false,
   alarm = false,
   badge,
   children,
@@ -54,22 +53,21 @@ function Tile({
   label: string;
   value: string;
   href: string;
-  glow?: boolean;
   alarm?: boolean; // tinted edge: something here needs the seller
   badge?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
     <div
-      className={`${card} relative grid content-start gap-1.5 px-5 py-[18px] transition-colors hover:border-accent/45 ${glow ? "glow" : ""} ${alarm ? "border-critical/35" : ""}`}
+      className={`${card} relative grid content-start gap-1.5 px-4 py-4 transition-colors hover:border-accent/45 sm:px-5 sm:py-[18px] ${alarm ? "border-critical/35" : ""}`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href={href} className={`text-[12.5px] text-ink-2 after:absolute after:inset-0 after:rounded-xl ${focusRing}`}>
           {label}
         </Link>
         {badge}
       </div>
-      <span className="font-mono text-[30px] font-bold leading-tight tracking-[-0.02em] tabular-nums">{value}</span>
+      <span className="font-mono text-[26px] font-bold leading-tight tracking-[-0.02em] tabular-nums sm:text-[30px]">{value}</span>
       {children}
     </div>
   );
@@ -235,11 +233,11 @@ function OverviewView({
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Tile label="Orders" value={tileCount(orders.count)} href={`/orders?from=${from}`}>
           <ChangeLine current={orders.count} previous={orders.previous_count} format={tileCount} days={days} />
         </Tile>
-        <Tile label="Sales" value={tileMoney(Number(orders.sales))} href={`/orders?from=${from}`} glow>
+        <Tile label="Sales" value={tileMoney(Number(orders.sales))} href={`/orders?from=${from}`}>
           <ChangeLine current={Number(orders.sales)} previous={Number(orders.previous_sales)} format={tileMoney} days={days} />
         </Tile>
         <Tile label="Need action" value={tileCount(orders.needs_action)} href="/orders?needs_action=1">
