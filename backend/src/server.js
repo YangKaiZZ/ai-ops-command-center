@@ -6,7 +6,11 @@ const { startWorker, stopWorker } = require('./services/jobQueue');
 const { startDemoCleanup } = require('./services/demo');
 const { refreshAllWebhooks } = require('./services/storeConnection');
 const { notifyOps } = require('./services/opsAlerts');
+const { emailSettingsProblem } = require('./services/email');
 require('./services/jobHandlers'); // what each job type does
+
+const emailProblem = emailSettingsProblem();
+if (emailProblem) console.warn(`[config] Email won't send: ${emailProblem}`);
 
 if (process.env.SLACK_WEBHOOK_URL) {
   console.warn('[config] SLACK_WEBHOOK_URL in .env is no longer used: each seller sets their own Slack webhook in Settings.');
