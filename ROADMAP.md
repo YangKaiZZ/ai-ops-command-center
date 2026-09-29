@@ -147,3 +147,8 @@ Separate from the code, and needed before anyone but the owner connects:
   order page with a timeline; a stock table with days-left bars and a CSV
   reorder list; decisions beside the notes the agent learns from; a Settings
   menu that follows the scroll.
+- Brand kit and the look that follows it: the Caret mark (a chevron, the A
+  of AI Ops, with a floating lime crossbar for the agent's call) as logo and
+  favicon; Ink surfaces with Paper text and Signal Lime as the one accent;
+  Instrument Sans titles; pip-led status chips; sign-in pages with a brand
+  panel ("It calls. You decide."); Decisions listed 15 at a time.

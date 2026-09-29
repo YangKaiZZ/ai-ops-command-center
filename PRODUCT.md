@@ -91,6 +91,11 @@ on the Shopify App Store.
 ## Brand Commitments
 
 - Name: **AI Ops Command Center** ("AI Ops" for short).
+- **Lime (#B6FF2E) is the brand color** and survives any redesign (user
+  confirmed, 2026-09-29).
+- **It must read as professional**: a tool a seller trusts with their store,
+  not a novelty (user's words for the 2026-09-29 redesign: "just make it
+  professional").
 - No emoji anywhere in the UI; icons are Phosphor.
 - Never invent business facts, customers, numbers or claims. Anything shown
   comes from the seller's own data or is labelled as a sample (the demo).
