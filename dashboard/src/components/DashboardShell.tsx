@@ -17,7 +17,7 @@ import {
   type Icon,
 } from "./icons";
 import { DemoBanner } from "./DemoBanner";
-import { Logo } from "./Logo";
+import { Lockup, Logo } from "./Logo";
 import { accentButton, focusRing } from "./ui";
 import { filterDecisions } from "@/lib/feedback";
 import { timeAgo } from "@/lib/format";
@@ -32,13 +32,17 @@ function NavLink({ item, active, compact = false }: { item: NavItem; active: boo
       aria-current={active ? "page" : undefined}
       className={`flex shrink-0 items-center gap-3 whitespace-nowrap rounded-lg font-medium transition-colors ${focusRing} ${
         compact ? "px-3 py-1.5 text-[13px]" : "px-2.5 py-[9px] text-sm"
-      } ${active ? "bg-accent/10 text-accent" : "text-ink-2 hover:bg-field hover:text-ink"}`}
+      } ${
+        active
+          ? `bg-field text-ink ${compact ? "shadow-[inset_0_-2px_0_var(--accent)]" : "shadow-[inset_2px_0_0_var(--accent)]"}`
+          : "text-ink-2 hover:bg-field/60 hover:text-ink"
+      }`}
     >
-      <Glyph aria-hidden="true" weight={active ? "fill" : "regular"} className="size-[18px] shrink-0" />
+      <Glyph aria-hidden="true" weight={active ? "fill" : "regular"} className={`size-[18px] shrink-0 ${active ? "text-accent" : ""}`} />
       {item.label}
       {item.count != null && item.count > 0 && (
         <span
-          className={`${compact ? "" : "ml-auto"} rounded-full px-[7px] py-px font-mono text-[11px] tabular-nums ${active ? "bg-accent/15" : "bg-line text-ink-soft"}`}
+          className={`${compact ? "" : "ml-auto"} rounded-md px-1.5 py-px font-mono text-[11px] tabular-nums ${active ? "bg-accent/15 text-accent" : "bg-line text-ink-soft"}`}
           title={`${item.count} ${item.countLabel ?? ""}`}
         >
           {item.count}
@@ -76,7 +80,7 @@ function SearchBox() {
         setText("");
         input.current?.blur();
       }}
-      className="hidden w-[300px] items-center gap-2 rounded-[9px] border border-border bg-field px-3 py-2 text-[13px] text-ink-2 transition-colors focus-within:border-accent/50 md:flex"
+      className="hidden w-[320px] items-center gap-2 rounded-lg border border-border bg-field px-3 py-2 text-[13px] text-ink-2 transition-colors hover:border-ink-2/30 focus-within:border-accent/50 md:flex"
     >
       <MagnifyingGlassIcon aria-hidden="true" className="size-[15px] shrink-0" />
       <input
@@ -89,7 +93,7 @@ function SearchBox() {
         aria-label="Search orders by number or customer"
         className="min-w-0 flex-1 bg-transparent text-ink placeholder:text-ink-2 focus:outline-none"
       />
-      <kbd className="rounded-[5px] border border-border px-1.5 font-sans text-[11px] text-ink-2">Ctrl K</kbd>
+      <kbd className="rounded-[5px] border border-border bg-well px-1.5 font-mono text-[11px] text-ink-2">Ctrl K</kbd>
     </form>
   );
 }
@@ -119,31 +123,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh">
-      <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col gap-0.5 border-r border-line bg-sidebar px-3.5 py-5 lg:flex">
-        <Link href="/overview" className={`mb-5 flex items-center gap-2.5 rounded-lg px-2 py-1 ${focusRing}`}>
-          <Logo />
-          <span>
-            <span className="block text-[15px] font-bold leading-tight">AI Ops</span>
-            <span className="block text-[11px] text-ink-2">Command Center</span>
-          </span>
+      <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col gap-0.5 border-r border-line bg-sidebar px-3.5 pb-4 pt-5 lg:flex">
+        <Link href="/overview" aria-label="AI Ops Command Center, Overview" className={`mb-7 rounded-lg px-2 py-1 ${focusRing}`}>
+          <Lockup small />
         </Link>
         <nav aria-label="Dashboard sections" className="flex flex-col gap-0.5">
           {main.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href)} />
           ))}
-          <span className="px-2.5 pb-1.5 pt-3.5 text-[11px] uppercase tracking-[0.08em] text-ink-2">Account</span>
+          <span className="px-2.5 pb-1.5 pt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-2">Account</span>
           <NavLink item={account} active={isActive(account.href)} />
         </nav>
         {data && (
-          <div className="mt-auto grid gap-1.5 rounded-[10px] border border-line bg-field/60 p-3">
+          <div className="mt-auto grid gap-1 rounded-[10px] border border-line bg-surface px-3 py-2.5">
             <p className="flex items-center gap-2 text-[13px] font-semibold">
-              <span
-                aria-hidden="true"
-                className={`size-2 rounded-full ${store?.connected ? "bg-accent shadow-[0_0_0_3px_rgb(182_255_46/0.15)]" : "bg-neutral"}`}
-              />
+              <span aria-hidden="true" className={`size-[7px] shrink-0 ${store?.connected ? "bg-accent" : "bg-neutral"}`} />
               {data.settings.demo ? "Demo store" : store?.connected ? "Store connected" : "No store connected"}
             </p>
-            <p className="text-xs text-ink-2">{lastCall ? `Agent's last call ${timeAgo(lastCall)}` : "No agent calls yet"}</p>
+            <p className="pl-[15px] text-xs text-ink-2">{lastCall ? `Agent's last call ${timeAgo(lastCall)}` : "No agent calls yet"}</p>
           </div>
         )}
       </aside>
@@ -157,7 +154,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </span>
               {store?.connected ? (
                 <>
-                  <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />
+                  <span aria-hidden="true" className="size-[7px] shrink-0 bg-accent" />
                   <span className="truncate font-mono" title="Your Shopify store">
                     {store.shop_domain}
                   </span>
@@ -173,7 +170,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               {updatedAt && (
                 <span className="hidden items-center gap-2 text-[12.5px] text-ink-2 xl:flex" aria-live="polite">
                   {/* Lime while the data is fresh; grey once a reload has failed (the banner says why). */}
-                  <span aria-hidden="true" className={`size-1.5 rounded-full ${banner?.isError ? "bg-neutral" : "bg-accent"}`} />
+                  <span aria-hidden="true" className={`size-1.5 ${banner?.isError ? "bg-neutral" : "bg-accent"}`} />
                   Updated {updatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                 </span>
               )}
@@ -192,7 +189,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <span
                   aria-hidden="true"
                   title={name}
-                  className="hidden size-8 place-items-center rounded-full bg-hairline text-[13px] font-bold uppercase sm:grid"
+                  className="hidden size-8 place-items-center rounded-lg border border-border bg-field font-display text-[14px] font-semibold uppercase sm:grid"
                 >
                   {name.trim().charAt(0)}
                 </span>
