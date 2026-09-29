@@ -206,7 +206,7 @@ async function fetchOrder(shopDomain, accessToken, orderId) {
 
 const VARIANT_FIELDS = `id title inventoryQuantity
   inventoryItem { id tracked }
-  product { id title }`;
+  product { id title isGiftCard }`;
 
 const VARIANTS_QUERY = `query Variants($cursor: String) {
   productVariants(first: ${VARIANTS_PAGE}, after: $cursor) {
@@ -219,7 +219,9 @@ const VARIANT_QUERY = `query Variant($id: ID!) { productVariant(id: $id) { ${VAR
 
 // A GraphQL ProductVariant with REST's field names, plus its product's id and
 // title. inventory_management is "shopify" when Shopify tracks its stock,
-// null when it doesn't (inventory_quantity then means nothing).
+// null when it doesn't (inventory_quantity then means nothing). A gift card
+// counts as untracked even when tracking is on: it's never restocked, so it
+// would sit on the Stock page as "out of stock" and hold orders for nothing.
 function toRestVariant(node) {
   return {
     id: numericId(node.id),
@@ -228,7 +230,7 @@ function toRestVariant(node) {
     title: node.title,
     inventory_item_id: node.inventoryItem ? numericId(node.inventoryItem.id) : null,
     inventory_quantity: node.inventoryQuantity ?? 0,
-    inventory_management: node.inventoryItem?.tracked ? 'shopify' : null,
+    inventory_management: node.inventoryItem?.tracked && !node.product.isGiftCard ? 'shopify' : null,
   };
 }
 

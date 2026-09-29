@@ -172,17 +172,17 @@ test('orders by id skip ones Shopify no longer has; a missing order is null', as
 });
 
 test('variants carry their product and whether Shopify tracks their stock', async () => {
-  const variant = (id, tracked, quantity) => ({
+  const variant = (id, tracked, quantity, isGiftCard = false) => ({
     id: `gid://shopify/ProductVariant/${id}`,
     title: 'Default Title',
     inventoryQuantity: quantity,
     inventoryItem: { id: `gid://shopify/InventoryItem/${id}0`, tracked },
-    product: { id: 'gid://shopify/Product/9', title: 'Board' },
+    product: { id: 'gid://shopify/Product/9', title: 'Board', isGiftCard },
   });
   const fake = fakeShopify((query, vars) => {
     if (query.includes('productVariant(id')) return { data: { productVariant: vars.id.endsWith('/404') ? null : variant(5, true, 3) } };
     return vars.cursor
-      ? { data: { productVariants: { pageInfo: { hasNextPage: false }, nodes: [variant(2, false, null)] } } }
+      ? { data: { productVariants: { pageInfo: { hasNextPage: false }, nodes: [variant(2, false, null), variant(3, true, 0, true)] } } }
       : { data: { productVariants: { pageInfo: { hasNextPage: true, endCursor: 'v2' }, nodes: [variant(1, true, 4)] } } };
   });
   try {
@@ -198,6 +198,7 @@ test('variants carry their product and whether Shopify tracks their stock', asyn
     });
     assert.equal(variants[1].inventory_management, null);
     assert.equal(variants[1].inventory_quantity, 0);
+    assert.equal(variants[2].inventory_management, null, 'a gift card is never restocked, even with tracking on');
     assert.equal((await shopify.fetchVariant('shop.myshopify.com', 'token', '5')).inventory_quantity, 3);
     assert.equal(await shopify.fetchVariant('shop.myshopify.com', 'token', '404'), null);
   } finally {
