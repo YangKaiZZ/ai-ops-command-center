@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthShell, AuthTitle } from "@/components/AuthShell";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -43,8 +44,8 @@ function ResetForm() {
 
   if (done) {
     return (
-      <div className="grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-        <h1 className="text-lg font-semibold">Password changed</h1>
+      <div className="grid w-full gap-3.5">
+        <AuthTitle title="Password changed" />
         <p role="status" className="text-sm text-ink-2">
           Your password is changed and you&rsquo;re signed out everywhere else. Sign in with the new one.
         </p>
@@ -57,8 +58,8 @@ function ResetForm() {
 
   if (!token) {
     return (
-      <div className="grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-        <h1 className="text-lg font-semibold">Reset your password</h1>
+      <div className="grid w-full gap-3.5">
+        <AuthTitle title="Reset your password" />
         <p className="text-sm text-ink-2">This page needs the link from your reset email. Open it from there, or ask for a new one.</p>
         <Link href="/forgot-password" className="text-center text-sm font-medium text-accent underline">
           Send me a reset link
@@ -68,8 +69,8 @@ function ResetForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-      <h1 className="text-lg font-semibold">Choose a new password</h1>
+    <form onSubmit={handleSubmit} className="grid w-full gap-3.5">
+      <AuthTitle title="Choose a new password" />
       <label className="grid gap-1.5 text-sm font-medium">
         New password
         <input type="password" name="password" autoComplete="new-password" required minLength={MIN_PASSWORD} maxLength={200} className={labelledInputClass} />
@@ -98,10 +99,10 @@ function ResetForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <AuthShell>
       <Suspense>
         <ResetForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }

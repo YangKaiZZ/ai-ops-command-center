@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Logo } from "@/components/Logo";
-import { labelledInputClass, primaryButton, secondaryButton } from "@/components/ui";
+import { AuthShell, AuthTitle } from "@/components/AuthShell";
+import { focusRing, labelledInputClass, primaryButton, secondaryButton } from "@/components/ui";
 import { shopParam } from "@/lib/format";
 import { saveSession, useSession } from "@/lib/session";
 
@@ -85,20 +85,23 @@ function LoginForm() {
   const signupHref = shop ? `/signup?shop=${encodeURIComponent(shop)}` : "/signup";
 
   return (
-    <form onSubmit={handleSubmit} className="glow relative grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-      <div className="flex items-center gap-3">
-        <Logo />
-        <h1 className="text-lg font-semibold tracking-tight">AI Ops Command Center</h1>
-      </div>
-      <p className="text-sm text-ink-2">Sign in to see your store&rsquo;s orders and what the agent decided.</p>
+    <form onSubmit={handleSubmit} className="grid w-full gap-3.5">
+      <AuthTitle title="Sign in">Sign in to see your store&rsquo;s orders and what the agent decided.</AuthTitle>
       <label className="grid gap-1.5 text-sm font-medium">
         Email
         <input type="email" name="email" autoComplete="username" required className={labelledInputClass} />
       </label>
-      <label className="grid gap-1.5 text-sm font-medium">
-        Password
-        <input type="password" name="password" autoComplete="current-password" required className={labelledInputClass} />
-      </label>
+      <div className="grid gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <label htmlFor="password" className="text-sm font-medium">
+            Password
+          </label>
+          <Link href="/forgot-password" className={`rounded text-[13px] text-ink-2 hover:text-ink hover:underline ${focusRing}`}>
+            Forgot it?
+          </Link>
+        </div>
+        <input id="password" type="password" name="password" autoComplete="current-password" required className={labelledInputClass} />
+      </div>
       {message && (
         <p role={error || expired ? "alert" : "status"} className={`text-sm ${error || expired ? "text-error" : "text-ink-2"}`}>
           {message}
@@ -115,12 +118,7 @@ function LoginForm() {
           <p className="text-center text-xs text-ink-2">A sample store of your own, no account needed. It&rsquo;s deleted after a few hours.</p>
         </div>
       )}
-      <p className="text-center text-sm text-ink-2">
-        <Link href="/forgot-password" className="font-medium text-accent underline">
-          Forgot your password?
-        </Link>
-      </p>
-      <p className="text-center text-sm text-ink-2">
+      <p className="mt-2 text-center text-sm text-ink-2">
         New here?{" "}
         <Link href={signupHref} className="font-medium text-accent underline">
           Create an account
@@ -137,11 +135,11 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <AuthShell>
       {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
       <Suspense>
         <LoginForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }

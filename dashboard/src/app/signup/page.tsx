@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Logo } from "@/components/Logo";
+import { AuthShell, AuthTitle } from "@/components/AuthShell";
 import { labelledInputClass, primaryButton } from "@/components/ui";
 import { shopParam } from "@/lib/format";
 import { saveSession, useSession } from "@/lib/session";
@@ -66,12 +66,8 @@ function SignupForm() {
   const loginHref = shop ? `/login?shop=${encodeURIComponent(shop)}` : "/login";
 
   return (
-    <form onSubmit={handleSubmit} className="glow relative grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-      <div className="flex items-center gap-3">
-        <Logo />
-        <h1 className="text-lg font-semibold tracking-tight">AI Ops Command Center</h1>
-      </div>
-      <p className="text-sm text-ink-2">
+    <form onSubmit={handleSubmit} className="grid w-full gap-3.5">
+      <AuthTitle title="Create your account">
         {shop ? (
           <>
             Create an account to finish installing on <span className="font-medium text-ink [overflow-wrap:anywhere]">{shop}</span>.
@@ -79,7 +75,7 @@ function SignupForm() {
         ) : (
           "Create an account, then connect your Shopify store. The agent checks every new order and watches your stock."
         )}
-      </p>
+      </AuthTitle>
       <label className="grid gap-1.5 text-sm font-medium">
         Business name
         <input name="business_name" autoComplete="organization" required maxLength={255} className={labelledInputClass} />
@@ -135,11 +131,11 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <AuthShell>
       {/* useSearchParams needs a Suspense boundary so the page can still prerender. */}
       <Suspense>
         <SignupForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }

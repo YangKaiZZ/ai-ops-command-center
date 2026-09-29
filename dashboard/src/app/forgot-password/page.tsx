@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthShell, AuthTitle } from "@/components/AuthShell";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -35,8 +36,8 @@ function ForgotForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid w-full max-w-sm gap-3.5 rounded-xl border border-border bg-surface p-7">
-      <h1 className="text-lg font-semibold">Reset your password</h1>
+    <form onSubmit={handleSubmit} className="grid w-full gap-3.5">
+      <AuthTitle title="Reset your password" />
       {done ? (
         <>
           <p role="status" className="text-sm text-ink-2">
@@ -74,10 +75,10 @@ function ForgotForm() {
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <AuthShell>
       <Suspense>
         <ForgotForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
