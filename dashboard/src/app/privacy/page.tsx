@@ -14,7 +14,7 @@ type Contact = { operator: string | null; contact_email: string | null };
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="grid gap-2.5">
-      <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em] text-ink">{title}</h2>
+      <h2 className="font-display text-[15.5px] font-semibold tracking-[-0.005em] text-ink">{title}</h2>
       {children}
     </section>
   );
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
           <Lockup small />
         </Link>
         <div className="grid gap-1">
-          <h1 className="font-display text-[32px] font-semibold leading-tight tracking-[-0.03em] text-ink">Privacy policy</h1>
+          <h1 className="font-display text-[29px] font-semibold leading-tight tracking-[-0.015em] text-ink">Privacy policy</h1>
           <p className="font-mono text-xs">Last updated {UPDATED}</p>
         </div>
         <p>

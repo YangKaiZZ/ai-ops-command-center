@@ -69,7 +69,7 @@ function ActForm() {
   const error = token ? loadError : "This link isn't valid.";
   const card = "grid w-full max-w-lg gap-4 rounded-xl border border-border bg-surface p-6 sm:p-7";
   const header = (
-    <h1 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.02em]">{link ? TITLES[link.action] : "In Shopify"}</h1>
+    <h1 className="font-display text-[21px] font-semibold leading-tight tracking-[-0.01em]">{link ? TITLES[link.action] : "In Shopify"}</h1>
   );
 
   if (error || !link) {

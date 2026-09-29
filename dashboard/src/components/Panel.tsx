@@ -22,7 +22,7 @@ export function Panel({
     <section id={id} className={`${card} scroll-mt-20 p-4 sm:px-5 sm:py-4 ${className}`}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <div className="min-w-0">
-          <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em]">{title}</h2>
+          <h2 className="font-display text-[15.5px] font-semibold tracking-[-0.005em]">{title}</h2>
           {sub && <div className="mt-0.5 text-[12.5px] text-ink-2">{sub}</div>}
         </div>
         {aside && <div className="text-[12.5px] text-ink-2">{aside}</div>}

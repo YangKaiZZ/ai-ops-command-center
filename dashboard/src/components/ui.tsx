@@ -48,7 +48,7 @@ export function PageHeader({ title, sub, children }: { title: React.ReactNode; s
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.025em]">{title}</h1>
+        <h1 className="font-display text-[26px] font-semibold leading-tight tracking-[-0.015em]">{title}</h1>
         {sub && <div className="mt-1 text-[13.5px] text-ink-2">{sub}</div>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2.5">{children}</div>}

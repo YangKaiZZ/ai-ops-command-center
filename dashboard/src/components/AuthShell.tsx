@@ -26,7 +26,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           <Lockup />
         </Link>
         <div className="relative max-w-xl">
-          <p className="font-display text-[clamp(52px,5.4vw,84px)] font-semibold leading-[0.92] tracking-[-0.045em]">
+          <p className="font-display text-[clamp(46px,4.9vw,76px)] font-bold leading-[0.95] tracking-[-0.03em]">
             It calls.
             <span className="block text-accent">You decide.</span>
           </p>
@@ -61,7 +61,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 export function AuthTitle({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="mb-2 grid gap-2">
-      <h1 className="font-display text-[30px] font-semibold leading-tight tracking-[-0.03em]">{title}</h1>
+      <h1 className="font-display text-[27px] font-semibold leading-tight tracking-[-0.015em]">{title}</h1>
       {children && <div className="text-sm leading-relaxed text-ink-2">{children}</div>}
     </div>
   );

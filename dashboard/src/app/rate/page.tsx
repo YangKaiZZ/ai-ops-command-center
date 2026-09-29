@@ -78,7 +78,7 @@ function RateForm() {
 
   const error = token ? loadError : "This rating link isn't valid.";
   const header = (
-    <h1 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.02em]">Rate the agent&rsquo;s call</h1>
+    <h1 className="font-display text-[21px] font-semibold leading-tight tracking-[-0.01em]">Rate the agent&rsquo;s call</h1>
   );
   const card = "grid w-full max-w-md gap-4 rounded-xl border border-border bg-surface p-6 sm:p-7";
 

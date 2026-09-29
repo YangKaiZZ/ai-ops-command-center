@@ -84,7 +84,7 @@ function WaitingOnYou({ orders, total, decisions }: { orders: Order[] | null; to
     <section className={`${card} flex flex-col overflow-hidden`}>
       <div className="flex flex-wrap items-start justify-between gap-2 px-5 py-4">
         <div>
-          <h2 className="font-display text-[16.5px] font-semibold tracking-[-0.015em]">Waiting on you</h2>
+          <h2 className="font-display text-[15.5px] font-semibold tracking-[-0.005em]">Waiting on you</h2>
           <p className="mt-0.5 text-[12.5px] text-ink-2">Orders still to ship or check, with the agent&rsquo;s call on each</p>
         </div>
         <Link href="/orders?needs_action=1" className={`text-[12.5px] text-ink-2 hover:text-ink ${focusRing}`}>

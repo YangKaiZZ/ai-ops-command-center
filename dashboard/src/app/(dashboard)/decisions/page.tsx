@@ -73,7 +73,7 @@ function Learning({ decisions }: { decisions: Decision[] }) {
   const noted = decisions.filter((d) => d.feedback_note);
   return (
     <section className={`${card} grid gap-2.5 px-5 py-[18px]`}>
-      <h2 className="flex items-center gap-2 font-display text-[16px] font-semibold tracking-[-0.015em]">
+      <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold tracking-[-0.005em]">
         <Logo className="size-4" />
         What it&rsquo;s learning
       </h2>

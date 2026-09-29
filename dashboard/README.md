@@ -33,7 +33,7 @@ The mark, "the Caret" (`src/components/Logo.tsx`, `src/app/icon.svg`), is a
 60-degree chevron, the A of AI Ops, with a lime crossbar floating free of the
 legs: the agent's call, waiting for the seller to close it.
 
-Titles are Instrument Sans, text is Inter, numbers and small labels
+Titles are Archivo set wide (112%), text is Inter, numbers and small labels
 JetBrains Mono, all in `src/app/fonts` (SIL Open Font License) and loaded
 with `next/font/local`, so builds need no network and pages make no font
 requests. Icons are [Phosphor](https://phosphoricons.com), imported one file

@@ -190,7 +190,7 @@ function AgentCall({ detail }: { detail: OrderDetail }) {
   if (!latest) {
     return (
       <section className={`${card} grid gap-2 px-5 py-[18px]`}>
-        <h2 className="flex items-center gap-2 font-display text-[16.5px] font-semibold tracking-[-0.015em]">
+        <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold tracking-[-0.005em]">
           <Logo className="size-4" />
           Agent&rsquo;s call
         </h2>
@@ -204,7 +204,7 @@ function AgentCall({ detail }: { detail: OrderDetail }) {
   return (
     <section className={`${card} grid gap-3.5 px-5 py-[18px] ${TONE_EDGE[info.tone]}`} data-decision={latest.id}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-display text-[16.5px] font-semibold tracking-[-0.015em]">
+        <h2 className="flex items-center gap-2 font-display text-[15.5px] font-semibold tracking-[-0.005em]">
           <Logo className="size-4" />
           Agent&rsquo;s call
         </h2>

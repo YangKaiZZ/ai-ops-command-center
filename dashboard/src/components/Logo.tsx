@@ -26,7 +26,7 @@ export function Lockup({ small = false }: { small?: boolean }) {
     <span className="flex items-center gap-2.5">
       <Logo className={small ? "size-7" : "size-9"} />
       <span className="leading-none">
-        <span className={`block font-display font-semibold tracking-[-0.03em] ${small ? "text-[19px]" : "text-[24px]"}`}>AI Ops</span>
+        <span className={`block font-display font-bold tracking-[-0.02em] ${small ? "text-[17px]" : "text-[22px]"}`}>AI Ops</span>
         <span className={`mt-1 block font-mono text-[11px] font-semibold uppercase text-ink-2 ${small ? "tracking-[0.12em]" : "tracking-[0.26em]"}`}>Command Center</span>
       </span>
     </span>
