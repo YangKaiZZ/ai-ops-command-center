@@ -8,11 +8,11 @@ import {
   ArrowsClockwiseIcon,
   ChatCircleDotsIcon,
   CubeIcon,
+  ListChecksIcon,
   MagnifyingGlassIcon,
   ReceiptIcon,
   SignOutIcon,
   SlidersHorizontalIcon,
-  SparkleIcon,
   SquaresFourIcon,
   type Icon,
 } from "./icons";
@@ -115,7 +115,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: "/overview", label: "Overview", icon: SquaresFourIcon },
     { href: "/orders", label: "Orders", icon: ReceiptIcon, count: data?.pendingCount, countLabel: "need action" },
     { href: "/stock", label: "Stock", icon: CubeIcon, count: data?.lowStock.length, countLabel: "running low" },
-    { href: "/decisions", label: "Decisions", icon: SparkleIcon, count: unrated, countLabel: "not rated yet" },
+    { href: "/decisions", label: "Decisions", icon: ListChecksIcon, count: unrated, countLabel: "not rated yet" },
     { href: "/chat", label: "Chat", icon: ChatCircleDotsIcon },
   ];
   const account: NavItem = { href: "/settings", label: "Settings", icon: SlidersHorizontalIcon };

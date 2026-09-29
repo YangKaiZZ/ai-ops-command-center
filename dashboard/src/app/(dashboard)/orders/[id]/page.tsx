@@ -7,7 +7,8 @@ import { Badge } from "@/components/Badge";
 import { BuyerName } from "@/components/BuyerName";
 import { DecisionFeedback } from "@/components/DecisionFeedback";
 import { useDashboard } from "@/components/DashboardProvider";
-import { ArrowSquareOutIcon, CaretLeftIcon, SparkleIcon } from "@/components/icons";
+import { ArrowSquareOutIcon, CaretLeftIcon } from "@/components/icons";
+import { Logo } from "@/components/Logo";
 import { card, Empty, Panel } from "@/components/Panel";
 import { ShopifyActions } from "@/components/ShopifyActions";
 import { focusRing, PageHeader, secondaryButton } from "@/components/ui";
@@ -166,7 +167,7 @@ function Timeline({ detail }: { detail: OrderDetail }) {
         <ol className="grid gap-3">
           {events.map((event, i) => (
             <li key={i} className="flex gap-3 text-[13px]">
-              <span aria-hidden="true" className={`mt-1 size-[9px] shrink-0 rounded-full ${TONE_DOT[event.tone]}`} />
+              <span aria-hidden="true" className={`mt-[5px] size-2 shrink-0 ${TONE_DOT[event.tone]}`} />
               <div className="min-w-0">
                 <div>{event.text}</div>
                 {event.sub && <div className="text-ink-soft">{event.sub}</div>}
@@ -189,8 +190,8 @@ function AgentCall({ detail }: { detail: OrderDetail }) {
   if (!latest) {
     return (
       <section className={`${card} grid gap-2 px-5 py-[18px]`}>
-        <h2 className="flex items-center gap-2 text-[14.5px] font-semibold">
-          <SparkleIcon aria-hidden="true" weight="fill" className="size-4 text-accent" />
+        <h2 className="flex items-center gap-2 font-display text-[16.5px] font-semibold tracking-[-0.015em]">
+          <Logo className="size-4" />
           Agent&rsquo;s call
         </h2>
         <Empty>The agent hasn&rsquo;t looked at this order. It checks each new order as it comes in.</Empty>
@@ -203,8 +204,8 @@ function AgentCall({ detail }: { detail: OrderDetail }) {
   return (
     <section className={`${card} grid gap-3.5 px-5 py-[18px] ${TONE_EDGE[info.tone]}`} data-decision={latest.id}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-[14.5px] font-semibold">
-          <SparkleIcon aria-hidden="true" weight="fill" className="size-4 text-accent" />
+        <h2 className="flex items-center gap-2 font-display text-[16.5px] font-semibold tracking-[-0.015em]">
+          <Logo className="size-4" />
           Agent&rsquo;s call
         </h2>
         <Badge label={info.label} tone={info.tone} className="!px-3 !py-1 !text-[12.5px]" />

@@ -198,7 +198,7 @@ function AgentCard({ decisions, days }: { decisions: Overview["decisions"]; days
         )}
         {decisions.total > 0 && (
           <>
-            <div className="flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+            <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-sm" aria-hidden="true">
               {shown.map((v) => (
                 <div key={v.key} className={v.bar} style={{ width: `${(decisions[v.key] / decisions.total) * 100}%` }} />
               ))}
@@ -206,7 +206,7 @@ function AgentCard({ decisions, days }: { decisions: Overview["decisions"]; days
             <p className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-soft">
               {shown.map((v) => (
                 <span key={v.key} className="inline-flex items-center gap-1.5">
-                  <span aria-hidden="true" className={`size-2 rounded-full ${v.bar}`} />
+                  <span aria-hidden="true" className={`size-[7px] ${v.bar}`} />
                   {ACTIONS[v.key].label} <span className="font-mono">{decisions[v.key]}</span>
                 </span>
               ))}

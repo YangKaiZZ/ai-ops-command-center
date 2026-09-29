@@ -214,7 +214,7 @@ function Chat({ storageKey: key }: { storageKey: string }) {
                   type="button"
                   onClick={() => ask(s)}
                   disabled={asking}
-                  className="rounded-full border border-border bg-page px-3 py-1.5 text-left text-sm text-ink transition-colors hover:border-accent/40 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
+                  className="rounded-lg border border-border bg-page px-3 py-1.5 text-left text-sm text-ink transition-colors hover:border-accent/40 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
                 >
                   {s}
                 </button>
@@ -229,7 +229,7 @@ function Chat({ storageKey: key }: { storageKey: string }) {
           ))}
           {asking && (
             <li className="mr-auto flex items-center gap-2 rounded-xl border border-border bg-page px-3.5 py-2.5 text-sm text-ink-2" role="status">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-accent motion-safe:animate-pulse" />
+              <span aria-hidden="true" className="size-1.5 bg-accent motion-safe:animate-pulse" />
               Looking it up…
             </li>
           )}

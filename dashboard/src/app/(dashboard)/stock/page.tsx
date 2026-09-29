@@ -114,8 +114,8 @@ function StockRow({
             aria-valuemax={coverDays}
             aria-valuenow={soldOut ? 0 : Math.round(forecast?.days_left ?? 0)}
           >
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline">
-              <div className={`h-full rounded-full ${BAR[status.tone]}`} style={{ width: `${percent}%` }} />
+            <div className="h-1.5 flex-1 overflow-hidden rounded-sm bg-hairline">
+              <div className={`h-full ${BAR[status.tone]}`} style={{ width: `${percent}%` }} />
             </div>
             <span className={`w-9 text-right font-mono ${NUMBER[status.tone]}`}>{soldOut ? 0 : Math.round(forecast?.days_left ?? 0)}</span>
           </div>

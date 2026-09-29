@@ -68,7 +68,7 @@ function SectionMenu({ sections }: { sections: { id: string; label: string }[] }
           href={`#${s.id}`}
           aria-current={current === s.id ? "location" : undefined}
           className={`rounded-lg px-3 py-[9px] text-[13.5px] transition-colors ${focusRing} ${
-            current === s.id ? "bg-surface text-ink" : "text-ink-2 hover:text-ink"
+            current === s.id ? "bg-field text-ink shadow-[inset_2px_0_0_var(--accent)]" : "text-ink-2 hover:bg-field/60 hover:text-ink"
           }`}
         >
           {s.label}
