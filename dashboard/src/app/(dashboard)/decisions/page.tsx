@@ -5,9 +5,9 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DecisionCard } from "@/components/DecisionCard";
 import { useDashboard } from "@/components/DashboardProvider";
-import { SparkleIcon } from "@/components/icons";
+import { Logo } from "@/components/Logo";
 import { card, Empty, Panel } from "@/components/Panel";
-import { focusRing, PageHeader, Tabs } from "@/components/ui";
+import { focusRing, PageHeader, secondaryButton, Tabs } from "@/components/ui";
 import { accuracyPercent, DECISION_FILTERS, filterDecisions, type DecisionFilter } from "@/lib/feedback";
 import { ACTIONS } from "@/lib/format";
 import type { Action, Decision, Ratings } from "@/lib/types";
@@ -21,6 +21,8 @@ const VERDICT_BAR: Record<Exclude<Action, "skipped">, string> = {
   unknown: "bg-neutral",
 };
 const LEARNING_NOTES = 3;
+// Calls shown at first, and added by each "Show more".
+const PAGE = 15;
 
 // How often the seller says the agent got it right, over every decision so far.
 function Accuracy({ ratings }: { ratings: Ratings }) {
@@ -29,7 +31,7 @@ function Accuracy({ ratings }: { ratings: Ratings }) {
   const perVerdict = RATED_VERDICTS.filter((v) => ratings.by_verdict[v].up + ratings.by_verdict[v].down > 0);
   return (
     <section className={`${card} grid gap-3.5 px-5 py-[18px]`}>
-      <h2 className="text-[12.5px] font-normal text-ink-2">Agent accuracy</h2>
+      <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink-2">Agent accuracy</h2>
       {percent === null ? (
         <p className="text-[13px] leading-normal text-ink-soft">
           Rate each call with <span className="font-medium text-ink">Yes</span> or <span className="font-medium text-ink">No</span> to see how often the
@@ -38,7 +40,7 @@ function Accuracy({ ratings }: { ratings: Ratings }) {
       ) : (
         <>
           <p className="flex flex-wrap items-baseline gap-x-2.5">
-            <span className="font-mono text-[34px] font-bold leading-tight">{percent}%</span>
+            <span className="font-mono text-[34px] font-semibold leading-tight tracking-[-0.02em]">{percent}%</span>
             <span className="text-[12.5px] text-ink-2">
               {ratings.up} of {rated} rated right
             </span>
@@ -53,7 +55,7 @@ function Accuracy({ ratings }: { ratings: Ratings }) {
                     {up} of {up + down}
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-hairline" aria-hidden="true">
+                <div className="h-1.5 overflow-hidden rounded-sm bg-hairline" aria-hidden="true">
                   <div className={`h-full ${VERDICT_BAR[v]}`} style={{ width: `${(up / (up + down)) * 100}%` }} />
                 </div>
               </div>
@@ -71,8 +73,8 @@ function Learning({ decisions }: { decisions: Decision[] }) {
   const noted = decisions.filter((d) => d.feedback_note);
   return (
     <section className={`${card} grid gap-2.5 px-5 py-[18px]`}>
-      <h2 className="flex items-center gap-2 text-[14.5px] font-semibold">
-        <SparkleIcon aria-hidden="true" weight="fill" className="size-4 text-accent" />
+      <h2 className="flex items-center gap-2 font-display text-[16px] font-semibold tracking-[-0.015em]">
+        <Logo className="size-4" />
         What it&rsquo;s learning
       </h2>
       <p className="text-[12.5px] leading-normal text-ink-2">
@@ -113,8 +115,15 @@ function DecisionsView() {
   const show: DecisionFilter = DECISION_FILTERS.includes(shown as DecisionFilter) ? (shown as DecisionFilter) : "all";
   // Decisions rated since this filter was picked stay in view (see filterDecisions).
   const [rated, setRated] = useState<{ show: DecisionFilter; ids: Set<number> }>({ show, ids: new Set() });
+  // How many calls are listed; back to one page whenever the filter changes
+  // (a tab here resets it; a link to another filter starts at one page too).
+  const [listed, setListed] = useState<{ show: DecisionFilter; count: number }>({ show, count: PAGE });
+  const count = listed.show === show ? listed.count : PAGE;
   const keep = rated.show === show ? rated.ids : new Set<number>();
-  const setShow = (next: DecisionFilter) => router.replace(next === "all" ? "/decisions" : `/decisions?show=${next}`, { scroll: false });
+  const setShow = (next: DecisionFilter) => {
+    setListed({ show: next, count: PAGE });
+    router.replace(next === "all" ? "/decisions" : `/decisions?show=${next}`, { scroll: false });
+  };
 
   const header = <PageHeader title="Decisions" sub="Every call the agent made. Rate them: it learns from your notes." />;
   if (!data) {
@@ -159,11 +168,23 @@ function DecisionsView() {
               <Empty>{emptyText}</Empty>
             </div>
           ) : (
-            <ol className="grid gap-3.5">
-              {decisions.map((decision) => (
-                <DecisionCard key={decision.id} decision={decision} onFeedbackSaved={onFeedbackSaved} />
-              ))}
-            </ol>
+            <>
+              <ol className="grid gap-3.5">
+                {decisions.slice(0, count).map((decision) => (
+                  <DecisionCard key={decision.id} decision={decision} onFeedbackSaved={onFeedbackSaved} />
+                ))}
+              </ol>
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-[13px] text-ink-2">
+                <span>
+                  Showing {Math.min(count, decisions.length)} of {decisions.length}
+                </span>
+                {decisions.length > count && (
+                  <button type="button" onClick={() => setListed({ show, count: count + PAGE })} className={secondaryButton}>
+                    Show {Math.min(PAGE, decisions.length - count)} more
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
         <aside className="grid gap-4 max-lg:row-start-1 lg:sticky lg:top-24">
