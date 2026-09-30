@@ -21,7 +21,7 @@ for now).
   Admin API token that's checked with Shopify before it's saved. Connecting
   registers the webhooks and starts the first import.
 - **An agent on every new order.** When Shopify sends `orders/create`, an LLM
-  agent (DeepSeek through the OpenAI SDK, with tool calling) looks at the
+  agent (OpenAI's gpt-5-nano through the OpenAI SDK, with tool calling) looks at the
   order using the MCP server's tools and recommends *fulfill* or *hold*.
   Whether each line item can ship is worked out in code from Shopify's live
   stock, and if the model's verdict contradicts it, the decision is recorded
@@ -116,7 +116,7 @@ flowchart LR
   api --> db[(MySQL)]
   api -- "starts per run,<br/>10-min seller token" --> mcp[MCP server]
   mcp -- "REST" --> api
-  api -- "tool calling" --> llm([DeepSeek])
+  api -- "tool calling" --> llm([AI model])
   api --> alerts([Slack · email · Telegram])
   claude([Claude Desktop]) -- "MCP" --> mcp2[MCP server] -- "REST, API key" --> caddy
 ```
@@ -197,7 +197,7 @@ from their own dashboard.
 
 | Part | Built with |
 | --- | --- |
-| [backend](backend) | Node.js, Express, MySQL (`mysql2`), JWT, OpenAI SDK (DeepSeek), MCP client SDK, Nodemailer |
+| [backend](backend) | Node.js, Express, MySQL (`mysql2`), JWT, OpenAI SDK (gpt-5-nano), MCP client SDK, Nodemailer |
 | [mcp](mcp) | Node.js, MCP server SDK, zod, axios |
 | [dashboard](dashboard) | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | [deploy](deploy) | Docker, Docker Compose, Caddy (automatic HTTPS), MySQL 8.4 |
@@ -220,24 +220,24 @@ on a VPS; that README walks through it.
 | Where | Command | What it covers |
 | --- | --- | --- |
 | backend | `npm run test:ops-alerts` | alerts to the operator, with sends captured: email and Telegram, repeats held back, nothing set, and each trigger (a failed job, sync failures in a row, a refused token refresh, a failing webhook, the agent's total cap), plus `/api/health` |
-| backend | `npm run test:chat` | the dashboard chat against a fake DeepSeek and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
+| backend | `npm run test:chat` | the dashboard chat against a fake model and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
 | backend | `npm test` | 145 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts, install tickets |
 | backend | `npm run test:onboarding` | sign-up to connected store, Shopify's install link (sign-up with an install ticket instead of the invite code), a store with its own app (approval, callback, install link and webhooks signed by it), disconnect, uninstall and privacy webhooks, webhooks brought up to date at startup, deleting an account, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
-| backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |
+| backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake model |
 | backend | `npm run test:jobs` | the job queue: retries, restarts, shutdown, and webhooks through the queue to a decision, with duplicates caught |
 | backend | `npm run test:rate-limits` | sign-in and sign-up limits through the real routes: per email, per IP, reset on success, no hint about which accounts exist |
 | backend | `npm run test:password-reset` | reset links against a fake mail server: one use, expiry, hashed storage, sign-out of old sessions, limits |
 | backend | `npm run test:order-queries` | order paging and filters through the API and the MCP tools: totals, date ranges, lookups, bad input, other sellers' orders |
 | backend | `npm run test:order-detail` | line items saved and replaced, the customer name (unknown when Shopify leaves it out, filled in later, never un-redacted), the order detail endpoint, fetching older orders' items from a fake Shopify once, and what happens when that fails |
-| backend | `npm run test:forecast` | restock forecasts through the API, the MCP tool and a low-stock agent run (fake DeepSeek): pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
+| backend | `npm run test:forecast` | restock forecasts through the API, the MCP tool and a low-stock agent run (fake model): pace, days left, reorder amounts, what counts, other sellers' sales, and the order sync fetching older orders' items from a fake Shopify |
 | backend | `npm run test:overview` | the Overview numbers: this period against the one before, sales without refunded or voided orders, what needs action, orders flagged for fraud, stock and what runs out soon, decisions by verdict, other sellers' data |
 | backend | `npm run test:decision-feedback` | thumbs up/down on decisions: rating, notes, changing and clearing, the counts on the feed and the Overview, bad input, skipped runs, other sellers, privacy redaction of notes |
-| backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake DeepSeek: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
+| backend | `npm run test:agent-feedback` | what the agent is told about the seller's ratings, against a fake model: wrong calls and noted right calls, newest first, at most 8; not unrated, old, other-kind or other sellers' ratings |
 | backend | `npm run test:reports` | the daily summary through the job queue (with its fraud line), late-order alerts, rating links and the rating page's API, and Telegram's rating buttons and note replies, against a fake mail server and a fake Telegram |
-| backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake DeepSeek: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, the signed risk webhook through the job queue (one alert, at once), `?risk=flagged`, the order page, privacy |
-| backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake DeepSeek) with its alerts |
+| backend | `npm run test:risk` | fraud risk against a fake Shopify and a fake model: what the agent is told, high risk forced to hold, waiting for a pending check through the job queue, the sync's re-check and its alerts, the signed risk webhook through the job queue (one alert, at once), `?risk=flagged`, the order page, privacy |
+| backend | `npm run test:actions` | holding, releasing and fulfilling against a fake Shopify: what's offered, only this app's holds released, refusals, the log, API keys kept out, and auto-hold through the agent (fake model) with its alerts |
 | backend | `npm run test:demo` | "Try the demo": a signed-in account with its sample store (orders, fraud checks, decisions, forecasts, the Overview), hold / release / fulfill in the stand-in store, everything that reaches outside refused, no Shopify or model calls, expiry, the cap and turning it off |
 | backend | `npm run test:mcp-decisions` | the MCP tools that read and rate decisions, through the real MCP server with an API key: filters, ratings and notes, a skipped run and another seller's decision refused, and the agent not getting them |
 | backend | `npm run test:alert-actions` | holding and fulfilling from alerts: the links in email and buttons in Telegram (only when the seller can act), the confirm page's API (signed, one order and one action, expiring, reads until confirmed), Telegram's ask-first flow from the seller's own chat only, against a fake Shopify, mail server and Telegram |

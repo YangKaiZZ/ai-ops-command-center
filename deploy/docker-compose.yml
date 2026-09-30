@@ -57,6 +57,12 @@ services:
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:-}
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_REASONING_EFFORT: ${AI_REASONING_EFFORT:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      # Only read when AI_API_KEY is blank (DeepSeek).
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       # Blank means the defaults (50 runs per account, 200 in total, per 24 hours).
       AGENT_DAILY_LIMIT_PER_ACCOUNT: ${AGENT_DAILY_LIMIT_PER_ACCOUNT:-}

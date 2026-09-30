@@ -2,13 +2,13 @@
 //   1. signed webhook -> /api/webhooks/orders-create (plus bad-signature + retry cases)
 //   2. order lands in the DB
 //   3. agent's MCP connection: tool list + real tool calls as that seller
-//   4. agent decision: with DEEPSEEK_API_KEY set, waits for the backend's run to
+//   4. agent decision: with a model key set (AI_API_KEY), waits for the backend's run to
 //      save a row in `decisions` (that run also posts to Slack); without a key, skipped
 //   5. dashboard endpoints: /api/orders, /api/inventory/low-stock, /api/decisions
 //   6. freshness webhooks: orders/updated changes the stored status;
 //      inventory_levels/update re-reads the variant from Shopify, and an item
 //      that drops to its threshold triggers a low-stock decision (a second
-//      LLM call when DEEPSEEK_API_KEY is set)
+//      LLM call when a model key is set)
 // The fake order and the decisions it produced are deleted at the end.
 //
 // Usage (backend must be running):  npm run test:agent
@@ -184,7 +184,7 @@ async function main() {
     const expectedAction = stockCheck.canShip ? null : 'hold';
     console.log('    prompt the model will get:\n' + describeTrigger(trigger, stockCheck).replace(/^/gm, '      '));
     let decisionRow = null;
-    if (!process.env.DEEPSEEK_API_KEY) {
+    if (!require('../src/services/aiModel').isConfigured()) {
       try {
         createLLMClient();
         check(false, 'expected missing-key error');
@@ -267,7 +267,7 @@ async function main() {
       }
       check(refreshed?.stock_quantity === low.stock_quantity, 'stock re-read from Shopify', `${low.low_stock_threshold + 10} -> ${refreshed?.stock_quantity}`);
 
-      if (process.env.DEEPSEEK_API_KEY) {
+      if (require('../src/services/aiModel').isConfigured()) {
         let alert = null;
         const deadline = Date.now() + 60000;
         while (!alert && Date.now() < deadline) {

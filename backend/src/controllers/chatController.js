@@ -1,3 +1,4 @@
+const aiModel = require('../services/aiModel');
 const chat = require('../services/chat');
 const rateLimit = require('../services/rateLimit');
 
@@ -18,7 +19,7 @@ async function getChat(req, res) {
 async function postChat(req, res) {
   const { messages, error } = chat.validateMessages(req.body?.messages);
   if (error) return res.status(400).json({ error });
-  if (!process.env.DEEPSEEK_API_KEY) {
+  if (!aiModel.isConfigured()) {
     return res.status(503).json({ error: "Chat isn't set up on this server (no model key)." });
   }
   try {

@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { connectAsSeller, AGENT_TOOLS } = require('./mcpClient');
 const { toOpenAITools, createLLMClient } = require('./agentService');
+const aiModel = require('./aiModel');
 const { readLimit } = require('./agentBudget');
 const rateLimit = require('./rateLimit');
 const { localDate } = require('../utils/timeZone');
@@ -10,7 +11,6 @@ const { localDate } = require('../utils/timeZone');
 // Desktop use. Read-only: nothing here syncs, rates, holds or ships. The
 // conversation lives in the seller's browser; the server keeps no copy.
 
-const DEEPSEEK_MODEL = 'deepseek-chat';
 // What the chat may call: the agent's tools plus the decision history.
 const CHAT_TOOLS = [...AGENT_TOOLS, 'get_decisions'];
 const MAX_STEPS = 6; // model calls per question, like the agent
@@ -76,7 +76,7 @@ async function status(sellerId) {
     [perAccount.bucket, rateLimit.subjectKey(perAccount, sellerId), perAccount.windowSeconds]
   );
   return {
-    available: Boolean(process.env.DEEPSEEK_API_KEY) && perAccount.max > 0,
+    available: aiModel.isConfigured() && perAccount.max > 0,
     daily_limit: perAccount.max,
     used_today: Math.min(Number(row.n), perAccount.max),
   };
@@ -104,7 +104,7 @@ async function answer(sellerId, messages) {
     const toolsUsed = [];
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      const completion = await llm.chat.completions.create({ model: DEEPSEEK_MODEL, messages: conversation, tools });
+      const completion = await llm.chat.completions.create({ ...aiModel.completionOptions(), messages: conversation, tools });
       const msg = completion.choices[0].message;
       if (!msg.tool_calls?.length) {
         return { reply: (msg.content || '').trim() || "Sorry, I couldn't come up with an answer. Try asking another way.", tools_used: toolsUsed };

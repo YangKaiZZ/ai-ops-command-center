@@ -1,6 +1,6 @@
 // End-to-end check of holding and fulfilling orders in Shopify from here, run
 // in-process against a fake Shopify (the shopifyService fulfillment calls)
-// and a fake DeepSeek; alerts are captured instead of sent. The real database
+// and a fake model API; alerts are captured instead of sent. The real database
 // is used with throwaway sellers, removed at the end:
 //   1. the order's Shopify status: fulfillment orders and what can be done,
 //      or why nothing can (not connected, permission missing); other sellers' orders
@@ -25,7 +25,7 @@ const check = (ok, label, detail = '') => {
   if (!ok) failures++;
 };
 
-// --- a fake DeepSeek: answers `reply.text`, never a tool call ---
+// --- a fake model API: answers `reply.text`, never a tool call ---
 const reply = { text: 'HOLD - Payment still pending\n- wait for it' };
 function startFakeLLM() {
   const server = http.createServer((req, res) => {
@@ -122,10 +122,12 @@ const countCalls = (kind) => calls.filter((c) => c.call === kind).length;
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '100',
     AGENT_DAILY_LIMIT_TOTAL: '100000',
     DASHBOARD_URL: 'https://dash.example.test',

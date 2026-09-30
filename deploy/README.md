@@ -60,7 +60,7 @@ cp .env.example .env
 for v in JWT_SECRET ENCRYPTION_KEY DB_PASSWORD MYSQL_ROOT_PASSWORD; do
   sed -i "s|^$v=$|$v=$(openssl rand -hex 32)|" .env
 done
-nano .env   # DOMAIN, the Shopify app keys, DEEPSEEK_API_KEY, alert settings
+nano .env   # DOMAIN, the Shopify app keys, AI_API_KEY, alert settings
 ```
 
 - **Keep a copy of `.env` somewhere safe** (a password manager).

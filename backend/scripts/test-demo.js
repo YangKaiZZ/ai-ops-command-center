@@ -1,6 +1,6 @@
 // End-to-end check of "Try the demo", run in-process against the real
 // database (every demo account made here is removed at the end, and nothing
-// calls Shopify or DeepSeek: both are made to fail loudly if anything tries):
+// calls Shopify or the model: both are made to fail loudly if anything tries):
 //   1. POST /api/auth/demo: a signed-in demo account with a sample store:
 //      orders, line items, fraud checks, decisions with ratings, stock,
 //      restock forecasts, a late order, the Overview
@@ -22,14 +22,14 @@ const check = (ok, label, detail = '') => {
 };
 
 async function main() {
-  // A "DeepSeek" that counts calls: a demo must never reach it.
+  // A model API that counts calls: a demo must never reach it.
   let modelCalls = 0;
   const llm = http.createServer((req, res) => {
     modelCalls++;
     res.writeHead(500).end();
   });
   await new Promise((resolve) => llm.listen(0, '127.0.0.1', resolve));
-  Object.assign(process.env, { DEEPSEEK_API_KEY: 'test-key', DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.address().port}` });
+  Object.assign(process.env, { AI_API_KEY: 'test-key', AI_PROVIDER: 'openai', DEEPSEEK_API_KEY: '', AI_BASE_URL: `http://127.0.0.1:${llm.address().port}` });
   require('dotenv').config({ quiet: true });
 
   // Any real Shopify call fails the run.

@@ -24,7 +24,7 @@ const check = (ok, label, detail = '') => {
   if (!ok) failures++;
 };
 
-// --- a fake DeepSeek: plays `script`, one reply per model call ---
+// --- a fake model API: plays `script`, one reply per model call ---
 // Each entry is { tool: name, args } for a tool call, { text } for an answer,
 // or { status } for an error.
 let script = [];
@@ -66,10 +66,12 @@ function startFakeLLM() {
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     CHAT_DAILY_LIMIT_PER_ACCOUNT: '4',
     CHAT_DAILY_LIMIT_TOTAL: '100000',
   });
@@ -185,10 +187,11 @@ async function main() {
     check(res.status === 403 && /demo/.test(res.body?.error), 'a demo account: 403, no model call', res.body?.error);
 
     llm.requests.length = 0;
+    delete process.env.AI_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
     res = await ask(seller, [{ role: 'user', content: 'hi' }]);
     const status = await call('GET', '/api/chat', { token: tokenFor(seller) });
-    process.env.DEEPSEEK_API_KEY = 'test-key';
+    process.env.AI_API_KEY = 'test-key';
     check(res.status === 503 && /isn't set up/.test(res.body?.error) && llm.requests.length === 0, 'no model key: 503, nothing counted', res.body?.error);
     check(status.body?.available === false, 'and GET says it can\'t be used');
 

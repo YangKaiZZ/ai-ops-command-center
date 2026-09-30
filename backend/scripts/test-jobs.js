@@ -1,4 +1,4 @@
-// End-to-end check of the job queue, run in-process against a fake DeepSeek
+// End-to-end check of the job queue, run in-process against a fake model API
 // on localhost (no real LLM call; the real database is used with a
 // throwaway seller and store):
 //   1. jobs: success, retry after failures, give up (retryable or not), one job per dedupe key
@@ -32,7 +32,7 @@ async function until(fn, ms = 15000) {
   return null;
 }
 
-// --- a fake DeepSeek: HOLD for orders, RESTOCK otherwise, never a tool call ---
+// --- a fake model API: HOLD for orders, RESTOCK otherwise, never a tool call ---
 function startFakeLLM() {
   const requests = [];
   const server = http.createServer((req, res) => {
@@ -61,10 +61,12 @@ async function main() {
   const llm = await startFakeLLM();
   const webhookSecret = 'jobs-test-secret';
   // Set before anything loads the .env (real environment variables win over
-  // it), so the real DeepSeek key and endpoint can't be used by accident.
+  // it), so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     SHOPIFY_API_SECRET: webhookSecret,
     JOB_RETRY_BASE_SECONDS: '0',
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '1000',

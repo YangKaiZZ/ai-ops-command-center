@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell, AuthTitle } from "@/components/AuthShell";
-import { DeepSeekNote } from "@/components/DeepSeekNote";
+import { AiNote } from "@/components/AiNote";
 import { labelledInputClass, primaryButton } from "@/components/ui";
 import { shopParam } from "@/lib/format";
 import { saveSession, useSession } from "@/lib/session";
@@ -148,7 +148,7 @@ function SignupForm() {
           {error}
         </p>
       )}
-      <DeepSeekNote />
+      <AiNote />
       <button type="submit" disabled={submitting !== ""} className={primaryButton}>
         {submitting === "shopify" ? "Connecting your store…" : submitting ? "Creating account…" : shop ? "Create account and connect" : "Create account"}
       </button>

@@ -18,7 +18,7 @@ const check = (ok, label, detail = '') => {
   if (!ok) failures++;
 };
 
-// --- a fake DeepSeek: answers every chat completion with a RESTOCK verdict and no tool calls ---
+// --- a fake model API: answers every chat completion with a RESTOCK verdict and no tool calls ---
 function startFakeLLM() {
   const requests = [];
   const server = http.createServer((req, res) => {
@@ -51,10 +51,12 @@ function startFakeLLM() {
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
   });
   require('dotenv').config({ quiet: true });
   process.env.MCP_SERVER_PATH ||= path.join(__dirname, '..', '..', 'mcp', 'server.js');
@@ -80,7 +82,7 @@ async function main() {
     await runAgent(sellerId, trigger);
     await runAgent(sellerId, trigger);
     check(llm.requests.length === 2, 'two runs, two model calls', `${llm.requests.length} call(s)`);
-    check(llm.requests.every((r) => r.url.endsWith('/chat/completions')), 'the calls went to the fake DeepSeek');
+    check(llm.requests.every((r) => r.url.endsWith('/chat/completions')), 'the calls went to the fake model API');
     check((await countedRuns()) === 2, 'both runs counted');
     let rows = await decisions();
     check(rows.length === 2 && rows.every((d) => d.action_taken === 'low_stock_alert'), "both saved with the agent's RESTOCK verdict");
@@ -113,6 +115,7 @@ async function main() {
     check(llm.requests.length === 3, 'with room for one more, the next run calls the model again', `${llm.requests.length} call(s)`);
 
     console.log('\n4. Without an API key');
+    delete process.env.AI_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
     const before = await countedRuns();
     let error = null;

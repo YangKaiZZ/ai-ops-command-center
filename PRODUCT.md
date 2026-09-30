@@ -71,8 +71,12 @@ on the Shopify App Store.
 - **The seller stays in charge.** The agent recommends; Shopify only changes
   when the seller acts, or when they turn on auto-hold (off by default). The
   agent never ships anything. Chat is read-only.
-- **The model is DeepSeek**, a Chinese AI provider. Real sellers must be told
-  this before they connect.
+- **The model is OpenAI's gpt-5-nano**, chosen as the cheapest option that
+  doesn't train on API data (OpenAI keeps abuse logs up to 30 days). Real
+  sellers must be told which provider reads their store before they connect;
+  the dashboard reads it from the server, so it stays true if the model changes.
+  DeepSeek still works (`AI_PROVIDER=deepseek`) but may train on the data and
+  stores it in China.
 - **Customer names are hidden** until Shopify approves the app for protected
   customer data (only first and last name are requested); orders show "Name
   not shared" until then.

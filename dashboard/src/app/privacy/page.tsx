@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Lockup } from "@/components/Logo";
+import { providerFacts, useAiProvider } from "@/lib/aiProvider";
 
 // The privacy policy. Everything here describes what the code does; who runs
 // the server and how to reach them come from its settings (PRIVACY_OPERATOR,
 // PRIVACY_CONTACT_EMAIL, via /api/auth/config). Change UPDATED with the text.
-const UPDATED = "28 September 2026";
+const UPDATED = "30 September 2026";
 
 type Contact = { operator: string | null; contact_email: string | null };
 
@@ -53,6 +54,8 @@ function WhoRunsIt({ contact }: { contact: Contact | null }) {
 
 export default function PrivacyPage() {
   const [contact, setContact] = useState<Contact | null>(null);
+  const ai = useAiProvider();
+  const aiFacts = ai ? providerFacts(ai) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -134,10 +137,12 @@ export default function PrivacyPage() {
               <span className="text-ink">Shopify</span>, to read your orders and stock and, when you ask, to hold or ship orders.
             </>,
             <>
-              <span className="text-ink">DeepSeek</span>, the AI model. For each new order or low-stock change, it gets the order&rsquo;s
+              <span className="text-ink">{ai ? ai.name : "The AI model"}</span>
+              {ai ? ", the AI model" : ""}
+              {aiFacts ? ` (an AI provider ${aiFacts.where})` : ""}. For each new order or low-stock change, it gets the order&rsquo;s
               items, total, payment status, stock and fraud check, and your earlier ratings and notes; while it works it can look up
               other orders, which can include the customer&rsquo;s name when it&rsquo;s kept. When you use Chat, it gets your questions
-              and what its tools read for them.
+              and what its tools read for them.{aiFacts ? ` ${aiFacts.data}` : ""}
             </>,
             <>
               <span className="text-ink">Where you send alerts:</span> Slack, Telegram, or email (sent through the operator&rsquo;s email

@@ -11,7 +11,7 @@
 //   6. an order sync fetches the items of older orders in the last 90 days, 100
 //      ids at a time, and still succeeds when that fails
 //   7. a low-stock agent run gives the model the items' forecast, against a
-//      fake DeepSeek on localhost (no real LLM call)
+//      fake model API on localhost (no real LLM call)
 //
 // Usage:  npm run test:forecast
 const path = require('path');
@@ -21,7 +21,7 @@ process.env.MCP_SERVER_PATH = path.join(__dirname, '..', '..', 'mcp', 'server.js
 const crypto = require('crypto');
 const http = require('http');
 
-// --- a fake DeepSeek: records each request, answers RESTOCK with no tool calls ---
+// --- a fake model API: records each request, answers RESTOCK with no tool calls ---
 function startFakeLLM() {
   const requests = [];
   const server = http.createServer((req, res) => {
@@ -71,10 +71,12 @@ const line = (variantId, quantity) => ({ id: lineId++, variant_id: variantId, ti
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '100000',
     AGENT_DAILY_LIMIT_TOTAL: '100000',
   });

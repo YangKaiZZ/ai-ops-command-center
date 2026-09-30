@@ -1,4 +1,4 @@
-// End-to-end check of risk triage, run in-process against a fake DeepSeek on
+// End-to-end check of risk triage, run in-process against a fake model API on
 // localhost and a fake Shopify fraud analysis (shopifyService.fetchOrderRisks);
 // alerts are captured instead of sent. The real database is used with
 // throwaway sellers, removed at the end:
@@ -42,7 +42,7 @@ async function until(fn, ms = 15000) {
   return null;
 }
 
-// --- a fake DeepSeek: answers `reply.text`, never a tool call ---
+// --- a fake model API: answers `reply.text`, never a tool call ---
 const reply = { text: 'FULFILL - looks fine\n- every item ships' };
 function startFakeLLM() {
   const requests = [];
@@ -105,10 +105,12 @@ const shopifyOrder = (id, msAgo = 0) => ({
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '100',
     AGENT_DAILY_LIMIT_TOTAL: '100000',
     DASHBOARD_URL: 'https://dash.example.test',

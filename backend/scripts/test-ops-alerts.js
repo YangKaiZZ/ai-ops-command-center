@@ -39,8 +39,10 @@ async function main() {
     EMAIL_FROM: 'Arbiter Ops <alerts@example.test>',
     TELEGRAM_BOT_TOKEN: 'test-bot-token',
     SHOPIFY_API_SECRET: 'ops-test-secret',
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: 'http://127.0.0.1:9', // never reached: the cap stops the run first
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: 'http://127.0.0.1:9', // never reached: the cap stops the run first
     AGENT_DAILY_LIMIT_TOTAL: '0',
     JOB_RETRY_BASE_SECONDS: '0',
   });

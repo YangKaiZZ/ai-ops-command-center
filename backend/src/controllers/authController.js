@@ -8,6 +8,7 @@ const passwordReset = require('../services/passwordReset');
 const { isInviteRequired, isValidInviteCode } = require('../services/inviteCode');
 const { isValidInstallTicket } = require('../services/installTickets');
 const demo = require('../services/demo');
+const aiModel = require('../services/aiModel');
 
 const { LIMITS } = rateLimit;
 const MIN_PASSWORD = 8;
@@ -81,7 +82,13 @@ function privacyContact() {
 // GET /api/auth/config: what the sign-in, sign-up and privacy pages need to
 // know before showing.
 function config(req, res) {
-  res.json({ invite_required: isInviteRequired(), demo_available: demo.isDemoEnabled(), privacy: privacyContact() });
+  res.json({
+    invite_required: isInviteRequired(),
+    demo_available: demo.isDemoEnabled(),
+    privacy: privacyContact(),
+    // Which AI provider reads a seller's store, for sign-up and the privacy page.
+    ai: aiModel.publicInfo(),
+  });
 }
 
 // POST /api/auth/demo

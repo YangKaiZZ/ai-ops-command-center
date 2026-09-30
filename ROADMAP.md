@@ -144,7 +144,7 @@ Separate from the code, and needed before anyone but the owner connects:
   open order, not only at the next sync for last week's. Connected stores
   get the new webhook when the backend starts.
 - Chat in the dashboard: questions about the store in the seller's words,
-  answered by DeepSeek with the agent's MCP tools plus the decision history,
+  answered by the AI model with the agent's MCP tools plus the decision history,
   read-only. Order numbers in answers link to the order; the conversation
   stays in the browser tab. Signed-in sellers only (not API keys, not the
   demo), with its own daily caps (`CHAT_DAILY_LIMIT_PER_ACCOUNT`, `_TOTAL`).
@@ -157,7 +157,7 @@ Separate from the code, and needed before anyone but the owner connects:
   webhook, the agent's total cap, each backend start. `/api/health` checks
   the database, for an uptime monitor.
 - Privacy policy page (`/privacy`, linked from sign-in and sign-up): what is
-  kept, who else sees it (Shopify, DeepSeek, the alert channels), what stays
+  kept, who else sees it (Shopify, the AI provider, the alert channels), what stays
   in the browser, how long things are kept, deleting an account and
   customers' requests, all as the code does it. Who runs the server and a
   contact address come from settings; until set, the page says so.
@@ -177,4 +177,4 @@ Separate from the code, and needed before anyone but the owner connects:
   encrypted, added with `npm run store-app`), used for its approval,
   webhooks and token refreshes. Shopify's install link brings a signed
   install ticket that stands in for the invite code, and sign-up connects
-  the store in the same step. Sign-up says the agent runs on DeepSeek.
+  the store in the same step. Sign-up names the AI provider the agent runs on.

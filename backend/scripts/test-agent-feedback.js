@@ -1,5 +1,5 @@
 // End-to-end check that the agent learns from the seller's ratings, run
-// in-process against a fake DeepSeek on localhost (no real LLM call; the real
+// in-process against a fake model API on localhost (no real LLM call; the real
 // database is used with throwaway sellers, removed at the end):
 //   1. an order run gets the seller's ratings of earlier order calls: every
 //      one marked wrong, those marked right with a note, newest first; not
@@ -21,7 +21,7 @@ const check = (ok, label, detail = '') => {
   if (!ok) failures++;
 };
 
-// --- a fake DeepSeek: records each request, answers with a verdict and no tool calls ---
+// --- a fake model API: records each request, answers with a verdict and no tool calls ---
 function startFakeLLM() {
   const requests = [];
   const server = http.createServer((req, res) => {
@@ -64,10 +64,12 @@ function ratingsSent(request) {
 async function main() {
   const llm = await startFakeLLM();
   // Set before anything loads the .env: real environment variables win over
-  // it, so the real DeepSeek key and endpoint can't be used by accident.
+  // it, so the real model key and endpoint can't be used by accident.
   Object.assign(process.env, {
-    DEEPSEEK_API_KEY: 'test-key',
-    DEEPSEEK_BASE_URL: `http://127.0.0.1:${llm.port}`,
+    AI_API_KEY: 'test-key',
+    AI_PROVIDER: 'openai',
+    DEEPSEEK_API_KEY: '',
+    AI_BASE_URL: `http://127.0.0.1:${llm.port}`,
     AGENT_DAILY_LIMIT_PER_ACCOUNT: '100',
     AGENT_DAILY_LIMIT_TOTAL: '100000',
   });

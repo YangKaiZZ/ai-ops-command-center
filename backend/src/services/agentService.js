@@ -1,4 +1,4 @@
-const { OpenAI } = require('openai');
+const aiModel = require('./aiModel');
 const { connectAsSeller } = require('./mcpClient');
 const { postDecision } = require('./notifier');
 const { saveDecision, actionFromReasoning, recentFeedback } = require('../models/decisionModel');
@@ -10,10 +10,8 @@ const { isDemoSeller } = require('./demo');
 const { checkOrderRisk, mustHold, isFlagged, describeRisk, riskForAgent } = require('./riskCheck');
 const { autoHold } = require('./orderActions');
 
-// DeepSeek speaks the OpenAI Chat Completions API, so the OpenAI SDK works
-// as-is once it's pointed at their endpoint. (DEEPSEEK_BASE_URL is for tests.)
-const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
-const DEEPSEEK_MODEL = 'deepseek-chat';
+// The model (OpenAI's gpt-5-nano by default, or another OpenAI-compatible
+// API) is set in .env: see aiModel.js.
 const MAX_STEPS = 6; // hard stop so a confused model can't loop on tool calls forever
 // An order's run waits for a pending fraud analysis, checking every minute,
 // for up to this long after the order was placed (orderRisk()).
@@ -229,17 +227,8 @@ function toOpenAITools(mcpTools) {
   });
 }
 
-function createLLMClient() {
-  if (!process.env.DEEPSEEK_API_KEY) {
-    // Not worth retrying: the job queue gives up on this one straight away.
-    throw Object.assign(new Error('DEEPSEEK_API_KEY is not set in .env - skipping the LLM call'), { retryable: false });
-  }
-  return new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: process.env.DEEPSEEK_BASE_URL || DEEPSEEK_BASE_URL,
-    timeout: 60 * 1000, // per model call; the SDK's default of 10 minutes would hold a job slot far too long
-  });
-}
+// Throws (not retryable) when no model is set up.
+const { createLLMClient } = aiModel;
 
 // The agent loop: give the model the event + the MCP tools, execute whatever
 // tools it asks for, feed results back, repeat until it answers in text.
@@ -287,7 +276,7 @@ async function runAgent(sellerId, trigger) {
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      const completion = await llm.chat.completions.create({ model: DEEPSEEK_MODEL, messages, tools });
+      const completion = await llm.chat.completions.create({ ...aiModel.completionOptions(), messages, tools });
       const msg = completion.choices[0].message;
       messages.push({ role: 'assistant', content: msg.content, tool_calls: msg.tool_calls });
 

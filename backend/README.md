@@ -156,7 +156,8 @@ Two triggers run the same agent loop (`src/services/agentService.js`):
    forecasts" below), so the alert can say when each runs out, how many to
    reorder and how much order history that's based on.
 
-The agent calls DeepSeek (`deepseek-chat`, via the OpenAI SDK) and gets the
+The agent calls an AI model (OpenAI's `gpt-5-nano` by default, via the OpenAI
+SDK; see "The AI model" below) and gets the
 [MCP server](../mcp)'s read-only tools — the backend spawns that server with a
 10-minute JWT for the seller in question. The decision is saved, then sent to
 every alert channel the seller turned on (Slack, email, Telegram), or to the
@@ -194,7 +195,7 @@ Shopify's own analysis takes seconds and a fraud app's can take longer, so:
 - an order that never had a check gets one from Shopify when its page is opened.
 
 If Shopify can't be asked, the agent decides without the check and says so.
-`npm run test:risk` checks all of it against a fake Shopify and a fake DeepSeek.
+`npm run test:risk` checks all of it against a fake Shopify and a fake model.
 
 **Learning from the seller's ratings.** Before each run the agent also gets
 the seller's recent ratings of its calls on the same kind of event (orders,
@@ -204,9 +205,9 @@ a note, newest first, at most 8 from the last 90 days (`recentFeedback` in
 seller said and their note. The prompt treats the notes as how this store
 works (e.g. "bank transfers always show pending first; ship them"): the agent
 applies them where they fit, says so in a bullet when one changed its call,
-and never lets them override the stock check. Notes go to DeepSeek with those
+and never lets them override the stock check. Notes go to the model with those
 later events. `npm run test:agent-feedback` checks what's sent, against a
-fake DeepSeek.
+fake model.
 
 **Daily limits.** So no account (or crowd of new accounts) can run up the
 LLM bill, runs are capped over any 24 hours: `AGENT_DAILY_LIMIT_PER_ACCOUNT`
@@ -216,7 +217,7 @@ calls, so the worst case is known up front. Runs that went ahead are counted
 in `agent_runs` (`src/services/agentBudget.js`). An event over a limit is
 still saved, as a `skipped` decision that says which limit it hit, but the
 model isn't called and no alert is sent. `npm run test:agent-limit` checks
-this against a fake DeepSeek.
+this against a fake model.
 
 Each seller sets their Slack incoming-webhook URL through the settings API
 (the dashboard's Settings page). It's stored encrypted, and only
@@ -266,6 +267,24 @@ and a fake Telegram on localhost.
 - `GET /api/rate/:token` shows the decision (order, verdict, first line,
   rating); `PUT /api/rate/:token` with `{ "feedback", "note" }` rates it, as
   on the dashboard. No sign-in: the token is the permission.
+
+### The AI model
+The agent and Chat share one model setting (`src/services/aiModel.js`), any API
+that speaks OpenAI's Chat Completions with tool calling. In `.env`:
+
+| Setting | Meaning |
+| --- | --- |
+| `AI_API_KEY` | The provider's key. Blank = no model: the agent is skipped and Chat answers 503. |
+| `AI_PROVIDER` | `openai` (default) or `deepseek`; picks the endpoint and default model. |
+| `AI_MODEL` | Overrides the default (`gpt-5-nano` for OpenAI, `deepseek-flash` for DeepSeek). |
+| `AI_REASONING_EFFORT` | `minimal`, `low`, `medium` or `high`, for gpt-5 models. Defaults to `low`: hidden reasoning is billed as output. |
+| `AI_BASE_URL` | Another OpenAI-compatible endpoint (the test scripts point this at a fake model). |
+
+An older `.env` with only `DEEPSEEK_API_KEY` keeps working (DeepSeek).
+`GET /api/auth/config` reports `ai: { provider, name, model }` so sign-up, the
+Connect step and the privacy page name the provider that reads a seller's store.
+OpenAI doesn't train on API data and keeps abuse logs up to 30 days; DeepSeek may
+train on it and stores it in China.
 
 ## Daily summary and late orders
 Two reports a seller can turn on in Settings, both sent to their alert
@@ -344,7 +363,7 @@ endpoints, and only their SHA-256 hash is stored:
 Everything under `/api/settings` needs a signed-in session: an API key can
 read and sync store data, but can't change Slack or create more keys.
 
-Settings in `.env`: `SHOPIFY_API_SECRET`, `DEEPSEEK_API_KEY`,
+Settings in `.env`: `SHOPIFY_API_SECRET`, `AI_API_KEY`,
 `MCP_SERVER_PATH` (see `.env.example`).
 
 **Stock check.** Whether each line item can ship is decided in code
@@ -372,7 +391,7 @@ orders, days of history) and is marked `low` confidence under 3 orders or 7
 days of history. `npm run test:forecast` checks it against a fake Shopify.
 
 Test the full flow with a signed fake order (backend running; with
-`DEEPSEEK_API_KEY` set, this makes one real LLM call):
+`AI_API_KEY` set, this makes one real LLM call):
 ```
 npm run test:agent
 ```
@@ -414,7 +433,7 @@ ask for, go through a job queue in MySQL (the `jobs` table,
 - A worker in the backend process runs `JOB_CONCURRENCY` jobs at a time
   (default 2), claiming them with `SELECT ... FOR UPDATE SKIP LOCKED`.
 - A failed job is retried after 30 seconds, then 2 minutes (3 tries in all).
-  Errors that waiting won't fix, like a missing DeepSeek key, fail at once.
+  Errors that waiting won't fix, like a missing AI key, fail at once.
   Each model call times out after 60 seconds.
 - On shutdown (SIGTERM, e.g. `docker compose stop`) the backend stops taking
   jobs and gives running ones up to 25 seconds to finish. Jobs still marked
@@ -428,7 +447,7 @@ ask for, go through a job queue in MySQL (the `jobs` table,
 - Finished jobs are kept for 30 days, delivery ids for 7.
 
 This assumes one backend process, as the per-seller locks already do.
-`npm run test:jobs` checks all of it against a fake DeepSeek.
+`npm run test:jobs` checks all of it against a fake model.
 
 ## Invite-only sign-up
 
