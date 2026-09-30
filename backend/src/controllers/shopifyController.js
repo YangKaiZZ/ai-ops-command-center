@@ -2,6 +2,7 @@ const oauth = require('../services/shopifyOAuth');
 const storeConnection = require('../services/storeConnection');
 const { createOAuthState, consumeOAuthState } = require('../models/oauthStateModel');
 const { findSellerByShopDomain } = require('../models/sellerModel');
+const { installTicket } = require('../services/installTickets');
 
 // "Connect with Shopify": the dashboard asks for an approval URL, the seller
 // approves on Shopify, Shopify redirects to /callback with a one-time code,
@@ -41,7 +42,8 @@ async function connect(req, res) {
 }
 
 // GET /api/shopify/install?shop=...&hmac=...&timestamp=...  (from Shopify, no login)
-// A store we know goes straight to approval; a new one signs up first.
+// A store we know goes straight to approval; a new one signs up first, with an
+// install ticket that stands in for the invite code (Shopify sent them).
 async function install(req, res) {
   const shop = exactShop(req.query.shop);
   try {
@@ -51,7 +53,8 @@ async function install(req, res) {
     }
     const holder = await findSellerByShopDomain(shop);
     if (holder) return res.redirect(oauth.buildAuthorizeUrl(shop, await createOAuthState(holder.id, shop), await oauth.appFor(shop)));
-    res.redirect(`${oauth.config().dashboardUrl}/signup?shop=${encodeURIComponent(shop)}`);
+    const params = new URLSearchParams({ shop, install: installTicket(shop) });
+    res.redirect(`${oauth.config().dashboardUrl}/signup?${params}`);
   } catch (err) {
     console.error(err);
     res.status(500).send('Something went wrong starting the install. Try again.');

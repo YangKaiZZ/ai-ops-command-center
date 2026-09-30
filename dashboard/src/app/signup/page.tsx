@@ -4,21 +4,45 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell, AuthTitle } from "@/components/AuthShell";
+import { DeepSeekNote } from "@/components/DeepSeekNote";
 import { labelledInputClass, primaryButton } from "@/components/ui";
 import { shopParam } from "@/lib/format";
 import { saveSession, useSession } from "@/lib/session";
 
 const MIN_PASSWORD = 8; // the backend's rule
+// What the backend's install tickets look like (services/installTickets.js).
+const TICKET = /^\d{1,12}\.[A-Za-z0-9_-]{43}$/;
+
+// Asks for the store's approval URL (POST /api/shopify/connect), or null.
+async function approvalUrl(token: string, shop: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/shopify/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ shop }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return res.ok && typeof body.authorize_url === "string" ? body.authorize_url : null;
+  } catch {
+    return null;
+  }
+}
 
 // POST /api/auth/register -> JWT, then Settings to connect the store.
-// Shopify's install link sends stores we don't know yet here with ?shop=.
+// Shopify's install link sends stores we don't know yet here with ?shop= and
+// an install ticket (?install=), which stands in for the invite code; the
+// store is then connected right away: the app is already installed, so
+// Shopify's approval sends the seller straight back, connected.
 function SignupForm() {
   const router = useRouter();
   const session = useSession();
-  const shop = shopParam(useSearchParams().get("shop"));
+  const params = useSearchParams();
+  const shop = shopParam(params.get("shop"));
+  const ticket = shop && TICKET.test(params.get("install") ?? "") ? (params.get("install") as string) : "";
   const signedUp = useRef(false); // set just before the session appears
+  const leaving = useRef(false); // on the way to Shopify: don't redirect here
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState<"" | "account" | "shopify">("");
   // Whether the server wants an invite code (SIGNUP_INVITE_CODE). If we can't ask, don't show the field: the server still enforces it.
   const [inviteRequired, setInviteRequired] = useState(false);
 
@@ -32,7 +56,7 @@ function SignupForm() {
   // Signed in: go connect the store they came from, or finish setting up a new
   // account. Someone who was already signed in goes to the dashboard.
   useEffect(() => {
-    if (!session) return;
+    if (!session || leaving.current) return;
     if (shop) router.replace(`/settings?connect=${encodeURIComponent(shop)}`);
     else router.replace(signedUp.current ? "/settings?welcome=1" : "/overview");
   }, [session, shop, router]);
@@ -41,7 +65,7 @@ function SignupForm() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setError("");
-    setSubmitting(true);
+    setSubmitting("account");
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -50,16 +74,28 @@ function SignupForm() {
           business_name: String(form.get("business_name")).trim(),
           email: String(form.get("email")).trim(),
           password: form.get("password"),
-          invite_code: inviteRequired ? String(form.get("invite_code")).trim() : undefined,
+          invite_code: inviteRequired && !ticket ? String(form.get("invite_code")).trim() : undefined,
+          ...(ticket ? { shop, install_ticket: ticket } : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Sign-up failed");
       signedUp.current = true;
+      if (shop) {
+        setSubmitting("shopify");
+        const url = await approvalUrl(body.token, shop);
+        if (url) {
+          leaving.current = true;
+          saveSession({ token: body.token, business_name: body.business_name });
+          window.location.assign(url);
+          return;
+        }
+      }
+      // No store yet, or Shopify's approval couldn't start: Settings takes it from here.
       saveSession({ token: body.token, business_name: body.business_name });
     } catch (err) {
       setError((err as Error).message);
-      setSubmitting(false);
+      setSubmitting("");
     }
   }
 
@@ -70,7 +106,8 @@ function SignupForm() {
       <AuthTitle title="Create your account">
         {shop ? (
           <>
-            Create an account to finish installing on <span className="font-medium text-ink [overflow-wrap:anywhere]">{shop}</span>.
+            Create an account to finish installing on <span className="font-medium text-ink [overflow-wrap:anywhere]">{shop}</span>. Your
+            store connects right after, and its orders and stock come in by themselves.
           </>
         ) : (
           "Create an account, then connect your Shopify store. The agent checks every new order and watches your stock."
@@ -99,7 +136,7 @@ function SignupForm() {
           At least {MIN_PASSWORD} characters.
         </span>
       </label>
-      {inviteRequired && (
+      {inviteRequired && !ticket && (
         <label className="grid gap-1.5 text-sm font-medium">
           Invite code
           <input name="invite_code" autoComplete="off" required className={labelledInputClass} />
@@ -111,8 +148,9 @@ function SignupForm() {
           {error}
         </p>
       )}
-      <button type="submit" disabled={submitting} className={primaryButton}>
-        {submitting ? "Creating account…" : "Create account"}
+      <DeepSeekNote />
+      <button type="submit" disabled={submitting !== ""} className={primaryButton}>
+        {submitting === "shopify" ? "Connecting your store…" : submitting ? "Creating account…" : shop ? "Create account and connect" : "Create account"}
       </button>
       <p className="text-center text-sm text-ink-2">
         Already have an account?{" "}

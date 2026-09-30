@@ -6,6 +6,7 @@ const { isEmail } = require('../utils/isEmail');
 const rateLimit = require('../services/rateLimit');
 const passwordReset = require('../services/passwordReset');
 const { isInviteRequired, isValidInviteCode } = require('../services/inviteCode');
+const { isValidInstallTicket } = require('../services/installTickets');
 const demo = require('../services/demo');
 
 const { LIMITS } = rateLimit;
@@ -28,14 +29,16 @@ function validateRegistration(body) {
 }
 
 // POST /api/auth/register
-// Creates a new seller (tenant). Password is hashed, never stored plain.
+// Creates a new seller (tenant). Password is hashed, never stored plain. A
+// seller who came from installing our app on Shopify brings { shop,
+// install_ticket } (shopifyController.install) instead of the invite code.
 async function register(req, res) {
   try {
     const input = validateRegistration(req.body);
     if (input.error) return res.status(400).json({ error: input.error });
 
     const limitedByIp = !rateLimit.isLoopback(req.ip);
-    if (isInviteRequired()) {
+    if (isInviteRequired() && !isValidInstallTicket(req.body?.shop, req.body?.install_ticket)) {
       const guessWait = limitedByIp ? await rateLimit.secondsUntilAllowed(LIMITS.inviteFailuresPerIp, req.ip) : 0;
       if (guessWait) return rateLimit.tooManyRequests(res, guessWait, 'Too many wrong invite codes');
       if (!isValidInviteCode(req.body?.invite_code)) {

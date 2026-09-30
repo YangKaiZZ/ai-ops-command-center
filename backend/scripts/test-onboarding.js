@@ -6,7 +6,8 @@
 //   3. Token refresh: one refresh for parallel callers; a rejected refresh disconnects
 //   4. Pasted custom-app token: validated against Shopify first
 //   5. app/uninstalled webhook disconnects but keeps the shop for later webhooks
-//   6. Shopify-side install link: new shop -> sign-up, known shop -> approval
+//   6. Shopify-side install link: new shop -> sign-up (with a ticket that
+//      stands in for the invite code), known shop -> approval
 //   7. Disconnect button, and switching stores clears the old store's data
 //   8. Privacy (GDPR) webhooks
 //   9. Low-stock thresholds: seller default for new items, per-item overrides
@@ -255,7 +256,31 @@ async function main() {
 
     console.log('\n6. Install link from Shopify');
     const fresh1 = await http('GET', `/api/shopify/install?${signedQuery({ shop: SHOP_2, timestamp: now() })}`);
-    check(fresh1.status === 302 && fresh1.location === `http://dashboard.example.test/signup?shop=${SHOP_2}`, 'new shop -> sign-up page with the shop', fresh1.location);
+    const signupUrl = fresh1.location && new URL(fresh1.location);
+    const ticket = signupUrl?.searchParams.get('install');
+    check(
+      fresh1.status === 302 && `${signupUrl.origin}${signupUrl.pathname}` === 'http://dashboard.example.test/signup' && signupUrl.searchParams.get('shop') === SHOP_2 && ticket,
+      'new shop -> sign-up page with the shop and an install ticket',
+      fresh1.location
+    );
+    process.env.SIGNUP_INVITE_CODE = 'onboarding-invite'; // a server that asks for one
+    try {
+      const signupBody = (label, extra) => ({
+        business_name: `Onboarding ${label}`,
+        email: `onboarding-${RUN}-${label}@example.test`,
+        password: 'test-password-1',
+        ...extra,
+      });
+      let viaTicket = await http('POST', '/api/auth/register', { body: signupBody('no-ticket', {}) });
+      check(viaTicket.status === 403, 'with an invite code set, sign-up without one or a ticket: refused', viaTicket.json?.error);
+      viaTicket = await http('POST', '/api/auth/register', { body: signupBody('wrong-shop', { shop: SHOP, install_ticket: ticket }) });
+      check(viaTicket.status === 403, "a ticket for another store doesn't stand in for the code", viaTicket.json?.error);
+      viaTicket = await http('POST', '/api/auth/register', { body: signupBody('ticket', { shop: SHOP_2, install_ticket: ticket }) });
+      if (viaTicket.json?.sellerId) created.push(viaTicket.json.sellerId);
+      check(viaTicket.status === 201, "the store's own ticket stands in for the invite code", `HTTP ${viaTicket.status}`);
+    } finally {
+      process.env.SIGNUP_INVITE_CODE = '';
+    }
     const known = await http('GET', `/api/shopify/install?${signedQuery({ shop: SHOP, timestamp: now() })}`);
     const knownUrl = known.location && new URL(known.location);
     check(known.status === 302 && knownUrl.host === SHOP && knownUrl.pathname === '/admin/oauth/authorize', 'known shop -> straight to approval');

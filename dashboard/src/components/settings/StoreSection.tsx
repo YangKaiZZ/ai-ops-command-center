@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/Badge";
 import { Panel } from "@/components/Panel";
+import { DeepSeekNote } from "@/components/DeepSeekNote";
 import { inputClass, Note, primaryButton, secondaryButton, Subhead, type Message } from "@/components/ui";
 import { scopeUses } from "@/lib/shopifyActions";
 import { jsonBody, useApi } from "@/lib/useApi";
@@ -202,6 +203,7 @@ export function StoreSection({
               You&rsquo;ll approve access on Shopify to read orders, products and stock, and to hold and fulfill orders when you ask
               (or the agent holds one, if you switch that on).
             </p>
+            <DeepSeekNote />
           </form>
         ) : (
           <p className="text-sm text-ink-2">
