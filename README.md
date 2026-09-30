@@ -148,7 +148,14 @@ from their own dashboard.
   expires.
 - **Sign-up can be invite-only**: set `SIGNUP_INVITE_CODE` and creating an
   account needs that code (wrong guesses are rate-limited), so strangers can't
-  connect stores and spend LLM credits before you're ready.
+  connect stores and spend LLM credits before you're ready. A seller who
+  installs their app from Shopify's install link brings a signed install
+  ticket for their store instead, so they never see the code.
+- **Each real seller has a Shopify app of their own** (custom distribution
+  installs an app on one store): its client ID and secret are stored per
+  store, encrypted, and used for that store's approval, webhooks and token
+  refreshes. [docs/ADD-A-SELLER.md](docs/ADD-A-SELLER.md) is the five-minute
+  routine per seller; the seller only opens a link and signs up.
 - **Sign-in is rate-limited**: 10 failed sign-ins per email and 30 per IP
   per 15 minutes, 10 sign-ups per IP per hour. Emails and IPs are stored only
   as keyed hashes, and unknown emails take as long to reject as wrong passwords.
@@ -212,8 +219,8 @@ on a VPS; that README walks through it.
 | --- | --- | --- |
 | backend | `npm run test:ops-alerts` | alerts to the operator, with sends captured: email and Telegram, repeats held back, nothing set, and each trigger (a failed job, sync failures in a row, a refused token refresh, a failing webhook, the agent's total cap), plus `/api/health` |
 | backend | `npm run test:chat` | the dashboard chat against a fake DeepSeek and the real MCP server: the tools offered (read-only), a tool call scoped to the seller, the conversation, refused input, API keys and the demo kept out, no model key, the model failing, the daily limit |
-| backend | `npm test` | 136 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts |
-| backend | `npm run test:onboarding` | sign-up to connected store, disconnect, uninstall and privacy webhooks, webhooks brought up to date at startup, deleting an account, against a fake Shopify |
+| backend | `npm test` | 145 unit tests: auth, API keys, secrets, Shopify OAuth, GraphQL paging and field mapping, sync, stock check, fraud risk, holding and fulfilling, alerts, agent limits, job retries, migrations, rate limits, invite code, order filters and search, line items, restock forecasts, overview, decision ratings, time zones, summaries and late orders, rating links, hold and fulfill links in alerts, install tickets |
+| backend | `npm run test:onboarding` | sign-up to connected store, Shopify's install link (sign-up with an install ticket instead of the invite code), a store with its own app (approval, callback, install link and webhooks signed by it), disconnect, uninstall and privacy webhooks, webhooks brought up to date at startup, deleting an account, against a fake Shopify |
 | backend | `npm run test:alerts` | email and Telegram alerts against a local fake mail server and fake Telegram |
 | backend | `npm run test:agent` | a signed fake order through the webhook and the agent (one real LLM call if a key is set) |
 | backend | `npm run test:agent-limit` | the daily agent limits, per account and in total, against a fake DeepSeek |

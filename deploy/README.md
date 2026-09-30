@@ -98,6 +98,10 @@ In the Shopify Dev Dashboard, in your app's settings (replace the domain):
 The order and inventory webhooks don't need setting up: the backend registers
 them on each store when it connects.
 
+That app is for your own dev stores. A real seller's store gets an app of its
+own, with the same settings and custom distribution:
+[docs/ADD-A-SELLER.md](../docs/ADD-A-SELLER.md).
+
 ## 7. Claude Desktop (optional)
 
 To use the MCP tools against the live server, create an API key in the live

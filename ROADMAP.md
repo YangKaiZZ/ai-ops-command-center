@@ -24,8 +24,9 @@ Separate from the code, and needed before anyone but the owner connects:
 
 - Shopify's approval for protected customer data. Until then Shopify leaves
   customer names and emails out of orders, so orders show no customer name.
-- How stores install it: a private install link or an App Store listing
-  (which needs Shopify's review).
+- How stores install it: done for a private install link per seller
+  (custom distribution, [docs/ADD-A-SELLER.md](docs/ADD-A-SELLER.md)); an
+  App Store listing would need Shopify's review.
 - Opening sign-up (today it's invite-only).
 
 ## Done: before production
@@ -152,3 +153,9 @@ Separate from the code, and needed before anyone but the owner connects:
   favicon; Ink surfaces with Paper text and Signal Lime as the one accent;
   wide Archivo titles; pip-led status chips; sign-in pages with a brand
   panel ("It calls. You decide."); Decisions listed 15 at a time.
+- A Shopify app per real seller: custom distribution installs an app on one
+  store, so each store can have its own client ID and secret (store_apps,
+  encrypted, added with `npm run store-app`), used for its approval,
+  webhooks and token refreshes. Shopify's install link brings a signed
+  install ticket that stands in for the invite code, and sign-up connects
+  the store in the same step. Sign-up says the agent runs on DeepSeek.
