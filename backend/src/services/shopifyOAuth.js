@@ -28,6 +28,30 @@ function isConfigured() {
   return Boolean(apiKey && apiSecret && appUrl.startsWith('https://'));
 }
 
+// The Shopify app a store connects through: its own (store_apps, for a real
+// seller's custom-distribution app) or else the server's. { apiKey, apiSecret, own }.
+// Required here, not at the top: sellerModel needs this file while loading.
+async function appFor(shop) {
+  const mine = shop ? await require('../models/storeAppModel').findStoreApp(shop) : null;
+  if (mine) return { apiKey: mine.clientId, apiSecret: mine.clientSecret, own: true };
+  const { apiKey, apiSecret } = config();
+  return { apiKey, apiSecret, own: false };
+}
+
+// Whether "Connect with Shopify" can work for this store: its own app, or the server's.
+async function isConfiguredFor(shop) {
+  const { apiKey, apiSecret } = await appFor(shop);
+  return Boolean(apiKey && apiSecret && config().appUrl.startsWith('https://'));
+}
+
+// The secrets a request about this store may be signed with: its own app's,
+// then the server's (both are ours; a store can have used the server's app
+// before it got its own). Without duplicates or blanks.
+async function secretsFor(shop) {
+  const { apiSecret } = await appFor(shop);
+  return [...new Set([apiSecret, config().apiSecret].filter(Boolean))];
+}
+
 // Accepts what a seller might type ("my-store", "my-store.myshopify.com",
 // "https://my-store.myshopify.com/admin") and returns "my-store.myshopify.com",
 // or null. The anchored pattern is Shopify's: without the $, a host like
@@ -71,9 +95,10 @@ function callbackUrl() {
 
 // Where the seller approves the app. No grant_options[] = an offline token
 // (belongs to the store, not a staff member), which background syncs need.
-function buildAuthorizeUrl(shop, state) {
-  const { apiKey, scopes } = config();
-  const params = new URLSearchParams({ client_id: apiKey, scope: scopes, redirect_uri: callbackUrl(), state });
+// `app` is the store's (appFor); the server's app when not given.
+function buildAuthorizeUrl(shop, state, app = config()) {
+  const { scopes } = config();
+  const params = new URLSearchParams({ client_id: app.apiKey, scope: scopes, redirect_uri: callbackUrl(), state });
   return `https://${shop}/admin/oauth/authorize?${params}`;
 }
 
@@ -91,7 +116,7 @@ function tokenFromResponse(data, nowMs = Date.now()) {
 // expiring offline token (1 hour, with a refresh token): Shopify requires
 // those for new public apps.
 async function exchangeCode(shop, code) {
-  const { apiKey, apiSecret } = config();
+  const { apiKey, apiSecret } = await appFor(shop);
   const { data } = await axios.post(
     `https://${shop}/admin/oauth/access_token`,
     { client_id: apiKey, client_secret: apiSecret, code, expiring: '1' },
@@ -103,7 +128,7 @@ async function exchangeCode(shop, code) {
 // Every refresh returns a new access token AND a new refresh token, and the
 // old refresh token stops working, so callers must save the result.
 async function refreshAccessToken(shop, refreshToken) {
-  const { apiKey, apiSecret } = config();
+  const { apiKey, apiSecret } = await appFor(shop);
   const { data } = await axios.post(
     `https://${shop}/admin/oauth/access_token`,
     { client_id: apiKey, client_secret: apiSecret, grant_type: 'refresh_token', refresh_token: refreshToken },
@@ -147,6 +172,9 @@ async function revokeAccess(shop, accessToken) {
 module.exports = {
   config,
   isConfigured,
+  appFor,
+  isConfiguredFor,
+  secretsFor,
   normalizeShopDomain,
   verifyQueryHmac,
   isFreshTimestamp,

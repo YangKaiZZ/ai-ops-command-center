@@ -13,6 +13,8 @@
 //  10. At startup, connected stores' webhooks are brought up to date
 //  11. Deleting an account: password asked again (wrong ones limited), not
 //      with an API key or in the demo, uninstalls on Shopify, removes it all
+//  12. A store with its own app (custom distribution): Connect, the callback,
+//      install links and webhooks use that app's client ID and secret
 //
 // Usage:  npm run test:onboarding
 const path = require('path');
@@ -35,6 +37,7 @@ const webhookSetup = require('../src/services/webhookSetup');
 const syncService = require('../src/services/syncService');
 const sellers = require('../src/models/sellerModel');
 const { createApiKey } = require('../src/models/apiKeyModel');
+const storeApps = require('../src/models/storeAppModel');
 
 const SECRET = process.env.SHOPIFY_API_SECRET;
 const RUN = crypto.randomBytes(3).toString('hex');
@@ -89,13 +92,13 @@ async function http(method, url, { token, body, headers = {} } = {}) {
   return { status: res.status, location: res.headers.get('location'), json, text };
 }
 
-// Query string signed the way Shopify signs redirects.
-function signedQuery(params) {
+// Query string signed the way Shopify signs redirects (by the server's app, unless given another secret).
+function signedQuery(params, secret = SECRET) {
   const message = Object.entries(params)
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
-  const hmac = crypto.createHmac('sha256', SECRET).update(message).digest('hex');
+  const hmac = crypto.createHmac('sha256', secret).update(message).digest('hex');
   return new URLSearchParams({ ...params, hmac }).toString();
 }
 const now = () => String(Math.floor(Date.now() / 1000));
@@ -135,12 +138,12 @@ function newWebhookId() {
   return id;
 }
 
-async function signedWebhook(topic, route, payload, shop) {
+async function signedWebhook(topic, route, payload, shop, secret = SECRET) {
   const raw = JSON.stringify(payload);
   return http('POST', `/api/webhooks/${route}`, {
     body: raw,
     headers: {
-      'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', SECRET).update(raw).digest('base64'),
+      'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', secret).update(raw).digest('base64'),
       'X-Shopify-Shop-Domain': shop,
       'X-Shopify-Topic': topic,
       'X-Shopify-Webhook-Id': newWebhookId(),
@@ -443,6 +446,60 @@ async function main() {
       created.push(demoId);
       del = await http('DELETE', '/api/settings/account', { token: demoRes.json.token, body: { password: 'x' } });
       check(del.status === 403 && /demo/.test(del.json?.error), 'a demo account: refused (it deletes itself)', del.json?.error);
+    }
+
+    console.log('\n12. A store with its own app (custom distribution)');
+    const SHOP_5 = `onboard-${RUN}-e.myshopify.com`;
+    const OWN = { id: `own-client-${RUN}`, secret: `own-secret-${RUN}-xyz` };
+    await storeApps.saveStoreApp(SHOP_5, OWN.id, OWN.secret);
+    try {
+      const own = await register('own-app');
+      created.push(own.id);
+      const resolved = await oauth.appFor(SHOP_5);
+      check(resolved.own && resolved.apiKey === OWN.id && resolved.apiSecret === OWN.secret, "the store resolves to its own app, secret decrypted");
+      check((await oauth.appFor(SHOP_2)).apiKey === process.env.SHOPIFY_API_KEY, "other stores keep the server's app");
+
+      const start5 = await http('POST', '/api/shopify/connect', { token: own.token, body: { shop: SHOP_5 } });
+      const url5 = start5.json?.authorize_url && new URL(start5.json.authorize_url);
+      check(url5?.searchParams.get('client_id') === OWN.id, "Connect asks Shopify to approve the store's own app", url5?.searchParams.get('client_id'));
+      const cbParams = { code: 'code-own', shop: SHOP_5, state: url5?.searchParams.get('state'), timestamp: now() };
+      let cb5 = await http('GET', `/api/shopify/callback?${signedQuery(cbParams, 'someone-elses-secret')}`);
+      check(/shopify=error/.test(cb5.location || ''), 'a callback signed with a secret that is not ours is refused', cb5.location);
+      nextToken = { accessToken: 'shpat_own', refreshToken: 'refresh-own', expiresAt: new Date(Date.now() + 3600e3), scopes: 'read_orders,read_products,read_inventory' };
+      cb5 = await http('GET', `/api/shopify/callback?${signedQuery(cbParams, OWN.secret)}`);
+      check(
+        /shopify=connected/.test(cb5.location || '') && (await row(own.id)).shopify_shop_domain === SHOP_5,
+        "a callback signed with the store's own secret connects it",
+        cb5.location
+      );
+
+      const inst = await http('GET', `/api/shopify/install?${signedQuery({ shop: SHOP_5, timestamp: now() }, OWN.secret)}`);
+      const instUrl = inst.location && new URL(inst.location);
+      check(
+        instUrl?.host === SHOP_5 && instUrl.searchParams.get('client_id') === OWN.id,
+        "Shopify's install link, signed by the store's app, goes to approval of that app",
+        inst.location
+      );
+      const fakeInst = await http('GET', `/api/shopify/install?${signedQuery({ shop: SHOP_5, timestamp: now() }, 'someone-elses-secret')}`);
+      check(fakeInst.status === 400, 'an install link signed with a secret that is not ours: 400', `HTTP ${fakeInst.status}`);
+
+      const privacy = { shop_id: 1, shop_domain: SHOP_5, customer: { id: 1, email: 'buyer@example.test' }, orders_requested: [] };
+      let hook = await signedWebhook('customers/data_request', 'compliance', privacy, SHOP_5, OWN.secret);
+      check(hook.status === 200, "a webhook signed with the store's own secret is accepted", `HTTP ${hook.status}`);
+      hook = await signedWebhook('customers/data_request', 'compliance', privacy, SHOP_5, 'someone-elses-secret');
+      check(hook.status === 401, 'a webhook signed with a secret that is not ours: 401', `HTTP ${hook.status}`);
+
+      const serverKey = process.env.SHOPIFY_API_KEY;
+      process.env.SHOPIFY_API_KEY = ''; // a server whose own app isn't set up
+      try {
+        const settings5 = await http('GET', '/api/settings', { token: own.token });
+        check(settings5.json?.shopify?.oauth_available === true, "Settings offers Connect for a store with its own app, even without the server's app");
+      } finally {
+        process.env.SHOPIFY_API_KEY = serverKey;
+      }
+    } finally {
+      await storeApps.removeStoreApp(SHOP_5);
+      await pool.query('DELETE FROM privacy_requests WHERE shop_domain = ?', [SHOP_5]);
     }
   } finally {
     for (const id of created) {

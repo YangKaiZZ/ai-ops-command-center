@@ -164,7 +164,8 @@ async function getSettings(sellerId) {
           shop_domain: connected ? seller.shopify_shop_domain : null,
           missing_scopes: connected && seller.shopify_scopes ? oauth.missingScopes(seller.shopify_scopes) : [],
         },
-    shopify: { oauth_available: oauth.isConfigured() },
+    // The server's app, or this store's own (store_apps), can connect it.
+    shopify: { oauth_available: oauth.isConfigured() || (await oauth.isConfiguredFor(seller.shopify_shop_domain)) },
     // Holding and fulfilling from here (orderActions.js): allowed unless the
     // store's grant is known to lack it; auto_hold puts the agent's HOLDs on hold.
     shopify_actions: {

@@ -18,17 +18,22 @@ function exactShop(value) {
   return shop && shop === value ? shop : null;
 }
 
+// Whether Shopify signed this redirect, with the store's own app or the server's.
+async function signedByShopify(query, shop) {
+  return (await oauth.secretsFor(shop)).some((secret) => oauth.verifyQueryHmac(query, secret));
+}
+
 // POST /api/shopify/connect   Body: { shop }  (signed-in seller)
 // Returns the Shopify approval URL for the dashboard to open.
 async function connect(req, res) {
-  if (!oauth.isConfigured()) return res.status(503).json({ error: NOT_CONFIGURED });
   const shop = oauth.normalizeShopDomain(req.body?.shop);
   if (!shop) return res.status(400).json({ error: 'Enter your store address, e.g. my-store.myshopify.com' });
   try {
+    if (!(await oauth.isConfiguredFor(shop))) return res.status(503).json({ error: NOT_CONFIGURED });
     const holder = await findSellerByShopDomain(shop);
     if (holder?.connected && holder.id !== req.sellerId) return res.status(409).json({ error: TAKEN });
     const state = await createOAuthState(req.sellerId, shop);
-    res.json({ authorize_url: oauth.buildAuthorizeUrl(shop, state) });
+    res.json({ authorize_url: oauth.buildAuthorizeUrl(shop, state, await oauth.appFor(shop)) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not start connecting to Shopify' });
@@ -38,14 +43,14 @@ async function connect(req, res) {
 // GET /api/shopify/install?shop=...&hmac=...&timestamp=...  (from Shopify, no login)
 // A store we know goes straight to approval; a new one signs up first.
 async function install(req, res) {
-  if (!oauth.isConfigured()) return res.status(503).send(NOT_CONFIGURED);
   const shop = exactShop(req.query.shop);
-  if (!shop || !oauth.verifyQueryHmac(req.query) || !oauth.isFreshTimestamp(req.query.timestamp)) {
-    return res.status(400).send('This install link is invalid or has expired. Start the install again from Shopify.');
-  }
   try {
+    if (!(await oauth.isConfiguredFor(shop))) return res.status(503).send(NOT_CONFIGURED);
+    if (!shop || !(await signedByShopify(req.query, shop)) || !oauth.isFreshTimestamp(req.query.timestamp)) {
+      return res.status(400).send('This install link is invalid or has expired. Start the install again from Shopify.');
+    }
     const holder = await findSellerByShopDomain(shop);
-    if (holder) return res.redirect(oauth.buildAuthorizeUrl(shop, await createOAuthState(holder.id, shop)));
+    if (holder) return res.redirect(oauth.buildAuthorizeUrl(shop, await createOAuthState(holder.id, shop), await oauth.appFor(shop)));
     res.redirect(`${oauth.config().dashboardUrl}/signup?shop=${encodeURIComponent(shop)}`);
   } catch (err) {
     console.error(err);
@@ -62,10 +67,10 @@ async function callback(req, res) {
   const { code, state, timestamp } = req.query;
   const shop = exactShop(req.query.shop);
   if (!shop || !code || !state) return fail('Shopify sent back an incomplete response. Try connecting again.');
-  if (!oauth.verifyQueryHmac(req.query)) return fail("The response from Shopify couldn't be verified. Try connecting again.");
-  if (!oauth.isFreshTimestamp(timestamp)) return fail('That approval link has expired. Try connecting again.');
 
   try {
+    if (!(await signedByShopify(req.query, shop))) return fail("The response from Shopify couldn't be verified. Try connecting again.");
+    if (!oauth.isFreshTimestamp(timestamp)) return fail('That approval link has expired. Try connecting again.');
     const pending = await consumeOAuthState(state);
     if (!pending || pending.shop !== shop) {
       return fail('This connection attempt expired or was already used. Start again from Settings.');
