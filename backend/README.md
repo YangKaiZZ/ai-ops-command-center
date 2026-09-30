@@ -1,6 +1,6 @@
-# AI Ops Command Center — Backend
+# Arbiter Ops — Backend
 
-Express + MySQL REST API for the AI Ops Command Center: multi-tenant
+Express + MySQL REST API for the Arbiter Ops: multi-tenant
 accounts, Shopify connection and webhooks, the order/stock agent, alerts,
 and the endpoints the dashboard and the MCP server use.
 

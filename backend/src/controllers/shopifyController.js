@@ -11,7 +11,7 @@ const { installTicket } = require('../services/installTickets');
 
 const NOT_CONFIGURED =
   "Connect with Shopify isn't set up on this server yet (it needs SHOPIFY_API_KEY, SHOPIFY_API_SECRET and a public https APP_URL).";
-const TAKEN = 'This store is already connected to another AI Ops account.';
+const TAKEN = 'This store is already connected to another Arbiter Ops account.';
 
 // Values Shopify sends must already be exact *.myshopify.com hosts.
 function exactShop(value) {

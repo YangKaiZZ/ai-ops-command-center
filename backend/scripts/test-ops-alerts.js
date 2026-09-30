@@ -36,7 +36,7 @@ async function main() {
     OPS_ALERT_EMAIL: 'ops@example.test',
     OPS_ALERT_TELEGRAM_CHAT_ID: '424242',
     SMTP_URL: 'smtp://127.0.0.1:1',
-    EMAIL_FROM: 'AI Ops <alerts@example.test>',
+    EMAIL_FROM: 'Arbiter Ops <alerts@example.test>',
     TELEGRAM_BOT_TOKEN: 'test-bot-token',
     SHOPIFY_API_SECRET: 'ops-test-secret',
     DEEPSEEK_API_KEY: 'test-key',
@@ -84,11 +84,11 @@ async function main() {
     check((await ops.notifyOps(key('first'), 'Something broke.\nDetails here.')) === true, 'an alert is sent');
     const [first, second] = since(before);
     check(
-      first?.via === 'telegram' && first.to === '424242' && first.text.startsWith('AI Ops server: Something broke.\nDetails here.'),
+      first?.via === 'telegram' && first.to === '424242' && first.text.startsWith('Arbiter Ops server: Something broke.\nDetails here.'),
       'to the Telegram chat',
       JSON.stringify(first)
     );
-    check(second?.via === 'email' && second.to === 'ops@example.test' && second.subject === 'AI Ops server: Something broke.', 'and the email address', JSON.stringify(second));
+    check(second?.via === 'email' && second.to === 'ops@example.test' && second.subject === 'Arbiter Ops server: Something broke.', 'and the email address', JSON.stringify(second));
     before = sent.length;
     check((await ops.notifyOps(key('first'), 'Something broke again.')) === false && sent.length === before, 'the same kind again within its window: only logged');
     check((await ops.notifyOps(key('other'), 'Something else.')) === true, 'another kind goes out');

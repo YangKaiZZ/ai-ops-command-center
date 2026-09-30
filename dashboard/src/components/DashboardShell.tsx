@@ -124,7 +124,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col gap-0.5 border-r border-line bg-sidebar px-3.5 pb-4 pt-5 lg:flex">
-        <Link href="/overview" aria-label="AI Ops Command Center, Overview" className={`mb-7 rounded-lg px-2 py-1 ${focusRing}`}>
+        <Link href="/overview" aria-label="Arbiter Ops, Overview" className={`mb-7 rounded-lg px-2 py-1 ${focusRing}`}>
           <Lockup small />
         </Link>
         <nav aria-label="Dashboard sections" className="flex flex-col gap-0.5">

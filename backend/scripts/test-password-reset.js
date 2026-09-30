@@ -87,7 +87,7 @@ function tokenIn(message) {
 
 async function main() {
   const smtp = await startFakeSmtp();
-  Object.assign(process.env, { SMTP_URL: `smtp://127.0.0.1:${smtp.port}`, EMAIL_FROM: 'AI Ops <alerts@example.test>' });
+  Object.assign(process.env, { SMTP_URL: `smtp://127.0.0.1:${smtp.port}`, EMAIL_FROM: 'Arbiter Ops <alerts@example.test>' });
 
   const app = require('../src/app');
   const pool = require('../src/config/db');

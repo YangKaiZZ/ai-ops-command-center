@@ -1,4 +1,4 @@
-// The mark, "the Caret": a 60-degree chevron (the A of AI Ops, a command
+// The mark, "the Caret": a 60-degree chevron (the A of Arbiter, a command
 // caret) with a lime crossbar that floats free of the legs: the agent's call,
 // waiting for the seller to close it. Paper chevron and lime bar on dark;
 // `onLime` draws both in ink, for a lime tile. The same shapes are in
@@ -19,15 +19,14 @@ export function Logo({ className = "size-8", onLime = false }: { className?: str
   );
 }
 
-// The wordmark next to the mark: "AI Ops" in the display face, the full name
-// under it in spaced capitals.
+// The wordmark next to the mark: "Arbiter Ops" in the display face, "Ops"
+// a step quieter.
 export function Lockup({ small = false }: { small?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
       <Logo className={small ? "size-7" : "size-9"} />
-      <span className="leading-none">
-        <span className={`block font-display font-bold tracking-[-0.02em] ${small ? "text-[17px]" : "text-[22px]"}`}>AI Ops</span>
-        <span className={`mt-1 block font-mono text-[11px] font-semibold uppercase text-ink-2 ${small ? "tracking-[0.12em]" : "tracking-[0.26em]"}`}>Command Center</span>
+      <span className={`font-display font-bold leading-none tracking-[-0.02em] ${small ? "text-[18px]" : "text-[24px]"}`}>
+        Arbiter <span className="text-ink-2">Ops</span>
       </span>
     </span>
   );

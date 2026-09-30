@@ -7,10 +7,10 @@ minutes); the seller only clicks a link.
 What the seller does:
 
 1. Opens the install link you send and approves the app in Shopify.
-2. Lands on AI Ops sign-up with their store already named, picks a business
+2. Lands on Arbiter Ops sign-up with their store already named, picks a business
    name, email and password, and clicks **Create account and connect**. No
    invite code: Shopify's signed install stands in for it.
-3. Is back in AI Ops with the store connected; orders and stock come in by
+3. Is back in Arbiter Ops with the store connected; orders and stock come in by
    themselves. From there they turn on alerts in Settings.
 
 What you do, once per seller:
@@ -25,7 +25,7 @@ It ends in `.myshopify.com`. They can find it in their Shopify admin under
 
 In the [Shopify Dev Dashboard](https://dev.shopify.com/dashboard), **Apps >
 Create app > Start from Dev Dashboard**. Name it so you can tell them apart,
-e.g. `AI Ops - Their Store`.
+e.g. `Arbiter Ops - Their Store`.
 
 On its **Versions** page, the same settings as your first app (see
 [deploy/README.md, step 6](../deploy/README.md#6-point-the-shopify-app-at-the-server)):
@@ -38,6 +38,12 @@ On its **Versions** page, the same settings as your first app (see
 | Scopes | `read_orders`, `read_products`, `read_inventory`, `write_merchant_managed_fulfillment_orders` |
 
 Then **Release**.
+
+To show customers' names on orders, turn on **Protected customer data** for
+the app and select only the first and last name fields, then answer the
+data-protection questions (the answers match the privacy page). A
+custom-distribution app doesn't need Shopify's review for this. Without it,
+orders show "Name not shared" and everything else still works.
 
 ## 3. Pick custom distribution and get the link
 
@@ -64,7 +70,7 @@ app and whether that store is connected yet.
 
 ## 5. Send them the link
 
-Something like: "Here's the install link for AI Ops. Open it while signed in
+Something like: "Here's the install link for Arbiter Ops. Open it while signed in
 to your Shopify admin, approve it, then create your account on the page it
 opens. Your orders and stock come in by themselves."
 
@@ -75,9 +81,9 @@ opens. Your orders and stock come in by themselves."
   `store-app -- list`, and run step 4 again (it replaces what's there).
 - **They already have an account** (they signed up before): the install link
   sends them straight to Shopify's approval, and the store connects to it.
-- **A customer's name shows as "Name not shared"**: each app asks Shopify for
-  protected customer data on its own. Until Shopify approves this app's
-  request, names stay hidden; everything else works.
+- **A customer's name shows as "Name not shared"**: protected customer data
+  is set per app. Turn it on for this app with the name fields (step 2);
+  names come in for orders synced after that.
 - **Removing a seller's app**: `store-app -- remove their-store.myshopify.com`
   (it refuses while the store is connected; `--force` removes it anyway, and
   the connection then stops working).

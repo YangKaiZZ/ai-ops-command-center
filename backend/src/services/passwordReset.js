@@ -22,9 +22,9 @@ async function sendResetEmail(seller) {
   );
   await sendEmail({
     to: seller.email,
-    subject: 'AI Ops: reset your password',
+    subject: 'Arbiter Ops: reset your password',
     text:
-      `Someone asked to reset the password for ${seller.business_name} on AI Ops Command Center.\n\n` +
+      `Someone asked to reset the password for ${seller.business_name} on Arbiter Ops.\n\n` +
       `Choose a new password here (the link works once and expires in ${TOKEN_TTL_MINUTES} minutes):\n${resetLink(token)}\n\n` +
       "If that wasn't you, ignore this email: your password stays as it is.\n",
   });

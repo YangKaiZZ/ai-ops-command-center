@@ -1,6 +1,6 @@
-# AI Ops Command Center — Dashboard
+# Arbiter Ops — Dashboard
 
-Next.js + Tailwind dashboard for the AI Ops Command Center. It reads the
+Next.js + Tailwind dashboard for the Arbiter Ops. It reads the
 [backend](../backend) API and shows a seller's
 orders, the agent's decisions, and stock.
 
@@ -30,7 +30,7 @@ actions, where you are and what's going well. The color tokens live in
 `src/app/globals.css`; statuses are always a word, never color alone.
 
 The mark, "the Caret" (`src/components/Logo.tsx`, `src/app/icon.svg`), is a
-60-degree chevron, the A of AI Ops, with a lime crossbar floating free of the
+60-degree chevron, the A of Arbiter, with a lime crossbar floating free of the
 legs: the agent's call, waiting for the seller to close it.
 
 Titles are Archivo set wide (112%), text is Inter, numbers and small labels

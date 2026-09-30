@@ -46,7 +46,7 @@ export function PrivacySection() {
     <Panel title="Customer data requests">
       <div className="grid max-w-2xl gap-3">
         <p className="text-sm text-ink-2">
-          A customer asked your store for the data held about them. Download what AI Ops holds and include it in your
+          A customer asked your store for the data held about them. Download what Arbiter Ops holds and include it in your
           reply to them.
         </p>
         <ul className="grid gap-2">

@@ -40,8 +40,8 @@ async function notifyOps(key, text, { repeatMinutes = DEFAULT_REPEAT_MINUTES } =
 
     const body = `${text}\n\n${new Date().toISOString()}`;
     const sends = [];
-    if (chatId) sends.push(telegram.sendTelegramMessage(chatId, `AI Ops server: ${body}`));
-    if (address) sends.push(email.sendEmail({ to: address, subject: `AI Ops server: ${text.split('\n')[0].slice(0, 120)}`, text: body }));
+    if (chatId) sends.push(telegram.sendTelegramMessage(chatId, `Arbiter Ops server: ${body}`));
+    if (address) sends.push(email.sendEmail({ to: address, subject: `Arbiter Ops server: ${text.split('\n')[0].slice(0, 120)}`, text: body }));
     const results = await Promise.allSettled(sends);
     for (const r of results) if (r.status === 'rejected') console.error(`[ops] sending an alert failed: ${r.reason?.message}`);
     return results.some((r) => r.status === 'fulfilled');

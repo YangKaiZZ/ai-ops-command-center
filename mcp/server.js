@@ -315,7 +315,7 @@ server.registerTool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('AI Ops MCP server running on stdio'); // stderr so it doesn't corrupt the MCP stdout protocol
+  console.error('Arbiter Ops MCP server running on stdio'); // stderr so it doesn't corrupt the MCP stdout protocol
 }
 
 main().catch((err) => {

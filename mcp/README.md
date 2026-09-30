@@ -1,4 +1,4 @@
-# AI Ops MCP server
+# Arbiter Ops MCP server
 
 An [MCP](https://modelcontextprotocol.io) server that exposes the backend's
 REST API as tools, so an AI model can look at a seller's store and act on it:

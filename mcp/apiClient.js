@@ -25,15 +25,15 @@ const api = axios.create({
 // The tool's error text is what Claude shows the seller, so say what to do.
 api.interceptors.response.use(null, (err) => {
   if (!token) {
-    throw new Error('No API key set. Create one in the AI Ops dashboard (Settings > API keys) and put it in BACKEND_API_KEY in this MCP server\'s .env.');
+    throw new Error('No API key set. Create one in the Arbiter Ops dashboard (Settings > API keys) and put it in BACKEND_API_KEY in this MCP server\'s .env.');
   }
   if (err.response?.status === 401) {
-    throw new Error('The AI Ops backend rejected the API key (revoked or mistyped). Create a new one in the dashboard (Settings > API keys) and put it in BACKEND_API_KEY in this MCP server\'s .env.');
+    throw new Error('The Arbiter Ops backend rejected the API key (revoked or mistyped). Create a new one in the dashboard (Settings > API keys) and put it in BACKEND_API_KEY in this MCP server\'s .env.');
   }
   if (!err.response) {
-    throw new Error(`Could not reach the AI Ops backend at ${BACKEND_URL} (${err.code || err.message}). Is it running?`);
+    throw new Error(`Could not reach the Arbiter Ops backend at ${BACKEND_URL} (${err.code || err.message}). Is it running?`);
   }
-  throw new Error(err.response.data?.error || `The AI Ops backend returned HTTP ${err.response.status}`);
+  throw new Error(err.response.data?.error || `The Arbiter Ops backend returned HTTP ${err.response.status}`);
 });
 
 module.exports = api;

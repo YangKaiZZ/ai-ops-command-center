@@ -16,7 +16,7 @@ async function connectStore(req, res) {
   try {
     const holder = await findSellerByShopDomain(shop);
     if (holder?.connected && holder.id !== req.sellerId) {
-      return res.status(409).json({ error: 'This store is already connected to another AI Ops account.' });
+      return res.status(409).json({ error: 'This store is already connected to another Arbiter Ops account.' });
     }
 
     let scopes;

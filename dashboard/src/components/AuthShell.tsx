@@ -22,7 +22,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(rgb(236_238_230/0.09)_1px,transparent_1.2px)] [background-size:18px_18px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]"
         />
-        <Link href="/login" aria-label="AI Ops Command Center" className={`relative w-fit rounded-lg ${focusRing}`}>
+        <Link href="/login" aria-label="Arbiter Ops" className={`relative w-fit rounded-lg ${focusRing}`}>
           <Lockup />
         </Link>
         <div className="relative max-w-xl">
@@ -47,7 +47,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="flex flex-col items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-sm">
-          <Link href="/login" aria-label="AI Ops Command Center" className={`mb-10 block w-fit rounded-lg lg:hidden ${focusRing}`}>
+          <Link href="/login" aria-label="Arbiter Ops" className={`mb-10 block w-fit rounded-lg lg:hidden ${focusRing}`}>
             <Lockup />
           </Link>
           {children}

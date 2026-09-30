@@ -1,4 +1,6 @@
-# AI Ops Command Center
+# Arbiter Ops
+
+(Formerly AI Ops Command Center; the repository keeps that name.)
 
 An AI operations assistant for Shopify stores. It watches a store's orders
 and stock, has an LLM agent decide what needs attention (ship this order,

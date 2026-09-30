@@ -9,7 +9,7 @@ test('email subjects name the event and the verdict', () => {
   assert.equal(subjectLine('*New order #1001*\nHOLD - 2 short\n- Snowboard'), 'New order #1001: HOLD');
   assert.equal(subjectLine('*Low stock: Mug, Tote*\nRESTOCK - both low'), 'Low stock: Mug, Tote: RESTOCK');
   assert.equal(subjectLine('*Test alert*\nThis is how alerts look.'), 'Test alert');
-  assert.equal(subjectLine(''), 'AI Ops alert');
+  assert.equal(subjectLine(''), 'Arbiter Ops alert');
 });
 
 test('email and Telegram get the text without Slack bold markers', () => {

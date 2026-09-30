@@ -1,7 +1,7 @@
 {
   "name": "ai-ops-backend",
   "version": "1.0.0",
-  "description": "AI Ops Command Center - RESTful backend, Phase 1",
+  "description": "Arbiter Ops - RESTful backend, Phase 1",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

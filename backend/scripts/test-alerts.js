@@ -112,7 +112,7 @@ async function main() {
   const tg = await startFakeTelegram();
   Object.assign(process.env, {
     SMTP_URL: `smtp://127.0.0.1:${smtp.port}`,
-    EMAIL_FROM: 'AI Ops <alerts@example.test>',
+    EMAIL_FROM: 'Arbiter Ops <alerts@example.test>',
     TELEGRAM_BOT_TOKEN: 'test-token',
     TELEGRAM_API_BASE: `http://127.0.0.1:${tg.port}`,
   });
@@ -153,9 +153,9 @@ async function main() {
     const address = `owner-${run}@example.test`;
     const start = await call('PUT', '/api/settings/email', token, { email: address.toUpperCase() });
     const codeMail = await until(() => smtp.messages.find((m) => m.to.includes(address)));
-    const code = codeMail?.raw.match(/Enter (\d{6}) in AI Ops/)?.[1];
+    const code = codeMail?.raw.match(/Enter (\d{6}) in Arbiter Ops/)?.[1];
     check(start.status === 200 && start.json.pending === address && code, 'code emailed to the (lower-cased) address', code ? 'code received' : 'no code');
-    check(/Subject: Your AI Ops code: \d{6}/.test(codeMail?.raw || ''), 'code in the subject too');
+    check(/Subject: Your Arbiter Ops code: \d{6}/.test(codeMail?.raw || ''), 'code in the subject too');
     const pending = (await call('GET', '/api/settings', token)).json.email_alerts;
     check(pending.pending === address && pending.address === null, 'settings: waiting for the code, not on yet');
 
@@ -213,7 +213,7 @@ async function main() {
     check(test.status === 200 && results.email === true && results.telegram === true, 'test alert: email + Telegram', JSON.stringify(test.json?.results));
 
     await postDecision(sellerId, '*New order #1001*\nHOLD - out of stock\n- Snowboard: 2 short');
-    const alertMail = await until(() => smtp.messages.slice(before.mails).find((m) => /Subject: AI Ops: New order #1001: HOLD/.test(m.raw)));
+    const alertMail = await until(() => smtp.messages.slice(before.mails).find((m) => /Subject: Arbiter Ops: New order #1001: HOLD/.test(m.raw)));
     check(Boolean(alertMail), 'email subject names the order and verdict');
     check(!/\*/.test(alertMail?.raw.split('\n\n').slice(1).join('\n') || '*'), 'email body is plain text (no Slack *bold*)');
     const alertTg = tg.sent.slice(before.tgs).find((m) => /New order #1001/.test(m.text));

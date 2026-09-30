@@ -225,15 +225,15 @@ async function handleUpdate(update) {
     await sendTelegramMessage(
       chatId,
       linked
-        ? `Connected to ${linked.businessName}. AI Ops alerts (new orders, low stock) will arrive here. Send /stop to turn them off.`
-        : 'That link has expired or was already used. Get a new one from Settings in the AI Ops dashboard.'
+        ? `Connected to ${linked.businessName}. Arbiter Ops alerts (new orders, low stock) will arrive here. Send /stop to turn them off.`
+        : 'That link has expired or was already used. Get a new one from Settings in the Arbiter Ops dashboard.'
     );
     if (linked) console.log(`[telegram] seller ${linked.sellerId} linked a chat`);
   } else if (command === '/stop') {
     const count = await channels.unlinkTelegramChat(chatId);
     await sendTelegramMessage(chatId, count ? 'Alerts turned off for this chat.' : 'This chat has no alerts turned on.');
   } else {
-    await sendTelegramMessage(chatId, 'To get AI Ops alerts here, use the "Connect Telegram" link in Settings in the AI Ops dashboard.');
+    await sendTelegramMessage(chatId, 'To get Arbiter Ops alerts here, use the "Connect Telegram" link in Settings in the Arbiter Ops dashboard.');
   }
 }
 

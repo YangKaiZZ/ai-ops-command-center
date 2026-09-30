@@ -166,7 +166,7 @@ test('each channel gets its own way to rate a decision', () => {
     ]
   );
   const mail = emailBody('*New order #1*\nHOLD - x', rating, 'Shop');
-  assert.match(mail, /^New order #1\nHOLD - x\n\nWas this the right call\?\nYes: https:\/\/x\.test\/rate\?t=a&r=up\nNo: https:\/\/x\.test\/rate\?t=a&r=down\n\n--\nSent by AI Ops for Shop/);
+  assert.match(mail, /^New order #1\nHOLD - x\n\nWas this the right call\?\nYes: https:\/\/x\.test\/rate\?t=a&r=up\nNo: https:\/\/x\.test\/rate\?t=a&r=down\n\n--\nSent by Arbiter Ops for Shop/);
   assert.doesNotMatch(emailBody('*Daily summary*', null, 'Shop'), /right call/);
   assert.deepEqual(telegramButtons(rating).inline_keyboard[0].map((b) => b.callback_data), ['rate:42:up', 'rate:42:down']);
   assert.equal(telegramButtons(null), undefined);

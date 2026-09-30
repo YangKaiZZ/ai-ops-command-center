@@ -115,7 +115,7 @@ async function main() {
   const tg = await startFakeTelegram();
   Object.assign(process.env, {
     SMTP_URL: `smtp://127.0.0.1:${smtp.port}`,
-    EMAIL_FROM: 'AI Ops <alerts@example.test>',
+    EMAIL_FROM: 'Arbiter Ops <alerts@example.test>',
     TELEGRAM_BOT_TOKEN: 'test-token',
     TELEGRAM_API_BASE: `http://127.0.0.1:${tg.port}`,
     DASHBOARD_URL: 'https://ops.example.test',

@@ -72,7 +72,7 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto grid max-w-2xl gap-7 px-4 pb-16 pt-8 text-sm leading-relaxed text-ink-2">
       <header className="grid gap-4">
-        <Link href="/login" aria-label="AI Ops Command Center" className="mb-4 w-fit text-ink">
+        <Link href="/login" aria-label="Arbiter Ops" className="mb-4 w-fit text-ink">
           <Lockup small />
         </Link>
         <div className="grid gap-1">
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           <p className="font-mono text-xs">Last updated {UPDATED}</p>
         </div>
         <p>
-          AI Ops Command Center connects to a Shopify store, watches its orders and stock, and has an AI agent recommend what to do
+          Arbiter Ops connects to a Shopify store, watches its orders and stock, and has an AI agent recommend what to do
           (ship, hold, restock), with alerts where the seller chooses. This page says what it keeps, who else sees it, and for how long.
           &ldquo;You&rdquo; is the seller using it; &ldquo;customers&rdquo; are the people who buy from your store.
         </p>

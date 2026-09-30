@@ -1,4 +1,4 @@
-# AI Ops Command Center: deploying to a VPS
+# Arbiter Ops: deploying to a VPS
 
 Runs the whole app on one Linux server with Docker Compose:
 
@@ -77,7 +77,7 @@ nano .env   # DOMAIN, the Shopify app keys, DEEPSEEK_API_KEY, alert settings
 ```bash
 docker compose up -d --build
 docker compose ps                 # all four "running"; mysql and backend "healthy"
-docker compose logs -f backend    # "Database is up to date." then "AI Ops backend running on port 3000"
+docker compose logs -f backend    # "Database is up to date." then "Arbiter Ops backend running on port 3000"
 ```
 
 The first start takes a few minutes: it builds the two images, and the

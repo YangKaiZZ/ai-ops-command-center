@@ -1,4 +1,4 @@
-# AI Ops Command Center on one server. Caddy takes the public traffic (and
+# Arbiter Ops on one server. Caddy takes the public traffic (and
 # gets the HTTPS certificate): /api/* goes to the backend, everything else to
 # the dashboard. Settings come from .env next to this file (see .env.example).
 name: ai-ops

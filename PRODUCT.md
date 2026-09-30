@@ -90,7 +90,10 @@ on the Shopify App Store.
 
 ## Brand Commitments
 
-- Name: **AI Ops Command Center** ("AI Ops" for short).
+- Name: **Arbiter Ops** (renamed from "AI Ops Command Center" on
+  2026-09-30: "AIOps" is an IT-monitoring term, and the name was long and
+  generic). The arbiter makes the call, the seller decides. The GitHub repo
+  and the live address keep the old name for now.
 - **Lime (#B6FF2E) is the brand color** and survives any redesign (user
   confirmed, 2026-09-29).
 - **It must read as professional**: a tool a seller trusts with their store,

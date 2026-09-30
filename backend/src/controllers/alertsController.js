@@ -36,8 +36,8 @@ async function startEmail(req, res) {
     try {
       await email.sendEmail({
         to: address,
-        subject: `Your AI Ops code: ${code}`,
-        text: `Enter ${code} in AI Ops Settings to get alerts at this address.\n\nThe code works for 15 minutes. If you didn't ask for it, ignore this email.`,
+        subject: `Your Arbiter Ops code: ${code}`,
+        text: `Enter ${code} in Arbiter Ops Settings to get alerts at this address.\n\nThe code works for 15 minutes. If you didn't ask for it, ignore this email.`,
       });
     } catch (err) {
       await channels.dropEmailCode(req.sellerId, code).catch(() => {});
@@ -113,7 +113,7 @@ async function testAlert(req, res) {
   try {
     const results = await notifier.postDecision(
       req.sellerId,
-      '*Test alert*\nThis is how AI Ops alerts will look.\n- New orders: FULFILL or HOLD, with the reasons\n- Items that run low: RESTOCK'
+      '*Test alert*\nThis is how Arbiter Ops alerts will look.\n- New orders: FULFILL or HOLD, with the reasons\n- Items that run low: RESTOCK'
     );
     if (!results.length) return res.status(400).json({ error: 'Turn on at least one alert channel first.' });
     res.json({ results });

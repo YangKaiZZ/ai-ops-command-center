@@ -23,7 +23,7 @@ const mono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Ops Dashboard",
+  title: "Arbiter Ops",
   description: "Orders, agent decisions, and low stock for your Shopify store.",
 };
 

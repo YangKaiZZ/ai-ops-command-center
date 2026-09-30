@@ -8,7 +8,7 @@ import { timeAgo } from "@/lib/format";
 import { jsonBody, useApi } from "@/lib/useApi";
 import type { ApiKey } from "@/lib/types";
 
-// Keys for the AI Ops MCP server in Claude Desktop: created here, shown once, revocable.
+// Keys for the Arbiter Ops MCP server in Claude Desktop: created here, shown once, revocable.
 export function ApiKeysSection() {
   const call = useApi();
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
@@ -73,7 +73,7 @@ export function ApiKeysSection() {
     <Panel title="API keys">
       <div className="grid gap-3">
         <p className="max-w-2xl text-sm text-ink-2">
-          Let Claude Desktop read your orders and stock through the AI Ops MCP server: put a key in{" "}
+          Let Claude Desktop read your orders and stock through the Arbiter Ops MCP server: put a key in{" "}
           <code className="rounded bg-ink/8 px-1 text-xs">BACKEND_API_KEY</code> in the MCP server&rsquo;s{" "}
           <code className="rounded bg-ink/8 px-1 text-xs">.env</code>. Keys don&rsquo;t expire and can&rsquo;t change
           these settings. Revoke one if it leaks.

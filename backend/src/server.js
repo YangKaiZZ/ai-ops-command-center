@@ -18,7 +18,7 @@ if (process.env.SLACK_WEBHOOK_URL) {
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
-  console.log(`AI Ops backend running on port ${PORT}`);
+  console.log(`Arbiter Ops backend running on port ${PORT}`);
   startScheduledSync();
   startReportScheduler();
   startTelegramPolling();

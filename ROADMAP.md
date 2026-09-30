@@ -1,6 +1,6 @@
 # Roadmap
 
-What's next for AI Ops Command Center, grouped by theme. Done items are
+What's next for Arbiter Ops, grouped by theme. Done items are
 listed at the end.
 
 ## Write actions
@@ -12,7 +12,7 @@ listed at the end.
 ## Fitting into a seller's other tools
 
 Sellers already run a stack (shipping, helpdesk, email marketing,
-accounting) and keep only what gets used, so AI Ops should feed the tools
+accounting) and keep only what gets used, so Arbiter Ops should feed the tools
 they have rather than ask them to look in one more place.
 
 - **Order tags for the agent's calls**: tag the order in Shopify
@@ -168,7 +168,7 @@ Separate from the code, and needed before anyone but the owner connects:
   reorder list; decisions beside the notes the agent learns from; a Settings
   menu that follows the scroll.
 - Brand kit and the look that follows it: the Caret mark (a chevron, the A
-  of AI Ops, with a floating lime crossbar for the agent's call) as logo and
+  of Arbiter Ops, with a floating lime crossbar for the agent's call) as logo and
   favicon; Ink surfaces with Paper text and Signal Lime as the one accent;
   wide Archivo titles; pip-led status chips; sign-in pages with a brand
   panel ("It calls. You decide."); Decisions listed 15 at a time.

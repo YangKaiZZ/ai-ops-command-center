@@ -2,7 +2,7 @@ const nodemailer = require('nodemailer');
 
 // Email alerts, sent through any SMTP provider:
 //   SMTP_URL=smtps://user:password@smtp.example.com:465
-//   EMAIL_FROM="AI Ops <alerts@example.com>"
+//   EMAIL_FROM="Arbiter Ops <alerts@example.com>"
 // Without both, email isn't offered in Settings.
 
 let transport = null;
@@ -29,7 +29,7 @@ function emailSettingsProblem(smtpUrl = process.env.SMTP_URL, from = process.env
   }
   const address = from.match(/<([^<>]*)>\s*$/)?.[1] ?? from;
   if (!ADDRESS.test(address.trim())) {
-    return `EMAIL_FROM needs a full address, like "AI Ops <alerts@example.com>" (it is ${JSON.stringify(from)})`;
+    return `EMAIL_FROM needs a full address, like "Arbiter Ops <alerts@example.com>" (it is ${JSON.stringify(from)})`;
   }
   return null;
 }

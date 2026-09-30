@@ -27,7 +27,7 @@ function plainText(text) {
 function subjectLine(text) {
   const [first = '', second = ''] = plainText(text).split('\n');
   const verdict = second.match(/^(FULFILL|HOLD|RESTOCK)\b/)?.[1];
-  return verdict ? `${first.trim()}: ${verdict}` : first.trim() || 'AI Ops alert';
+  return verdict ? `${first.trim()}: ${verdict}` : first.trim() || 'Arbiter Ops alert';
 }
 
 // The rating links for a decision the seller can rate (ratingLinks.js), or null.
@@ -85,7 +85,7 @@ function emailBody(text, rating, businessName, actions = null) {
   const act = actions
     ? `\n\nIn Shopify (each link opens a page to confirm, and works for ${ACTION_LINK_DAYS} days):\nPut on hold: ${actions.hold}\nMark fulfilled: ${actions.fulfill}`
     : '';
-  return `${plainText(text)}${rate}${act}\n\n--\nSent by AI Ops for ${businessName}. Change where alerts go in Settings.`;
+  return `${plainText(text)}${rate}${act}\n\n--\nSent by Arbiter Ops for ${businessName}. Change where alerts go in Settings.`;
 }
 
 // Telegram's buttons answer in the chat itself (telegram.js handles the tap),
@@ -133,7 +133,7 @@ async function postDecision(sellerId, text, { decisionId = null, orderId = null 
     sends.push([
       'email',
       () =>
-        email.sendEmail({ to: targets.email, subject: `AI Ops: ${subjectLine(text)}`, text: emailBody(text, rating, targets.businessName, actions) }),
+        email.sendEmail({ to: targets.email, subject: `Arbiter Ops: ${subjectLine(text)}`, text: emailBody(text, rating, targets.businessName, actions) }),
     ]);
   }
   if (targets?.telegramChatId && telegram.isTelegramConfigured()) {
