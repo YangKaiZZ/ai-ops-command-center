@@ -372,6 +372,8 @@ function queueAgentRun(sellerId, trigger) {
 
 module.exports = {
   runAgent,
+  SYSTEM_PROMPT,
+  MAX_STEPS,
   queueAgentRun,
   slimTrigger,
   describeTrigger,
