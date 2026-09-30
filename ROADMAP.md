@@ -9,6 +9,25 @@ listed at the end.
   into Claude instead of editing JSON.
 - **Longer term**: multi-channel stock (Shopee, TikTok Shop).
 
+## Fitting into a seller's other tools
+
+Sellers already run a stack (shipping, helpdesk, email marketing,
+accounting) and keep only what gets used, so AI Ops should feed the tools
+they have rather than ask them to look in one more place.
+
+- **Order tags for the agent's calls**: tag the order in Shopify
+  (`ai-ops-hold`, `ai-ops-fraud-risk`, `ai-ops-can-ship`) with the reason in
+  its note. Shipping apps (ShipStation), helpdesks (Gorgias) and email tools
+  (Klaviyo) already filter and trigger on Shopify tags, so the calls reach
+  them with no integration per tool. Needs the `write_orders` scope, so
+  connected stores reconnect once.
+- **Direct integrations, one at a time, when a seller uses the tool**: a
+  helpdesk ticket for a held order (Gorgias), the hold reflected in the
+  shipping queue (ShipStation). Built only for a tool a real seller runs.
+- Checked and left out: listing a store's other apps and what they cost
+  (Shopify doesn't show one app another app's charges), and accessibility
+  scanning (a different product).
+
 ## Smaller ideas
 
 - Real Slack interactivity, for one-click rating inside Slack.
