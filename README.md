@@ -10,7 +10,7 @@ and run everything from a web dashboard. The same tools are available in
 Claude Desktop through an MCP server.
 
 Tested end to end against a Shopify development store. Live at
-https://ai-ops-drew.duckdns.org: press **Try the demo** on the sign-in page
+https://aiops-cocenter.site: press **Try the demo** on the sign-in page
 for a sample store of your own (no account needed; sign-up is invite-only
 for now).
 

@@ -63,7 +63,7 @@ on the Shopify App Store.
   restock forecasts and a CSV reorder list), Decisions, Chat, Settings.
 - Evaluators use "Try the demo": a private sample store per visitor, no
   Shopify or model calls, deleted after 4 hours.
-- Live at https://ai-ops-drew.duckdns.org on a single VPS; alert email is sent
+- Live at https://aiops-cocenter.site on a single VPS; alert email is sent
   from alerts@aiops-cocenter.site.
 
 ## Capabilities and Constraints

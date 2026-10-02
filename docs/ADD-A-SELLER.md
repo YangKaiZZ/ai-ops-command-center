@@ -32,9 +32,9 @@ On its **Versions** page, the same settings as your first app (see
 
 | Setting | Value |
 |---|---|
-| App URL | `https://ai-ops-drew.duckdns.org/api/shopify/install` |
-| Allowed redirection URL | `https://ai-ops-drew.duckdns.org/api/shopify/callback` |
-| Compliance webhooks (all three) | `https://ai-ops-drew.duckdns.org/api/webhooks/compliance` |
+| App URL | `https://aiops-cocenter.site/api/shopify/install` |
+| Allowed redirection URL | `https://aiops-cocenter.site/api/shopify/callback` |
+| Compliance webhooks (all three) | `https://aiops-cocenter.site/api/webhooks/compliance` |
 | Scopes | `read_orders`, `read_products`, `read_inventory`, `write_merchant_managed_fulfillment_orders` |
 
 Then **Release**.
