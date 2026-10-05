@@ -1,0 +1,21 @@
+// Phosphor, as in the dashboard (the SSR builds need no context provider).
+export { ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+export { BellRingingIcon } from "@phosphor-icons/react/dist/ssr/BellRinging";
+export { ChatCircleDotsIcon } from "@phosphor-icons/react/dist/ssr/ChatCircleDots";
+export { CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
+export { CubeIcon } from "@phosphor-icons/react/dist/ssr/Cube";
+export { EnvelopeSimpleIcon } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
+export { HandPointingIcon } from "@phosphor-icons/react/dist/ssr/HandPointing";
+export { NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
+export { PackageIcon } from "@phosphor-icons/react/dist/ssr/Package";
+export { PaperPlaneTiltIcon } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
+export { PauseIcon } from "@phosphor-icons/react/dist/ssr/Pause";
+export { ShieldCheckIcon } from "@phosphor-icons/react/dist/ssr/ShieldCheck";
+export { ShieldWarningIcon } from "@phosphor-icons/react/dist/ssr/ShieldWarning";
+export { SlackLogoIcon } from "@phosphor-icons/react/dist/ssr/SlackLogo";
+export { ThumbsDownIcon } from "@phosphor-icons/react/dist/ssr/ThumbsDown";
+export { ThumbsUpIcon } from "@phosphor-icons/react/dist/ssr/ThumbsUp";
+export { TruckIcon } from "@phosphor-icons/react/dist/ssr/Truck";
+export { UserCircleCheckIcon } from "@phosphor-icons/react/dist/ssr/UserCircleCheck";
+export { WarningIcon } from "@phosphor-icons/react/dist/ssr/Warning";
+export { type Icon } from "@phosphor-icons/react";

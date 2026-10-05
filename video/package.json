@@ -1,0 +1,26 @@
+{
+  "name": "arbiter-ops-ad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Motion graphics ads for Arbiter Ops, built with Remotion",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render ArbiterAd out/arbiter-ops-ad.mp4",
+    "render:vertical": "remotion render ArbiterAdVertical out/arbiter-ops-ad-vertical.mp4",
+    "still": "remotion still ArbiterAd out/poster.png --frame=840",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "2.1.10",
+    "@remotion/cli": "4.0.533",
+    "@remotion/fonts": "4.0.533",
+    "@remotion/transitions": "4.0.533",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.533"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
