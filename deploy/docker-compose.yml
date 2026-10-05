@@ -109,6 +109,10 @@ services:
       - "${HTTPS_PORT:-443}:443/udp" # HTTP/3
     environment:
       DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      # Second tenant on this server (AI Hub). Unset is safe: the site binds to
+      # localhost rather than failing a public certificate request. Defaulted
+      # here too, because an empty value is not the same as an absent one.
+      AIHUB_DOMAIN: ${AIHUB_DOMAIN:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data # certificates: keep this volume, or Caddy asks for new ones
@@ -116,9 +120,18 @@ services:
     depends_on:
       - backend
       - dashboard
+    networks:
+      - default
+      - edge
     logging: *logging
 
 volumes:
   mysql-data:
   caddy-data:
   caddy-config:
+
+networks:
+  # Shared with other stacks on this host so Caddy can reach their containers.
+  # Create it once: docker network create edge
+  edge:
+    external: true

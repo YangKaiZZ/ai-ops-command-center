@@ -20,3 +20,27 @@
 		reverse_proxy dashboard:3000
 	}
 }
+
+# Second tenant on this server: AI Hub, a separate Compose stack reached over
+# the shared `edge` network. Caddy resolves the upstream per request, so this
+# site returning 502 while that stack is down does not affect the one above.
+#
+# The default is deliberately `localhost`: if AIHUB_DOMAIN is unset, this block
+# binds to a local name Caddy serves with its internal CA, instead of failing a
+# public certificate request and taking the whole config down with it.
+{$AIHUB_DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	# Uploaded coursework is capped at 25 MB by the app; leave Caddy room above it.
+	request_body {
+		max_size 32MB
+	}
+
+	reverse_proxy aihub-app:3000
+}
