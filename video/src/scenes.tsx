@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { Backdrop, Badge, Caption, cardStyle, clamp, FeatureLayout, hexA, Logo, Rise, SampleTag, StaggerText, Tap, useEnter, useIsVertical } from "./components";
+import { Backdrop, Badge, Caption, cardStyle, clamp, FeatureLayout, hexA, Logo, Rise, SampleTag, Sfx, StaggerText, Tap, useEnter, useIsVertical } from "./components";
 import {
   ArrowRightIcon,
   ChatCircleDotsIcon,
@@ -53,6 +53,12 @@ export function Hook() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.5} glowY={0.5} />
+      {PINGS.map((p) => (
+        <Sfx key={p.n} at={p.d} name="blip" volume={0.12} />
+      ))}
+      <Sfx at={40} name="pop1" volume={0.45} />
+      <Sfx at={47} name="pop2" volume={0.45} />
+      <Sfx at={54} name="pop3" volume={0.45} />
       {PINGS.map((p, i) => {
         const e = enterAt(frame, p.d, { damping: 14, stiffness: 160 });
         const float = Math.sin((frame + i * 20) / 22) * 8;
@@ -200,6 +206,14 @@ export function TheCall() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.72} glowY={0.45} />
+      {/* The card's rows appear, are checked, and get their result. */}
+      {[30, 50, 70].map((d) => (
+        <Sfx key={d} at={d} name="tick" volume={0.3} />
+      ))}
+      <Sfx at={44} name="good" volume={0.4} />
+      <Sfx at={64} name="bad" volume={0.45} />
+      <Sfx at={84} name="warn" volume={0.35} />
+      <Sfx at={92} name="stamp" volume={0.75} />
       <FeatureLayout
         caption={<Caption step="01 · The call" title="The agent decides. Code checks it." body="Stock comes live from Shopify. Fraud risk from Shopify's own analysis." />}
         visual={<OrderCallCard />}
@@ -378,6 +392,10 @@ export function TheAlert() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.7} glowY={0.5} />
+      <Sfx at={26} name="notify" volume={0.5} />
+      <Sfx at={84} name="click" volume={0.55} />
+      <Sfx at={87} name="success" volume={0.4} />
+      <Sfx at={104} name="notify" volume={0.25} />
       <FeatureLayout
         caption={
           <div style={{ display: "grid", gap: 34, justifyItems: vertical ? "center" : "start" }}>
@@ -457,6 +475,10 @@ export function TheStock() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.7} glowY={0.4} />
+      {[18, 30, 42].map((d) => (
+        <Sfx key={d} at={d} name="tick" volume={0.3} />
+      ))}
+      <Sfx at={24} name="bad" volume={0.25} />
       <FeatureLayout
         caption={<Caption step="03 · Stock" title="Knows what runs out before it does." body="Forecasts from your own orders, always with how much history they're based on." />}
         visual={<StockCard />}
@@ -564,6 +586,10 @@ export function TheLearning() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.68} glowY={0.55} />
+      <Sfx at={30} name="click" volume={0.55} />
+      <Sfx at={38} name="typing" volume={0.35} />
+      <Sfx at={92} name="swish" volume={0.35} />
+      <Sfx at={110} name="success" volume={0.45} />
       <FeatureLayout
         caption={<Caption step="04 · It learns" title="Rate a call. It learns your store." body="It reads your notes before similar calls, and says when one changed its mind." />}
         visual={<LearnCards />}
@@ -587,6 +613,10 @@ export function InCharge() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.5} glowY={0.45} />
+      <Sfx at={24} name="swish" volume={0.45} />
+      <Sfx at={46} name="pop1" volume={0.35} />
+      <Sfx at={53} name="pop2" volume={0.35} />
+      <Sfx at={60} name="pop3" volume={0.35} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 70, padding: 80 }}>
         <div style={{ ...displayStyle, fontSize: vertical ? 100 : 120, lineHeight: 1.08, textAlign: "center", color: color.ink }}>
           <StaggerText text="The agent recommends." delay={2} every={4} />
@@ -646,6 +676,9 @@ export function EndCard() {
   return (
     <AbsoluteFill>
       <Backdrop glowX={0.5} glowY={0.42} />
+      <Sfx at={4} name="shimmer" volume={0.4} />
+      <Sfx at={28} name="lock" volume={0.55} />
+      <Sfx at={72} name="pop2" volume={0.35} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 44, padding: 80 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 34, flexDirection: vertical ? "column" : "row" }}>
           <Logo size={vertical ? 190 : 170} draw={draw} bar={bar} />

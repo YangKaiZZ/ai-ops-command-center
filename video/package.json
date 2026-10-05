@@ -4,10 +4,16 @@
   "private": true,
   "description": "Motion graphics ads for Arbiter Ops, built with Remotion",
   "scripts": {
+    "sounds": "node scripts/make-sounds.mjs",
+    "prestudio": "npm run sounds",
     "studio": "remotion studio",
+    "prerender": "npm run sounds",
     "render": "remotion render ArbiterAd out/arbiter-ops-ad.mp4",
+    "postrender": "node scripts/master.mjs out/arbiter-ops-ad.mp4",
+    "prerender:vertical": "npm run sounds",
     "render:vertical": "remotion render ArbiterAdVertical out/arbiter-ops-ad-vertical.mp4",
-    "still": "remotion still ArbiterAd out/poster.png --frame=840",
+    "postrender:vertical": "node scripts/master.mjs out/arbiter-ops-ad-vertical.mp4",
+    "still": "remotion still ArbiterAd out/poster.png --frame=880",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

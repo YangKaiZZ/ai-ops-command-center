@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig, Easing } from "remotion";
+import { AbsoluteFill, Audio, Easing, interpolate, Sequence, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { color, displayStyle, font, type Tone } from "./theme";
 import type { Icon } from "./icons";
 
@@ -260,5 +260,21 @@ export function Tap({ at, x, y }: { at: number; x: number; y: number }) {
         }}
       />
     </div>
+  );
+}
+
+// The sound effects made by scripts/make-sounds.mjs.
+export type SfxName =
+  | "click" | "tick" | "typing" | "pop1" | "pop2" | "pop3" | "blip"
+  | "good" | "bad" | "warn" | "stamp" | "notify" | "success"
+  | "whoosh" | "swish" | "shimmer" | "lock";
+
+// A sound effect at `at` frames into the current scene, so it sits next to
+// the animation it belongs to and moves with it.
+export function Sfx({ at, name, volume = 0.5 }: { at: number; name: SfxName; volume?: number }) {
+  return (
+    <Sequence from={Math.round(at)} layout="none" name={`sfx: ${name}`}>
+      <Audio src={staticFile(`audio/${name}.wav`)} volume={volume} />
+    </Sequence>
   );
 }

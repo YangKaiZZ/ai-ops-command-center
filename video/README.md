@@ -21,14 +21,36 @@ rules in `PRODUCT.md`: no invented customers, numbers or claims.
 | 0:22 | In charge | "The agent recommends. You decide." |
 | 0:25 | End card | The Caret draws itself; Try the demo, aiops-cocenter.site |
 
-There's no soundtrack; add one in your editor or with `<Audio>` in `src/Ad.tsx`.
+## Sound
+
+Everything you hear is synthesized by `scripts/make-sounds.mjs` from
+oscillators and noise (no samples, so no licences to worry about):
+
+- **Music bed**, about 121 BPM in A minor (Am, F, C, G). Its beat grid is
+  anchored to the cut: the drums come in with scene 01 (frame 85) and the drop
+  lands on the end card (frame 740). The beat drops out for a breakdown and
+  riser under "You decide." If you change scene lengths in `src/Ad.tsx`,
+  update `CALL_START` and `END_START` in the script.
+- **Sound effects** for the on-screen moments: badge pops, row ticks, a chime
+  for "Every item can ship" and a low tone for "High risk", a stamp for the Hold,
+  a notification, the tap and its success sound, typing, a whoosh on each
+  transition, and a shimmer and lock for the logo. Each one is placed in the
+  scene next to the animation it belongs to (`<Sfx at={...} />`), so it
+  moves when the animation does.
+
+`npm run sounds` writes the WAVs to `public/audio` (not committed; the
+studio and render scripts make them first). After each render,
+`scripts/master.mjs` normalizes the audio to -14 LUFS with peaks under
+-1.5 dBTP (two-pass loudnorm, using the ffmpeg that ships with Remotion),
+which is the usual loudness for YouTube, Instagram and TikTok.
 
 ## Commands
 
 ```bash
 npm install
 npm run studio            # preview and scrub in the browser
-npm run render            # out/arbiter-ops-ad.mp4
+npm run sounds            # regenerate the music and effects
+npm run render            # out/arbiter-ops-ad.mp4 (makes sounds, renders, masters)
 npm run render:vertical   # out/arbiter-ops-ad-vertical.mp4
 npm run still             # out/poster.png, a frame from the end card
 npm run typecheck
@@ -44,3 +66,5 @@ Rendering needs Chrome; Remotion downloads its own headless shell, or pass
 - `src/scenes.tsx`: the seven scenes
 - `src/Ad.tsx`: scene lengths and transitions
 - `src/Root.tsx`: the two compositions
+- `scripts/make-sounds.mjs`: the music bed and sound effects
+- `scripts/master.mjs`: loudness mastering of a rendered MP4

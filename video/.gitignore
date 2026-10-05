@@ -1,2 +1,4 @@
 node_modules
 out
+# Made by `npm run sounds`
+public/audio

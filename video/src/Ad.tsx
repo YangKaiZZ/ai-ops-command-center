@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill } from "remotion";
+import { AbsoluteFill, Audio, Sequence, staticFile } from "remotion";
 import { linearTiming, springTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
@@ -15,9 +15,22 @@ export const AD_DURATION = Object.values(SCENES).reduce((a, b) => a + b, 0) - 6 
 
 const timing = springTiming({ config: { damping: 200 }, durationInFrames: T });
 
+// Where each transition begins: a scene starts T frames before the one
+// before it ends. A whoosh rides each one.
+const TRANSITIONS = Object.values(SCENES)
+  .slice(0, -1)
+  .reduce<number[]>((starts, length, i) => [...starts, (i ? starts[i - 1] : 0) + length - T], []);
+
 export function Ad() {
   return (
     <AbsoluteFill style={{ background: color.page }}>
+      {/* Made by scripts/make-sounds.mjs, its beat grid anchored to this cut. */}
+      <Audio src={staticFile("audio/music.wav")} volume={0.8} />
+      {TRANSITIONS.map((at) => (
+        <Sequence key={at} from={at - 4} layout="none" name="sfx: whoosh">
+          <Audio src={staticFile("audio/whoosh.wav")} volume={0.3} />
+        </Sequence>
+      ))}
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={SCENES.hook}>
           <Hook />
